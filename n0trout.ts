@@ -202,7 +202,7 @@ const debug$ = filteredMessage$('!f debug')
 
 const debugSub = debug$.subscribe((command: Command): void => {
     logger.info('Debug called')
-    logger.debug(JSON.stringify(command, null, 4))
+    logger.debug(JSON.stringify(command.serverJson, null, 4))
 })
 
 const addAdmin$ = filteredMessage$('!f add admin')
