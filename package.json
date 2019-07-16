@@ -1,0 +1,34 @@
+{
+  "name": "osrs-discord-competition-bot",
+  "version": "0.0.1",
+  "description": "Runs competitions for osrs on Discord.",
+  "main": "n0trout.js",
+  "scripts": {
+    "build": "tsc --project ./",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build_start": "tsc --project ./ && node ./out/n0trout.js",
+    "start": "node ./out/n0trout.js"
+  },
+  "author": "https://github.com/kylemiller3",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kylemiller3/osrs-competition-bot.git"
+  },
+  "dependencies": {
+    "@types/node": "^12.6.2",
+    "discord.js": "^11.5.1",
+    "esm": "^3.2.25",
+    "jsonfile": "^5.0.0",
+    "osrs-json-api": "^1.1.1",
+    "rxjs": "^6.5.2",
+    "typescript": "^3.5.3",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/jsonfile": "^5.0.0",
+    "eslint": "^5.3.0",
+    "eslint-config-airbnb-base": "^13.2.0",
+    "eslint-plugin-import": "^2.18.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+      "resolveJsonModule": true,
+      "moduleResolution": "node",
+      "esModuleInterop": true,
+      "sourceMap": true,
+      "outDir": "out",
+      "target": "es6"
+    }
+}
