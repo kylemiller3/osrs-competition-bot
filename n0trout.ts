@@ -128,7 +128,7 @@ const COMMANDS: Commands = {
         name: 'debug',
         description: 'logs debug info to console',
         accessControl: ONLY_ADMIN,
-        usage: '!f debug',
+        usage: 'requires:',
         command: '!f debug'
     },
 
@@ -136,7 +136,7 @@ const COMMANDS: Commands = {
         name: 'add admin',
         description: 'adds administratior for this guild',
         accessControl: ONLY_UNSET_ADMINS_OR_ADMIN,
-        usage: '!f add admin (user_mentions)',
+        usage: 'requires: (@mentions)',
         command: '!f add admin '
     },
 
@@ -144,7 +144,7 @@ const COMMANDS: Commands = {
         name: 'add upcoming event',
         description: 'schedules a new event',
         accessControl: ONLY_ADMIN,
-        usage: '!f add upcoming (name starting ending type (specific event info))',
+        usage: 'requires: name starting ending type [xp? skills]',
         command: '!f add upcoming '
     },
 
@@ -152,7 +152,7 @@ const COMMANDS: Commands = {
         name: 'list upcoming',
         description: 'lists scheduled events along with scheduled index',
         accessControl: ANY_USER,
-        usage: '!f list upcoming',
+        usage: 'requires:',
         command: '!f list upcoming'
     },
 
@@ -160,7 +160,7 @@ const COMMANDS: Commands = {
         name: 'delete upcoming',
         description: 'deletes an event by index (use with \'list upcoming\')',
         accessControl: ONLY_ADMIN,
-        usage: '!f delete upcoming (index)',
+        usage: 'requires: (index)',
         command: '!f delete upcoming '
     },
 
@@ -168,7 +168,7 @@ const COMMANDS: Commands = {
         name: 'signup',
         description: 'signs up for a scheduled event with runescape name (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: '!f signup (event rsn)',
+        usage: 'requires: rsn event',
         command: '!f signup '
     },
 
@@ -176,7 +176,7 @@ const COMMANDS: Commands = {
         name: 'unsignup',
         description: 'un-signs up for a scheduled event (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: '!f unsignup (index)',
+        usage: 'requires: (index)',
         command: '!f unsignup '
     },
 
@@ -184,7 +184,7 @@ const COMMANDS: Commands = {
         name: 'help',
         description: 'prints this info',
         accessControl: ANY_USER,
-        usage: '!f help',
+        usage: 'requires:',
         command: '!f help'
     }
 }
@@ -497,7 +497,7 @@ const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
             const parsedRegexes = findFirstRegexesMatch(regexes, command.input)
             if (parsedRegexes.length !== regexes.length) {
                 logger.debug(`Admin ${command.author.username} entered invalid parameters`)
-                command.message.reply('invalid input: requires [name, starting, ending, type] inputs')
+                command.message.reply(`blank parameters\n${COMMANDS.ADD_UPCOMING.usage}`)
                 return null
             }
             const dateA: Date = new Date(parsedRegexes[1])
@@ -510,6 +510,12 @@ const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
                 ? EVENT_TYPE.UNKNOWN
                 : EVENT_TYPE[inputType]
 
+            if (type === EVENT_TYPE.UNKNOWN) {
+                logger.debug(`Admin ${command.author.username} entered invalid event type`)
+                command.message.reply(`unknown event type specified\n${COMMANDS.ADD_UPCOMING.usage}`)
+                return null
+            }
+
             const clanEvent: ClanEvent = {
                 name: parsedRegexes[0],
                 startingDate,
@@ -517,14 +523,14 @@ const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
                 type,
                 participants: []
             }
-            if (!isValidDate(clanEvent.startingDate) || !isValidDate(clanEvent.endingDate)) {
+            if (!isValidDate(dateA) || !isValidDate(dateB)) {
                 logger.debug(`Admin ${command.author.username} entered invalid date`)
-                command.message.reply('invalid input: starting date or ending date is invalid')
+                command.message.reply('starting date or ending date is invalid use IS0 8601 standard')
                 return null
             }
             if (startingDate <= new Date()) {
                 logger.debug(`Admin ${command.author.username} entered a start date in the past`)
-                command.message.reply('invalid input: cannot start an event in the past')
+                command.message.reply('cannot start an event in the past')
                 return null
             }
             return [command, clanEvent]
@@ -553,7 +559,7 @@ const addUpcomingXpEvent$ = addGenericUpcomingEvent$
             const parsedRegex = findFirstRegexesMatch(skillsRegex, commandEventArr[0].input)
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`Admin ${commandEventArr[0].author.id} entered no skills`)
-                commandEventArr[0].message.reply('invalid input: starting date or ending date is invalid')
+                commandEventArr[0].message.reply(`no skills specified\n${COMMANDS.ADD_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const skills = parsedRegex[0]
@@ -568,7 +574,7 @@ const addUpcomingXpEvent$ = addGenericUpcomingEvent$
             )
             if (skillsArr.length !== filteredSkills.length) {
                 logger.debug(`Admin ${commandEventArr[0].author.id} entered some invalid skill names`)
-                commandEventArr[0].message.reply(`invalid input: some skill names entered are invalid\n choices are: [${OSRS_SKILLS.toString}]`)
+                commandEventArr[0].message.reply(`some skill names entered are invalid\nchoices are: [${OSRS_SKILLS.toString}]`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const xpClanEvent: XpClanEvent = update(commandEventArr[1], {
@@ -648,7 +654,7 @@ const deleteUpcomingEvent$ = filteredMessage$(COMMANDS.DELETE_UPCOMING.command)
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
-                command.message.reply(`invalid input: no index ${idxToRemove} found`)
+                command.message.reply(`invalid index ${idxToRemove}\n${COMMANDS.DELETE_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const newServerData: ServerData = update(command.serverJson, {
@@ -682,7 +688,7 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
             const parsedRegex = findFirstRegexesMatch(skillsRegex, command.input)
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`${command.author.id} entered invalid signup data`)
-                command.message.reply(`invalid input: ${COMMANDS.SIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid input\n${COMMANDS.SIGNUP_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
@@ -693,7 +699,7 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
             const rsnToAdd: string = parsedRegex[1]
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
-                command.message.reply(`no index ${idxToModify} found`)
+                command.message.reply(`invalid index ${idxToModify}\n${COMMANDS.SIGNUP_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
@@ -769,7 +775,7 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
         Observable<[ServerData, discord.Message]> => {
             if (dataMsgHiArr[2] === null) {
                 logger.debug('User entered invalid rsn')
-                dataMsgHiArr[1].reply('input error: cannot find rsn on hiscores')
+                dataMsgHiArr[1].reply('cannot find rsn on hiscores')
                 return of<[ServerData, discord.Message]>(null)
             }
             return forkJoin(
