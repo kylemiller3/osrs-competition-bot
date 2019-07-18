@@ -102,8 +102,7 @@ const ANY_USER: AccessControl = {
     description: 'any user can run this'
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface CommandInfo extends Record<string, any> {
+interface CommandInfo extends Record<string, unknown> {
     name: string
     description: string
     accessControl: AccessControl
@@ -111,8 +110,7 @@ interface CommandInfo extends Record<string, any> {
     command: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Commands extends Record<string, any> {
+interface Commands extends Record<string, unknown> {
     DEBUG: CommandInfo
     ADD_ADMIN: CommandInfo
     ADD_UPCOMING: CommandInfo
@@ -194,13 +192,12 @@ const EVENT_TYPE = {
     UNKNOWN: 'UNKNOWN'
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface EventParticipant extends Record<string, any> {
+interface EventParticipant extends Record<string, unknown> {
     rsn: string
     id: string
 }
 
-interface XpEventComponent extends Record<string, any> {
+interface XpEventComponent extends Record<string, unknown> {
     skill: string
     startingXp: number
     endingXp: number
@@ -210,8 +207,7 @@ interface XpEventParticipant extends EventParticipant {
     skills: XpEventComponent[]
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface ClanEvent extends Record<string, any> {
+interface ClanEvent extends Record<string, unknown> {
     name: string
     startingDate: Date
     endingDate: Date
@@ -224,8 +220,7 @@ interface XpClanEvent extends ClanEvent {
 }
 
 // top level data structure
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface ServerData extends Record<string, any> {
+interface ServerData extends Record<string, unknown> {
     settings: {
         admins: string[]
     }
@@ -241,8 +236,7 @@ const SERVER_DEFAULT_DATA: ServerData = {
 }
 
 // command interface
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Command extends Record<string, any> {
+interface Command extends Record<string, unknown> {
     message: discord.Message
     author: discord.User
     guild: discord.Guild
