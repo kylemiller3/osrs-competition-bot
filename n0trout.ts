@@ -166,15 +166,15 @@ const COMMANDS: Commands = {
 
     SIGNUP_UPCOMING: {
         name: 'signup',
-        description: 'signs-up for a scheduled event (use with \'list upcoming\')',
+        description: 'signs up for a scheduled event with runescape name (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: '!f signup (index in_game_name)',
+        usage: '!f signup (event rsn)',
         command: '!f signup '
     },
 
     UNSIGNUP_UPCOMING: {
         name: 'unsignup',
-        description: 'unsigns-up for a scheduled event (use with \'list upcoming\')',
+        description: 'un-signs up for a scheduled event (use with \'list upcoming\')',
         accessControl: ANY_USER,
         usage: '!f unsignup (index)',
         command: '!f unsignup '
@@ -196,15 +196,18 @@ const EVENT_TYPE = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface EventParticipant extends Record<string, any> {
-    ign: string
+    rsn: string
     id: string
 }
 
+interface XpEventComponent extends Record<string, any> {
+    skill: string
+    startingXp: number
+    endingXp: number
+}
+
 interface XpEventParticipant extends EventParticipant {
-    skills: [{
-        startingXp: number
-        endingXp: number
-    }]
+    skills: XpEventComponent[]
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -322,10 +325,14 @@ const gClient: discord.Client = new discord.Client()
 const ready$ = fromEvent(gClient as unknown as FromEventTarget<void>, 'ready')
 const error$ = fromEvent(gClient as unknown as FromEventTarget<Error>, 'error')
 const message$ = fromEvent(gClient as unknown as FromEventTarget<discord.Message>, 'message')
-const hiscore$ = (ign: string): Observable<JSON> => from(hiscores.getPlayer(ign))
+const hiscore$ = (rsn: string): Observable<JSON> => from(hiscores.getPlayer(rsn))
     .pipe(
         publishReplay(1, 10 * 60 * 1000),
-        refCount()
+        refCount(),
+        catchError((error: Error): Observable<JSON> => {
+            logError(error)
+            return of<JSON>(null)
+        })
     )
 
 
@@ -462,14 +469,17 @@ const findFirstRegexesMatch = (regexes: RegExp[], search: string): string[] => {
     const filteredRegexes: string[][] = foundRegexes.filter(
         (results: string[]): boolean => results !== null && results.length >= 2
     )
-    const parsedRegexes: string[] = filteredRegexes.map(
-        (results: string[]): string => results[1]
+    const parsedStrs: string[] = filteredRegexes.map(
+        (results: string[]): string => results[1].trim()
     )
-    return parsedRegexes
+    const nonEmptyStrs: string[] = parsedStrs.filter(
+        (str: string): boolean => str.length > 0
+    )
+    return nonEmptyStrs
 }
 
 const eventTermRegex = 'type|skills|starting|ending|name|$'
-const eventCommandRegex = `(?:\\s|)+(.*?)(?:\\s|)+(?:${eventTermRegex})`
+const commandRegex = (term: string): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term})`
 const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
     .pipe(
         filter((command: Command): boolean => COMMANDS.ADD_UPCOMING.accessControl.controlFunction(
@@ -477,11 +487,12 @@ const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
         )),
         // we need at least a name, starting date and end date
         map((command: Command): [Command, ClanEvent] => {
+            const compoundRegex: string = commandRegex(eventTermRegex)
             const regexes: RegExp[] = [
-                new RegExp(`name${eventCommandRegex}`, 'gim'),
-                new RegExp(`starting${eventCommandRegex}`, 'gim'),
-                new RegExp(`ending${eventCommandRegex}`, 'gim'),
-                new RegExp(`type${eventCommandRegex}`, 'gim')
+                new RegExp(`name${compoundRegex}`, 'gim'),
+                new RegExp(`starting${compoundRegex}`, 'gim'),
+                new RegExp(`ending${compoundRegex}`, 'gim'),
+                new RegExp(`type${compoundRegex}`, 'gim')
             ]
             const parsedRegexes = findFirstRegexesMatch(regexes, command.input)
             if (parsedRegexes.length !== regexes.length) {
@@ -535,8 +546,9 @@ const addUpcomingXpEvent$ = addGenericUpcomingEvent$
             === EVENT_TYPE.XP),
         switchMap((commandEventArr: [Command, ClanEvent]):
         Observable<[ServerData, discord.Message]> => {
+            const compoundRegex: string = commandRegex(eventTermRegex)
             const skillsRegex = [
-                new RegExp(`skills${eventCommandRegex}`, 'gim')
+                new RegExp(`skills${compoundRegex}`, 'gim')
             ]
             const parsedRegex = findFirstRegexesMatch(skillsRegex, commandEventArr[0].input)
             if (parsedRegex.length !== skillsRegex.length) {
@@ -560,7 +572,7 @@ const addUpcomingXpEvent$ = addGenericUpcomingEvent$
                 return of<[ServerData, discord.Message]>(null)
             }
             const xpClanEvent: XpClanEvent = update(commandEventArr[1], {
-                skill: skillsArr
+                skills: skillsArr
             }) as XpClanEvent
             const events: ClanEvent[] = commandEventArr[0].serverJson.events.concat(xpClanEvent)
             const sortedEvents: ClanEvent[] = stableSort(
@@ -618,7 +630,7 @@ listUpcomingEvent$.subscribe((saveMsgArr: [string, discord.Message]): void => {
     saveMsgArr[1].reply(saveMsgArr[0])
 })
 
-const deleteUpcomingEvent$ = filteredMessage$('!f delete upcoming ')
+const deleteUpcomingEvent$ = filteredMessage$(COMMANDS.DELETE_UPCOMING.command)
     .pipe(
         filter((command: Command):
         boolean => COMMANDS.DELETE_UPCOMING.accessControl.controlFunction(
@@ -636,7 +648,7 @@ const deleteUpcomingEvent$ = filteredMessage$('!f delete upcoming ')
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
-                command.message.reply(`no index ${idxToRemove} found`)
+                command.message.reply(`invalid input: no index ${idxToRemove} found`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const newServerData: ServerData = update(command.serverJson, {
@@ -654,15 +666,122 @@ deleteUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void
     saveMsgArr[1].reply('event deleted')
 })
 
+const signupTermRegex = 'event|rsn|$'
 const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
     .pipe(
         filter((command: Command):
         boolean => COMMANDS.SIGNUP_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
+        switchMap((command: Command): Observable<[ServerData, discord.Message, JSON]> => {
+            const compoundRegex: string = commandRegex(signupTermRegex)
+            const skillsRegex = [
+                new RegExp(`event${compoundRegex}`, 'gim'),
+                new RegExp(`rsn${compoundRegex}`, 'gim')
+            ]
+            const parsedRegex = findFirstRegexesMatch(skillsRegex, command.input)
+            if (parsedRegex.length !== skillsRegex.length) {
+                logger.debug(`${command.author.id} entered invalid signup data`)
+                command.message.reply(`invalid input: ${COMMANDS.SIGNUP_UPCOMING.usage}`)
+                return of<[ServerData, discord.Message, JSON]>(null)
+            }
+
+            // get upcoming events
+            // if index is out of range return
+            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
+            const idxToModify: number = Number.parseInt(parsedRegex[0], 10)
+            const rsnToAdd: string = parsedRegex[1]
+            if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
+                logger.debug(`User did not specify index (${idxToModify})`)
+                command.message.reply(`no index ${idxToModify} found`)
+                return of<[ServerData, discord.Message, JSON]>(null)
+            }
+
+            // get event to modify and its type
+            const eventToModify: ClanEvent = upcomingEvents[idxToModify]
+            const eventToModifyType: string = eventToModify.type
+
+            // get the participant to modify and return
+            // or create a new one and continue
+            const filteredParticipants: EventParticipant[] = eventToModify.participants.filter(
+                (participant: EventParticipant): boolean => participant.rsn === rsnToAdd
+            )
+            if (filteredParticipants.length > 0) {
+                logger.debug('User already exists')
+                command.message.reply(`player ${rsnToAdd} already signed up`)
+                return of<[ServerData, discord.Message, JSON]>(null)
+            }
+
+            const participantToAdd: EventParticipant = {
+                rsn: rsnToAdd,
+                id: command.author.id
+            }
+
+            if (eventToModifyType === EVENT_TYPE.XP) {
+                // TODO: refactor this to a function
+                // add skills to user
+                const skills: XpEventComponent[] = (eventToModify as XpClanEvent).skills.map(
+                    (skillName: string): XpEventComponent => ({
+                        skill: skillName,
+                        startingXp: -1,
+                        endingXp: -1
+                    })
+                )
+                const xpParticipant: XpEventParticipant = update(participantToAdd, {
+                    skills
+                }) as XpEventParticipant
+
+                // add participant to event array
+                const newEventParticipants: EventParticipant[] = eventToModify.participants.concat(
+                    [xpParticipant]
+                )
+
+                // create a new event
+                // create new event list
+                // create new server data
+                const newEvent: ClanEvent = update(eventToModify, {
+                    participants: newEventParticipants
+                }) as ClanEvent
+                const newEvents: ClanEvent[] = command.serverJson.events.map(
+                    (event: ClanEvent, idx: number): ClanEvent => {
+                        if (idx === idxToModify) {
+                            return newEvent
+                        }
+                        return event
+                    }
+                )
+                const newData: ServerData = update(command.serverJson, {
+                    events: newEvents
+                }) as ServerData
+
+                return forkJoin(
+                    of<ServerData>(newData),
+                    of<discord.Message>(command.message),
+                    hiscore$(rsnToAdd)
+                )
+            }
+            return of<[ServerData, discord.Message, JSON]>(null)
+        }),
+        filter((dataMsgHiArr: [ServerData, discord.Message, JSON]):
+        boolean => dataMsgHiArr !== null),
+
+        switchMap((dataMsgHiArr: [ServerData, discord.Message, JSON]):
+        Observable<[ServerData, discord.Message]> => {
+            if (dataMsgHiArr[2] === null) {
+                logger.debug('User entered invalid rsn')
+                dataMsgHiArr[1].reply('input error: cannot find rsn on hiscores')
+                return of<[ServerData, discord.Message]>(null)
+            }
+            return forkJoin(
+                save$(dataMsgHiArr[1].guild.id, dataMsgHiArr[0]),
+                of<discord.Message>(dataMsgHiArr[1])
+            )
+        }),
+        filter((saveMsgArr: [ServerData, discord.Message]): boolean => saveMsgArr !== null)
     )
-signupUpcomingEvent$.subscribe((): void => {
+signupUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
     logger.debug('Signup called')
+    saveMsgArr[1].reply('signed up for event')
 })
 
 const unsignupUpcomingEvent$ = filteredMessage$(COMMANDS.UNSIGNUP_UPCOMING.command)
