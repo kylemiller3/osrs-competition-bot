@@ -69,33 +69,126 @@ const OSRS_SKILLS = {
     FARM: 'farming'
 }
 
-/* const OSRS_SKILLS = [
-    'attack',
-    'strength',
-    'defense',
-    'ranged',
-    'prayer',
-    'magic',
-    'runecrafting',
-    'construction',
-    'hitpoints',
-    'agility',
-    'herblore',
-    'thieving',
-    'crafting',
-    'fletching',
-    'slayer',
-    'hunter',
-    'mining',
-    'smithing',
-    'fishing',
-    'cooking',
-    'firemaking',
-    'woodcutting',
-    'farming'
-] */
-
 // interface contracts data structures
+// access controls
+interface AccessControl {
+    controlFunction: (author: discord.User, serverJson: ServerData) => boolean
+    description: string
+}
+
+// control filter helpers
+const hasAdmin = (serverJson: ServerData): boolean => serverJson.settings.admins.length > 0
+// eslint-disable-next-line max-len
+const isAdmin = (author: discord.User, serverJson: ServerData): boolean => serverJson.settings.admins.includes(author.id)
+
+// no admins or is admin
+const ONLY_UNSET_ADMINS_OR_ADMIN: AccessControl = {
+    controlFunction: (
+        author: discord.User, serverJson: ServerData
+    ): boolean => !hasAdmin(serverJson) || isAdmin(author, serverJson),
+    description: 'requires unconfigured admins or admin privileges'
+}
+
+// only admins
+const ONLY_ADMIN: AccessControl = {
+    controlFunction: (
+        author: discord.User, serverJson: ServerData
+    ): boolean => isAdmin(author, serverJson),
+    description: 'requires admin privleges'
+}
+
+const ANY_USER: AccessControl = {
+    controlFunction: (): boolean => true,
+    description: 'any user can run this'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface CommandInfo extends Record<string, any> {
+    name: string
+    description: string
+    accessControl: AccessControl
+    usage: string
+    command: string
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface Commands extends Record<string, any> {
+    DEBUG: CommandInfo
+    ADD_ADMIN: CommandInfo
+    ADD_UPCOMING: CommandInfo
+    LIST_UPCOMING: CommandInfo
+    DELETE_UPCOMING: CommandInfo
+    SIGNUP_UPCOMING: CommandInfo
+    UNSIGNUP_UPCOMING: CommandInfo
+    HELP: CommandInfo
+}
+
+const COMMANDS: Commands = {
+    DEBUG: {
+        name: 'debug',
+        description: 'logs debug info to console',
+        accessControl: ONLY_ADMIN,
+        usage: '!f debug',
+        command: '!f debug'
+    },
+
+    ADD_ADMIN: {
+        name: 'add admin',
+        description: 'adds administratior for this guild',
+        accessControl: ONLY_UNSET_ADMINS_OR_ADMIN,
+        usage: '!f add admin (user_mentions)',
+        command: '!f add admin '
+    },
+
+    ADD_UPCOMING: {
+        name: 'add upcoming event',
+        description: 'schedules a new event',
+        accessControl: ONLY_ADMIN,
+        usage: '!f add upcoming (name starting ending type (specific event info))',
+        command: '!f add upcoming '
+    },
+
+    LIST_UPCOMING: {
+        name: 'list upcoming',
+        description: 'lists scheduled events along with scheduled index',
+        accessControl: ANY_USER,
+        usage: '!f list upcoming',
+        command: '!f list upcoming'
+    },
+
+    DELETE_UPCOMING: {
+        name: 'delete upcoming',
+        description: 'deletes an event by index (use with \'list upcoming\')',
+        accessControl: ONLY_ADMIN,
+        usage: '!f delete upcoming (index)',
+        command: '!f delete upcoming '
+    },
+
+    SIGNUP_UPCOMING: {
+        name: 'signup',
+        description: 'signs-up for a scheduled event (use with \'list upcoming\')',
+        accessControl: ANY_USER,
+        usage: '!f signup (index in_game_name)',
+        command: '!f signup '
+    },
+
+    UNSIGNUP_UPCOMING: {
+        name: 'unsignup',
+        description: 'unsigns-up for a scheduled event (use with \'list upcoming\')',
+        accessControl: ANY_USER,
+        usage: '!f unsignup (index)',
+        command: '!f unsignup '
+    },
+
+    HELP: {
+        name: 'help',
+        description: 'prints this info',
+        accessControl: ANY_USER,
+        usage: '!f help',
+        command: '!f help'
+    }
+}
+
 const EVENT_TYPE = {
     XP: 'XP',
     UNKNOWN: 'UNKNOWN'
@@ -239,10 +332,6 @@ const hiscore$ = (ign: string): Observable<JSON> => from(hiscores.getPlayer(ign)
 // updates a dictionary entry functionally
 // eslint-disable-next-line max-len
 const update = (dict: Record<string, unknown>, entry: unknown): Record<string, unknown> => Object.assign({}, dict, entry)
-// control filters
-const hasAdmin = (serverJson: ServerData): boolean => serverJson.settings.admins.length > 0
-// eslint-disable-next-line max-len
-const isAdmin = (author: discord.User, serverJson: ServerData): boolean => serverJson.settings.admins.includes(author.id)
 const isValidDate = (date: Date): boolean => date instanceof Date && !Number.isNaN(date.getTime())
 
 
@@ -329,19 +418,22 @@ const filteredMessage$ = (find: string): Observable<Command> => message$
         })
     )
 
-const debug$ = filteredMessage$('!f debug')
+const debug$ = filteredMessage$(COMMANDS.DEBUG.command)
     .pipe(
-        filter((command: Command): boolean => isAdmin(command.author, command.serverJson))
+        filter((command: Command): boolean => COMMANDS.DEBUG.accessControl.controlFunction(
+            command.author, command.serverJson
+        ))
     )
 debug$.subscribe((command: Command): void => {
     logger.info('Debug called')
     logger.debug(JSON.stringify(command.serverJson, null, 4))
 })
 
-const addAdmin$ = filteredMessage$('!f add admin')
+const addAdmin$ = filteredMessage$(COMMANDS.ADD_ADMIN.command)
     .pipe(
-        filter((command: Command): boolean => isAdmin(command.author, command.serverJson)
-            || !hasAdmin(command.serverJson)),
+        filter((command: Command): boolean => COMMANDS.ADD_ADMIN.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
         filter((command: Command): boolean => command.message.mentions.members.array().length > 0),
         switchMap((command: Command): Observable<[ServerData, discord.Message]> => {
             const mentions: string[] = command.message.mentions.members.array()
@@ -375,20 +467,21 @@ const findFirstRegexesMatch = (regexes: RegExp[], search: string): string[] => {
     )
     return parsedRegexes
 }
-const regexTermStr = 'type|skills|starting|ending|name|$'
-const regexCommandStr = `(?:\\s|)+(.*?)(?:\\s|)+(?:${regexTermStr})`
-const addGenericEvent$ = filteredMessage$('!f add event ')
-    .pipe(
-        // admins only
-        filter((command: Command): boolean => isAdmin(command.author, command.serverJson)),
 
+const eventTermRegex = 'type|skills|starting|ending|name|$'
+const eventCommandRegex = `(?:\\s|)+(.*?)(?:\\s|)+(?:${eventTermRegex})`
+const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
+    .pipe(
+        filter((command: Command): boolean => COMMANDS.ADD_UPCOMING.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
         // we need at least a name, starting date and end date
         map((command: Command): [Command, ClanEvent] => {
             const regexes: RegExp[] = [
-                new RegExp(`name${regexCommandStr}`, 'gim'),
-                new RegExp(`starting${regexCommandStr}`, 'gim'),
-                new RegExp(`ending${regexCommandStr}`, 'gim'),
-                new RegExp(`type${regexCommandStr}`, 'gim')
+                new RegExp(`name${eventCommandRegex}`, 'gim'),
+                new RegExp(`starting${eventCommandRegex}`, 'gim'),
+                new RegExp(`ending${eventCommandRegex}`, 'gim'),
+                new RegExp(`type${eventCommandRegex}`, 'gim')
             ]
             const parsedRegexes = findFirstRegexesMatch(regexes, command.input)
             if (parsedRegexes.length !== regexes.length) {
@@ -418,6 +511,11 @@ const addGenericEvent$ = filteredMessage$('!f add event ')
                 command.message.reply('invalid input: starting date or ending date is invalid')
                 return null
             }
+            if (startingDate <= new Date()) {
+                logger.debug(`Admin ${command.author.username} entered a start date in the past`)
+                command.message.reply('invalid input: cannot start an event in the past')
+                return null
+            }
             return [command, clanEvent]
         }),
         filter((commandEventArr: [Command, ClanEvent]): boolean => commandEventArr !== null),
@@ -431,14 +529,14 @@ const addGenericEvent$ = filteredMessage$('!f add event ')
         })
     )
 
-const addXpEvent$ = addGenericEvent$
+const addUpcomingXpEvent$ = addGenericUpcomingEvent$
     .pipe(
-        // eslint-disable-next-line max-len
-        filter((commandEventArr: [Command, ClanEvent]): boolean => commandEventArr[1].type === EVENT_TYPE.XP),
-        // eslint-disable-next-line max-len
-        switchMap((commandEventArr: [Command, ClanEvent]): Observable<[ServerData, discord.Message]> => {
+        filter((commandEventArr: [Command, ClanEvent]): boolean => commandEventArr[1].type
+            === EVENT_TYPE.XP),
+        switchMap((commandEventArr: [Command, ClanEvent]):
+        Observable<[ServerData, discord.Message]> => {
             const skillsRegex = [
-                new RegExp(`skills${regexCommandStr}`, 'gim')
+                new RegExp(`skills${eventCommandRegex}`, 'gim')
             ]
             const parsedRegex = findFirstRegexesMatch(skillsRegex, commandEventArr[0].input)
             if (parsedRegex.length !== skillsRegex.length) {
@@ -479,7 +577,7 @@ const addXpEvent$ = addGenericEvent$
         }),
         filter((saveMsgArr: [ServerData, discord.Message]): boolean => saveMsgArr !== null)
     )
-addXpEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
+addUpcomingXpEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
     logger.debug('Event added')
     saveMsgArr[1].reply('event added')
 })
@@ -487,8 +585,11 @@ addXpEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
 const getUpcomingEvents = (events: ClanEvent[]): ClanEvent[] => events.filter(
     (event: ClanEvent): boolean => event.startingDate > new Date()
 )
-const listUpcomingEvent$ = filteredMessage$('!f list upcoming')
+const listUpcomingEvent$ = filteredMessage$(COMMANDS.LIST_UPCOMING.command)
     .pipe(
+        filter((command: Command): boolean => COMMANDS.LIST_UPCOMING.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
         map((command: Command): [string, discord.Message] => {
             const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
             const eventsStr = upcomingEvents.map(
@@ -517,8 +618,12 @@ listUpcomingEvent$.subscribe((saveMsgArr: [string, discord.Message]): void => {
     saveMsgArr[1].reply(saveMsgArr[0])
 })
 
-const deleteUpcomingEvent$ = filteredMessage$('!f delete upcoming event ')
+const deleteUpcomingEvent$ = filteredMessage$('!f delete upcoming ')
     .pipe(
+        filter((command: Command):
+        boolean => COMMANDS.DELETE_UPCOMING.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
         filter((command: Command): boolean => isAdmin(command.author, command.serverJson)),
         tap((): void => {
             logger.debug('Admin called delete upcoming event')
@@ -547,6 +652,38 @@ const deleteUpcomingEvent$ = filteredMessage$('!f delete upcoming event ')
 deleteUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
     logger.debug('Event deleted')
     saveMsgArr[1].reply('event deleted')
+})
+
+const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
+    .pipe(
+        filter((command: Command):
+        boolean => COMMANDS.SIGNUP_UPCOMING.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
+    )
+signupUpcomingEvent$.subscribe((): void => {
+    logger.debug('Signup called')
+})
+
+const unsignupUpcomingEvent$ = filteredMessage$(COMMANDS.UNSIGNUP_UPCOMING.command)
+    .pipe(
+        filter((command: Command):
+        boolean => COMMANDS.UNSIGNUP_UPCOMING.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
+    )
+unsignupUpcomingEvent$.subscribe((): void => {
+    logger.debug('Unsignup called')
+})
+
+const help$ = filteredMessage$(COMMANDS.HELP.command)
+    .pipe(
+        filter((command: Command): boolean => COMMANDS.HELP.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
+    )
+help$.subscribe((): void => {
+    logger.debug('Help called')
 })
 
 // log in
