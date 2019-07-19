@@ -781,9 +781,59 @@ const unsignupUpcomingEvent$ = filteredMessage$(COMMANDS.UNSIGNUP_UPCOMING.comma
         boolean => COMMANDS.UNSIGNUP_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
+        switchMap((command: Command): Observable<[ServerData, discord.Message]> => {
+            // get upcoming events
+            // if index is out of range return
+            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
+            const idxToModify: number = Number.parseInt(command.input, 10)
+            if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
+                logger.debug(`User did not specify index (${idxToModify})`)
+                command.message.reply(`invalid index ${idxToModify}\n${COMMANDS.UNSIGNUP_UPCOMING.usage}`)
+                return of<[ServerData, discord.Message]>(null)
+            }
+
+            // does the event to modify contain our user?
+            const eventToModify: ClanEvent = upcomingEvents[idxToModify]
+            const participantCount: number = eventToModify.participants.length
+            const newEventParticipants: EventParticipant[] = eventToModify.participants.filter(
+                (participant: EventParticipant): boolean => participant.id !== command.author.id
+            )
+
+            // user was not signed up
+            if (participantCount === newEventParticipants.length) {
+                logger.debug('User was not signed up')
+                command.message.reply('you were not signed up for this event')
+                return of<[ServerData, discord.Message]>(null)
+            }
+
+            // create a new event
+            // create new event list
+            // create new server data
+            const newEvent: ClanEvent = update(eventToModify, {
+                participants: newEventParticipants
+            }) as ClanEvent
+            const newEvents: ClanEvent[] = command.serverJson.events.map(
+                (event: ClanEvent, idx: number): ClanEvent => {
+                    if (idx === idxToModify) {
+                        return newEvent
+                    }
+                    return event
+                }
+            )
+            const newData: ServerData = update(command.serverJson, {
+                events: newEvents
+            }) as ServerData
+
+            return forkJoin(
+                save$(command.guild.id, newData),
+                of<discord.Message>(command.message)
+            )
+        }),
+        filter((saveMsgArr: [ServerData, discord.Message]): boolean => saveMsgArr !== null)
     )
-unsignupUpcomingEvent$.subscribe((): void => {
+unsignupUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
     logger.debug('Unsignup called')
+    saveMsgArr[1].reply('removed from event')
 })
 
 const help$ = filteredMessage$(COMMANDS.HELP.command)
