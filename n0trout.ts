@@ -499,7 +499,7 @@ const addGenericUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.ADD_UPCOMING.comm
             const parsedRegexes = findFirstRegexesMatch(regexes, command.input)
             if (parsedRegexes.length !== regexes.length) {
                 logger.debug(`Admin ${command.author.username} entered invalid parameters`)
-                command.message.reply(`blank parameters\n${BOT_COMMANDS.ADD_UPCOMING.usage}`)
+                command.message.reply(`blank parameters\n${BOT_COMMANDS.ADD_UPCOMING.parameters}`)
                 return null
             }
             const dateA: Date = new Date(parsedRegexes[1])
@@ -514,7 +514,7 @@ const addGenericUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.ADD_UPCOMING.comm
 
             if (type === EVENT_TYPE.UNKNOWN) {
                 logger.debug(`Admin ${command.author.username} entered invalid event type`)
-                command.message.reply(`unknown event type specified\n${BOT_COMMANDS.ADD_UPCOMING.usage}`)
+                command.message.reply(`unknown event type specified\n${BOT_COMMANDS.ADD_UPCOMING.parameters}`)
                 return null
             }
 
@@ -561,7 +561,7 @@ const addUpcomingXpEvent$ = addGenericUpcomingEvent$
             const parsedRegex = findFirstRegexesMatch(skillsRegex, commandEventArr[0].input)
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`Admin ${commandEventArr[0].author.id} entered no skills`)
-                commandEventArr[0].message.reply(`no skills specified\n${BOT_COMMANDS.ADD_UPCOMING.usage}`)
+                commandEventArr[0].message.reply(`no skills specified\n${BOT_COMMANDS.ADD_UPCOMING.parameters}`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const skills = parsedRegex[0]
@@ -656,7 +656,7 @@ const deleteUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.DELETE_UPCOMING.comma
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
-                command.message.reply(`invalid index ${idxToRemove}\n${BOT_COMMANDS.DELETE_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToRemove}\n${BOT_COMMANDS.DELETE_UPCOMING.parameters}`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const newServerData: ServerData = update(command.serverJson, {
@@ -697,7 +697,7 @@ const signupUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.SIGNUP_UPCOMING.comma
             const parsedRegex = findFirstRegexesMatch(skillsRegex, command.input)
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`${command.author.id} entered invalid signup data`)
-                command.message.reply(`invalid input\n${BOT_COMMANDS.SIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid input\n${BOT_COMMANDS.SIGNUP_UPCOMING.parameters}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
@@ -709,7 +709,7 @@ const signupUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.SIGNUP_UPCOMING.comma
             const rsnToAdd: string = parsedRegex[1]
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
-                command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.SIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.SIGNUP_UPCOMING.parameters}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
@@ -817,7 +817,7 @@ const unsignupUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.UNSIGNUP_UPCOMING.c
             const idxToModify: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
-                command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.UNSIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.UNSIGNUP_UPCOMING.parameters}`)
                 return of<[ServerData, discord.Message]>(null)
             }
 
@@ -876,7 +876,7 @@ const amISignedUp$ = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP_UPCOMING.command)
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
-                command.message.reply(`invalid index ${idxToCheck}\n${BOT_COMMANDS.AMISIGNEDUP_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToCheck}\n${BOT_COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`)
                 return
             }
 
@@ -909,7 +909,7 @@ const listParticipant$ = filteredMessage$(BOT_COMMANDS.LISTPARTICIPANTS_UPCOMING
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
-                command.message.reply(`invalid index ${idxToCheck}\n${BOT_COMMANDS.AMISIGNEDUP_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToCheck}\n${BOT_COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`)
                 return
             }
 
