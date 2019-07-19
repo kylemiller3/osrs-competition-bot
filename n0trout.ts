@@ -102,26 +102,27 @@ const ANY_USER: AccessControl = {
     description: 'all users'
 }
 
-interface CommandInfo extends Record<string, unknown> {
+interface BotCommand extends Record<string, unknown> {
     description: string
     accessControl: AccessControl
     usage: string
     command: string
 }
 
-interface Commands extends Record<string, unknown> {
-    DEBUG: CommandInfo
-    ADD_ADMIN: CommandInfo
-    ADD_UPCOMING: CommandInfo
-    LIST_UPCOMING: CommandInfo
-    DELETE_UPCOMING: CommandInfo
-    SIGNUP_UPCOMING: CommandInfo
-    UNSIGNUP_UPCOMING: CommandInfo
-    AMISIGNEDUP_UPCOMING: CommandInfo
-    HELP: CommandInfo
+interface BotCommands extends Record<string, unknown> {
+    DEBUG: BotCommand
+    ADD_ADMIN: BotCommand
+    ADD_UPCOMING: BotCommand
+    LIST_UPCOMING: BotCommand
+    DELETE_UPCOMING: BotCommand
+    SIGNUP_UPCOMING: BotCommand
+    UNSIGNUP_UPCOMING: BotCommand
+    AMISIGNEDUP_UPCOMING: BotCommand
+    LISTPARTICIPANTS_UPCOMING: BotCommand
+    HELP: BotCommand
 }
 
-const COMMANDS: Commands = {
+const BOT_COMMANDS: BotCommands = {
     DEBUG: {
         command: '!f debug',
         description: 'logs debug info to console',
@@ -178,6 +179,13 @@ const COMMANDS: Commands = {
         usage: 'parameters (index)'
     },
 
+    LISTPARTICIPANTS_UPCOMING: {
+        command: '!f list participants ',
+        description: 'lists all participants in an event',
+        accessControl: ANY_USER,
+        usage: 'parameters (index)'
+    },
+
     HELP: {
         command: '!f help',
         description: 'prints this help',
@@ -197,7 +205,7 @@ interface EventParticipant extends Record<string, unknown> {
 }
 
 interface XpEventComponent extends Record<string, unknown> {
-    skill: string
+    name: string
     startingXp: number
     endingXp: number
 }
@@ -418,9 +426,9 @@ const filteredMessage$ = (find: string): Observable<Command> => message$
         })
     )
 
-const debug$ = filteredMessage$(COMMANDS.DEBUG.command)
+const debug$ = filteredMessage$(BOT_COMMANDS.DEBUG.command)
     .pipe(
-        filter((command: Command): boolean => COMMANDS.DEBUG.accessControl.controlFunction(
+        filter((command: Command): boolean => BOT_COMMANDS.DEBUG.accessControl.controlFunction(
             command.author, command.serverJson
         ))
     )
@@ -429,9 +437,9 @@ debug$.subscribe((command: Command): void => {
     logger.debug(JSON.stringify(command.serverJson, null, 4))
 })
 
-const addAdmin$ = filteredMessage$(COMMANDS.ADD_ADMIN.command)
+const addAdmin$ = filteredMessage$(BOT_COMMANDS.ADD_ADMIN.command)
     .pipe(
-        filter((command: Command): boolean => COMMANDS.ADD_ADMIN.accessControl.controlFunction(
+        filter((command: Command): boolean => BOT_COMMANDS.ADD_ADMIN.accessControl.controlFunction(
             command.author, command.serverJson
         )),
         filter((command: Command): boolean => command.message.mentions.members.array().length > 0),
@@ -473,9 +481,10 @@ const findFirstRegexesMatch = (regexes: RegExp[], search: string): string[] => {
 
 const eventTermRegex = 'type|skills|starting|ending|name|$'
 const commandRegex = (term: string): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term})`
-const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
+const addGenericUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.ADD_UPCOMING.command)
     .pipe(
-        filter((command: Command): boolean => COMMANDS.ADD_UPCOMING.accessControl.controlFunction(
+        filter((command: Command):
+        boolean => BOT_COMMANDS.ADD_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
         // we need at least a name, starting date and end date
@@ -490,7 +499,7 @@ const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
             const parsedRegexes = findFirstRegexesMatch(regexes, command.input)
             if (parsedRegexes.length !== regexes.length) {
                 logger.debug(`Admin ${command.author.username} entered invalid parameters`)
-                command.message.reply(`blank parameters\n${COMMANDS.ADD_UPCOMING.usage}`)
+                command.message.reply(`blank parameters\n${BOT_COMMANDS.ADD_UPCOMING.usage}`)
                 return null
             }
             const dateA: Date = new Date(parsedRegexes[1])
@@ -505,7 +514,7 @@ const addGenericUpcomingEvent$ = filteredMessage$(COMMANDS.ADD_UPCOMING.command)
 
             if (type === EVENT_TYPE.UNKNOWN) {
                 logger.debug(`Admin ${command.author.username} entered invalid event type`)
-                command.message.reply(`unknown event type specified\n${COMMANDS.ADD_UPCOMING.usage}`)
+                command.message.reply(`unknown event type specified\n${BOT_COMMANDS.ADD_UPCOMING.usage}`)
                 return null
             }
 
@@ -552,7 +561,7 @@ const addUpcomingXpEvent$ = addGenericUpcomingEvent$
             const parsedRegex = findFirstRegexesMatch(skillsRegex, commandEventArr[0].input)
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`Admin ${commandEventArr[0].author.id} entered no skills`)
-                commandEventArr[0].message.reply(`no skills specified\n${COMMANDS.ADD_UPCOMING.usage}`)
+                commandEventArr[0].message.reply(`no skills specified\n${BOT_COMMANDS.ADD_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const skills = parsedRegex[0]
@@ -596,12 +605,13 @@ addUpcomingXpEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void 
 const getUpcomingEvents = (events: ClanEvent[]): ClanEvent[] => events.filter(
     (event: ClanEvent): boolean => event.startingDate > new Date()
 )
-const listUpcomingEvent$ = filteredMessage$(COMMANDS.LIST_UPCOMING.command)
+const listUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.LIST_UPCOMING.command)
     .pipe(
-        filter((command: Command): boolean => COMMANDS.LIST_UPCOMING.accessControl.controlFunction(
+        filter((command: Command):
+        boolean => BOT_COMMANDS.LIST_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
-        map((command: Command): [string, discord.Message] => {
+        map((command: Command): void => {
             const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
             const eventsStr = upcomingEvents.map(
                 (event: ClanEvent, idx: number): string => {
@@ -621,18 +631,17 @@ const listUpcomingEvent$ = filteredMessage$(COMMANDS.LIST_UPCOMING.command)
             const reply: string = upcomingEvents.length > 0
                 ? `upcoming events: ${eventsStr}`
                 : 'no upcoming events'
-            return [reply, command.message]
+            command.message.reply(reply)
         })
     )
-listUpcomingEvent$.subscribe((saveMsgArr: [string, discord.Message]): void => {
+listUpcomingEvent$.subscribe((): void => {
     logger.debug('List upcoming events called')
-    saveMsgArr[1].reply(saveMsgArr[0])
 })
 
-const deleteUpcomingEvent$ = filteredMessage$(COMMANDS.DELETE_UPCOMING.command)
+const deleteUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.DELETE_UPCOMING.command)
     .pipe(
         filter((command: Command):
-        boolean => COMMANDS.DELETE_UPCOMING.accessControl.controlFunction(
+        boolean => BOT_COMMANDS.DELETE_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
         filter((command: Command): boolean => isAdmin(command.author, command.serverJson)),
@@ -647,7 +656,7 @@ const deleteUpcomingEvent$ = filteredMessage$(COMMANDS.DELETE_UPCOMING.command)
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
-                command.message.reply(`invalid index ${idxToRemove}\n${COMMANDS.DELETE_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToRemove}\n${BOT_COMMANDS.DELETE_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message]>(null)
             }
             const newServerData: ServerData = update(command.serverJson, {
@@ -665,11 +674,18 @@ deleteUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void
     saveMsgArr[1].reply('event deleted')
 })
 
+const userIdToName = (guild: discord.Guild, userId: string): string => {
+    const members: discord.Collection<string, discord.GuildMember> = guild.members.filter(
+        (member: discord.GuildMember): boolean => member.id === userId
+    )
+    const name: string = members.size > 0 ? members.first().nickname : null
+    return name
+}
 const signupTermRegex = 'event|rsn|$'
-const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
+const signupUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.SIGNUP_UPCOMING.command)
     .pipe(
         filter((command: Command):
-        boolean => COMMANDS.SIGNUP_UPCOMING.accessControl.controlFunction(
+        boolean => BOT_COMMANDS.SIGNUP_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
         switchMap((command: Command): Observable<[ServerData, discord.Message, JSON]> => {
@@ -681,7 +697,7 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
             const parsedRegex = findFirstRegexesMatch(skillsRegex, command.input)
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`${command.author.id} entered invalid signup data`)
-                command.message.reply(`invalid input\n${COMMANDS.SIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid input\n${BOT_COMMANDS.SIGNUP_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
@@ -689,10 +705,11 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
             // if index is out of range return
             const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
             const idxToModify: number = Number.parseInt(parsedRegex[0], 10)
+            const userIdToAdd: string = command.author.id
             const rsnToAdd: string = parsedRegex[1]
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
-                command.message.reply(`invalid index ${idxToModify}\n${COMMANDS.SIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.SIGNUP_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
@@ -700,18 +717,22 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
             const eventToModify: ClanEvent = upcomingEvents[idxToModify]
             const eventToModifyType: string = eventToModify.type
 
-            // get the participant to modify and return
-            // or create a new one and continue
+            // is the player already added?
             const filteredParticipants: EventParticipant[] = eventToModify.participants.filter(
                 (participant: EventParticipant): boolean => participant.rsn === rsnToAdd
+                    || participant.id === userIdToAdd
             )
             if (filteredParticipants.length > 0) {
-                logger.debug('User already exists')
-                command.message.reply(`player ${rsnToAdd} already signed up`)
+                logger.debug('Player already exists')
+                const idSignedup: string = filteredParticipants[0].id
+                const playerSignedup: string = filteredParticipants[0].rsn
+                command.message.reply(`<@${idSignedup}> already signed up ${playerSignedup}`)
                 return of<[ServerData, discord.Message, JSON]>(null)
             }
 
-            const participantToAdd: EventParticipant = {
+            // get the participant to modify and return
+            // or create a new one and continue
+            const participantToAdd = {
                 rsn: rsnToAdd,
                 id: command.author.id
             }
@@ -721,7 +742,7 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
                 // add skills to user
                 const skills: XpEventComponent[] = (eventToModify as XpClanEvent).skills.map(
                     (skillName: string): XpEventComponent => ({
-                        skill: skillName,
+                        name: skillName,
                         startingXp: -1,
                         endingXp: -1
                     })
@@ -783,10 +804,10 @@ signupUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void
     saveMsgArr[1].reply('signed up for event')
 })
 
-const unsignupUpcomingEvent$ = filteredMessage$(COMMANDS.UNSIGNUP_UPCOMING.command)
+const unsignupUpcomingEvent$ = filteredMessage$(BOT_COMMANDS.UNSIGNUP_UPCOMING.command)
     .pipe(
         filter((command: Command):
-        boolean => COMMANDS.UNSIGNUP_UPCOMING.accessControl.controlFunction(
+        boolean => BOT_COMMANDS.UNSIGNUP_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
         switchMap((command: Command): Observable<[ServerData, discord.Message]> => {
@@ -796,7 +817,7 @@ const unsignupUpcomingEvent$ = filteredMessage$(COMMANDS.UNSIGNUP_UPCOMING.comma
             const idxToModify: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
-                command.message.reply(`invalid index ${idxToModify}\n${COMMANDS.UNSIGNUP_UPCOMING.usage}`)
+                command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.UNSIGNUP_UPCOMING.usage}`)
                 return of<[ServerData, discord.Message]>(null)
             }
 
@@ -844,19 +865,19 @@ unsignupUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): vo
     saveMsgArr[1].reply('removed from event')
 })
 
-const amISignedUp$ = filteredMessage$(COMMANDS.AMISIGNEDUP_UPCOMING.command)
+const amISignedUp$ = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP_UPCOMING.command)
     .pipe(
         filter((command: Command):
-        boolean => COMMANDS.AMISIGNEDUP_UPCOMING.accessControl.controlFunction(
+        boolean => BOT_COMMANDS.AMISIGNEDUP_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
-        map((command: Command): [EventParticipant[], discord.Message] => {
+        map((command: Command): void => {
             const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
-                command.message.reply(`invalid index ${idxToCheck}\n${COMMANDS.AMISIGNEDUP_UPCOMING.usage}`)
-                return null
+                command.message.reply(`invalid index ${idxToCheck}\n${BOT_COMMANDS.AMISIGNEDUP_UPCOMING.usage}`)
+                return
             }
 
             // does the event to modify contain our user?
@@ -864,30 +885,62 @@ const amISignedUp$ = filteredMessage$(COMMANDS.AMISIGNEDUP_UPCOMING.command)
             const filteredEventParticipants: EventParticipant[] = eventToCheck.participants.filter(
                 (participant: EventParticipant): boolean => participant.id === command.author.id
             )
-            return [filteredEventParticipants, command.message]
+
+            const filteredParticipant: EventParticipant = filteredEventParticipants.length > 0
+                ? filteredEventParticipants[0] : null
+            const reply: string = filteredParticipant !== null
+                ? `you are signed up with RSN: ${filteredParticipant.rsn}`
+                : 'you are not signed up'
+            command.message.reply(reply)
         })
     )
-amISignedUp$.subscribe((signedup: [EventParticipant[], discord.Message]): void => {
+amISignedUp$.subscribe((): void => {
     logger.debug('AmISignedUp Called')
-    const accounts: string = signedup[0].map(
-        ((participant: EventParticipant): string => participant.rsn)
-    ).join(', ')
-    const reply = signedup[0].length === 0
-        ? 'you are not signed up'
-        : `you are signed up with RSN(s) ${accounts}`
-    signedup[1].reply(reply)
 })
 
-const help$ = filteredMessage$(COMMANDS.HELP.command)
+const listParticipant$ = filteredMessage$(BOT_COMMANDS.LISTPARTICIPANTS_UPCOMING.command)
     .pipe(
-        filter((command: Command): boolean => COMMANDS.HELP.accessControl.controlFunction(
+        filter((command: Command):
+        boolean => BOT_COMMANDS.LISTPARTICIPANTS_UPCOMING.accessControl.controlFunction(
             command.author, command.serverJson
         )),
         map((command: Command): void => {
-            const commandValues: CommandInfo[] = Object.keys(COMMANDS).map(
-                (key: string): CommandInfo => COMMANDS[key] as CommandInfo
+            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
+            const idxToCheck: number = Number.parseInt(command.input, 10)
+            if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
+                logger.debug(`User did not specify index (${idxToCheck})`)
+                command.message.reply(`invalid index ${idxToCheck}\n${BOT_COMMANDS.AMISIGNEDUP_UPCOMING.usage}`)
+                return
+            }
+
+            const eventToList: ClanEvent = upcomingEvents[idxToCheck]
+            const formattedStr: string = eventToList.participants.map(
+                (participant: EventParticipant, idx: number): string => {
+                    const nickname: string = userIdToName(command.guild, participant.id)
+                    return `\n${idx}: ${nickname} signed up ${participant.rsn}`
+                }
+            ).join('')
+
+            const reply: string = eventToList.participants.length > 0
+                ? `participants:${formattedStr}`
+                : 'no participants'
+            command.message.reply(reply)
+        })
+    )
+listParticipant$.subscribe((): void => {
+    logger.debug('ListParticipants called')
+})
+
+const help$ = filteredMessage$(BOT_COMMANDS.HELP.command)
+    .pipe(
+        filter((command: Command): boolean => BOT_COMMANDS.HELP.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
+        map((command: Command): void => {
+            const commandValues: BotCommand[] = Object.keys(BOT_COMMANDS).map(
+                (key: string): BotCommand => BOT_COMMANDS[key] as BotCommand
             )
-            const outterStrs: string[] = commandValues.map((commandInfo: CommandInfo): string => {
+            const outterStrs: string[] = commandValues.map((commandInfo: BotCommand): string => {
                 const innerStrs: string[] = [
                     `\ncommand: '${commandInfo.command}'`,
                     `\ndescription: ${commandInfo.description}`,
