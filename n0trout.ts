@@ -117,6 +117,7 @@ interface Commands extends Record<string, unknown> {
     DELETE_UPCOMING: CommandInfo
     SIGNUP_UPCOMING: CommandInfo
     UNSIGNUP_UPCOMING: CommandInfo
+    AMISIGNEDUP_UPCOMING: CommandInfo
     HELP: CommandInfo
 }
 
@@ -160,12 +161,19 @@ const COMMANDS: Commands = {
         command: '!f signup ',
         description: 'signs up for a scheduled event with runescape name (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: 'parameters (rsn event)'
+        usage: 'parameters (RSN event)'
     },
 
     UNSIGNUP_UPCOMING: {
         command: '!f unsignup ',
         description: 'un-signs up for a scheduled event (use with \'list upcoming\')',
+        accessControl: ANY_USER,
+        usage: 'parameters (index)'
+    },
+
+    AMISIGNEDUP_UPCOMING: {
+        command: '!f amisignedup ',
+        description: 'checks to see if you are signed up for a scheduled event (use with \'list upcoming\')',
         accessControl: ANY_USER,
         usage: 'parameters (index)'
     },
@@ -759,8 +767,8 @@ const signupUpcomingEvent$ = filteredMessage$(COMMANDS.SIGNUP_UPCOMING.command)
         switchMap((dataMsgHiArr: [ServerData, discord.Message, JSON]):
         Observable<[ServerData, discord.Message]> => {
             if (dataMsgHiArr[2] === null) {
-                logger.debug('User entered invalid rsn')
-                dataMsgHiArr[1].reply('cannot find rsn on hiscores')
+                logger.debug('User entered invalid RSN')
+                dataMsgHiArr[1].reply('cannot find RSN on hiscores')
                 return of<[ServerData, discord.Message]>(null)
             }
             return forkJoin(
@@ -834,6 +842,40 @@ const unsignupUpcomingEvent$ = filteredMessage$(COMMANDS.UNSIGNUP_UPCOMING.comma
 unsignupUpcomingEvent$.subscribe((saveMsgArr: [ServerData, discord.Message]): void => {
     logger.debug('Unsignup called')
     saveMsgArr[1].reply('removed from event')
+})
+
+const amISignedUp$ = filteredMessage$(COMMANDS.AMISIGNEDUP_UPCOMING.command)
+    .pipe(
+        filter((command: Command):
+        boolean => COMMANDS.AMISIGNEDUP_UPCOMING.accessControl.controlFunction(
+            command.author, command.serverJson
+        )),
+        map((command: Command): [EventParticipant[], discord.Message] => {
+            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.serverJson.events)
+            const idxToCheck: number = Number.parseInt(command.input, 10)
+            if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
+                logger.debug(`User did not specify index (${idxToCheck})`)
+                command.message.reply(`invalid index ${idxToCheck}\n${COMMANDS.AMISIGNEDUP_UPCOMING.usage}`)
+                return null
+            }
+
+            // does the event to modify contain our user?
+            const eventToCheck: ClanEvent = upcomingEvents[idxToCheck]
+            const filteredEventParticipants: EventParticipant[] = eventToCheck.participants.filter(
+                (participant: EventParticipant): boolean => participant.id === command.author.id
+            )
+            return [filteredEventParticipants, command.message]
+        })
+    )
+amISignedUp$.subscribe((signedup: [EventParticipant[], discord.Message]): void => {
+    logger.debug('AmISignedUp Called')
+    const accounts: string = signedup[0].map(
+        ((participant: EventParticipant): string => participant.rsn)
+    ).join(', ')
+    const reply = signedup[0].length === 0
+        ? 'you are not signed up'
+        : `you are signed up with RSN(s) ${accounts}`
+    signedup[1].reply(reply)
 })
 
 const help$ = filteredMessage$(COMMANDS.HELP.command)
