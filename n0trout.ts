@@ -105,7 +105,7 @@ const ANY_USER: AccessControl = {
 interface BotCommand extends Record<string, unknown> {
     description: string
     accessControl: AccessControl
-    usage: string
+    parameters: string
     command: string
 }
 
@@ -127,70 +127,70 @@ const BOT_COMMANDS: BotCommands = {
         command: '!f debug',
         description: 'logs debug info to console',
         accessControl: ONLY_ADMIN,
-        usage: 'parameters none'
+        parameters: 'none'
     },
 
     ADD_ADMIN: {
         command: '!f add admin ',
         description: 'adds administratior for this guild',
         accessControl: ONLY_UNSET_ADMINS_OR_ADMIN,
-        usage: 'parameters (@mentions)'
+        parameters: '(@mentions)'
     },
 
     ADD_UPCOMING: {
         command: '!f add upcoming ',
         description: 'schedules a new event',
         accessControl: ONLY_ADMIN,
-        usage: 'parameters (name starting ending type [xp? skills])'
+        parameters: '(name starting ending type [xp? skills])'
     },
 
     LIST_UPCOMING: {
         command: '!f list upcoming',
         description: 'lists scheduled events along with scheduled index',
         accessControl: ANY_USER,
-        usage: 'parameters none'
+        parameters: 'none'
     },
 
     DELETE_UPCOMING: {
         command: '!f delete upcoming ',
         description: 'deletes an event by index (use with \'list upcoming\')',
         accessControl: ONLY_ADMIN,
-        usage: 'parameters (index)'
+        parameters: '(index)'
     },
 
     SIGNUP_UPCOMING: {
         command: '!f signup ',
         description: 'signs up for a scheduled event with runescape name (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: 'parameters (RSN event)'
+        parameters: '(RSN event)'
     },
 
     UNSIGNUP_UPCOMING: {
         command: '!f unsignup ',
         description: 'un-signs up for a scheduled event (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: 'parameters (index)'
+        parameters: '(index)'
     },
 
     AMISIGNEDUP_UPCOMING: {
         command: '!f amisignedup ',
         description: 'checks to see if you are signed up for a scheduled event (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: 'parameters (index)'
+        parameters: '(index)'
     },
 
     LISTPARTICIPANTS_UPCOMING: {
         command: '!f list participants ',
         description: 'lists all participants in an event',
         accessControl: ANY_USER,
-        usage: 'parameters (index)'
+        parameters: '(index)'
     },
 
     HELP: {
         command: '!f help',
         description: 'prints this help',
         accessControl: ANY_USER,
-        usage: 'parameters none'
+        parameters: 'none'
     }
 }
 
@@ -942,10 +942,10 @@ const help$ = filteredMessage$(BOT_COMMANDS.HELP.command)
             )
             const outterStrs: string[] = commandValues.map((commandInfo: BotCommand): string => {
                 const innerStrs: string[] = [
-                    `\ncommand: '${commandInfo.command}'`,
+                    `\n'${commandInfo.command}'`,
                     `\ndescription: ${commandInfo.description}`,
                     `\naccess control: ${commandInfo.accessControl.description}`,
-                    `\nusage: ${commandInfo.usage}`
+                    `\nparameters: ${commandInfo.parameters}`
                 ]
                 return innerStrs.join('')
             })
