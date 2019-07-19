@@ -86,7 +86,7 @@ const ONLY_UNSET_ADMINS_OR_ADMIN: AccessControl = {
     controlFunction: (
         author: discord.User, serverJson: ServerData
     ): boolean => !hasAdmin(serverJson) || isAdmin(author, serverJson),
-    description: 'requires unconfigured admins or admin privileges'
+    description: 'unconfigured server or admin privileges'
 }
 
 // only admins
@@ -94,16 +94,15 @@ const ONLY_ADMIN: AccessControl = {
     controlFunction: (
         author: discord.User, serverJson: ServerData
     ): boolean => isAdmin(author, serverJson),
-    description: 'requires admin privleges'
+    description: 'admin privleges'
 }
 
 const ANY_USER: AccessControl = {
     controlFunction: (): boolean => true,
-    description: 'any user can run this'
+    description: 'all users'
 }
 
 interface CommandInfo extends Record<string, unknown> {
-    name: string
     description: string
     accessControl: AccessControl
     usage: string
@@ -123,67 +122,59 @@ interface Commands extends Record<string, unknown> {
 
 const COMMANDS: Commands = {
     DEBUG: {
-        name: 'debug',
+        command: '!f debug',
         description: 'logs debug info to console',
         accessControl: ONLY_ADMIN,
-        usage: 'requires:',
-        command: '!f debug'
+        usage: 'parameters none'
     },
 
     ADD_ADMIN: {
-        name: 'add admin',
+        command: '!f add admin ',
         description: 'adds administratior for this guild',
         accessControl: ONLY_UNSET_ADMINS_OR_ADMIN,
-        usage: 'requires: (@mentions)',
-        command: '!f add admin '
+        usage: 'parameters (@mentions)'
     },
 
     ADD_UPCOMING: {
-        name: 'add upcoming event',
+        command: '!f add upcoming ',
         description: 'schedules a new event',
         accessControl: ONLY_ADMIN,
-        usage: 'requires: name starting ending type [xp? skills]',
-        command: '!f add upcoming '
+        usage: 'parameters (name starting ending type [xp? skills])'
     },
 
     LIST_UPCOMING: {
-        name: 'list upcoming',
+        command: '!f list upcoming',
         description: 'lists scheduled events along with scheduled index',
         accessControl: ANY_USER,
-        usage: 'requires:',
-        command: '!f list upcoming'
+        usage: 'parameters none'
     },
 
     DELETE_UPCOMING: {
-        name: 'delete upcoming',
+        command: '!f delete upcoming ',
         description: 'deletes an event by index (use with \'list upcoming\')',
         accessControl: ONLY_ADMIN,
-        usage: 'requires: (index)',
-        command: '!f delete upcoming '
+        usage: 'parameters (index)'
     },
 
     SIGNUP_UPCOMING: {
-        name: 'signup',
+        command: '!f signup ',
         description: 'signs up for a scheduled event with runescape name (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: 'requires: rsn event',
-        command: '!f signup '
+        usage: 'parameters (rsn event)'
     },
 
     UNSIGNUP_UPCOMING: {
-        name: 'unsignup',
+        command: '!f unsignup ',
         description: 'un-signs up for a scheduled event (use with \'list upcoming\')',
         accessControl: ANY_USER,
-        usage: 'requires: (index)',
-        command: '!f unsignup '
+        usage: 'parameters (index)'
     },
 
     HELP: {
-        name: 'help',
-        description: 'prints this info',
+        command: '!f help',
+        description: 'prints this help',
         accessControl: ANY_USER,
-        usage: 'requires:',
-        command: '!f help'
+        usage: 'parameters none'
     }
 }
 
@@ -800,6 +791,25 @@ const help$ = filteredMessage$(COMMANDS.HELP.command)
         filter((command: Command): boolean => COMMANDS.HELP.accessControl.controlFunction(
             command.author, command.serverJson
         )),
+        map((command: Command): void => {
+            const commandValues: CommandInfo[] = Object.keys(COMMANDS).map(
+                (key: string): CommandInfo => COMMANDS[key] as CommandInfo
+            )
+            const outterStrs: string[] = commandValues.map((commandInfo: CommandInfo): string => {
+                const innerStrs: string[] = [
+                    `\ncommand: '${commandInfo.command}'`,
+                    `\ndescription: ${commandInfo.description}`,
+                    `\naccess control: ${commandInfo.accessControl.description}`,
+                    `\nusage: ${commandInfo.usage}`
+                ]
+                return innerStrs.join('')
+            })
+            const formattedStr = outterStrs.join('\n')
+            logger.debug(formattedStr)
+            command.message.reply(formattedStr, {
+                code: true
+            })
+        })
     )
 help$.subscribe((): void => {
     logger.debug('Help called')
