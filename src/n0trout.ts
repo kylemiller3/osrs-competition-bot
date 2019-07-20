@@ -13,12 +13,19 @@ import {
     FromEventTarget
 } from 'rxjs/internal/observable/fromEvent'
 import {
-    publishReplay, refCount, take, skip, filter, switchMap, catchError, tap, map
+    publishReplay, refCount, take, skip, filter, switchMap, catchError, tap, map, retry
 } from 'rxjs/operators'
 import {
     hiscores
 } from 'osrs-json-api'
 import auth from './auth.json'
+
+//-------------
+// Global state
+//
+//-------------
+const loadCache: Record<string, Observable<JSON>> = {}
+const hiscoreCache: Record<string, Observable<hiscores.HiscoreResponse>> = {}
 
 /**
  * @function
@@ -106,7 +113,7 @@ interface ClanEventParticipant extends Record<string, unknown> {
  * @description Contract extending ClanEventParticipant to include XpClanEventParticipantComponents
  */
 interface XpClanEventParticipant extends ClanEventParticipant {
-    skills: XpClanEventParticipantComponent[]
+    skills: XpClanEventParticipantSkillsComponent[]
 }
 
 /**
@@ -114,7 +121,7 @@ interface XpClanEventParticipant extends ClanEventParticipant {
  * a clan event participant needs for XP clan events
  * @interface
  */
-interface XpClanEventParticipantComponent extends Record<string, unknown> {
+interface XpClanEventParticipantSkillsComponent extends Record<string, unknown> {
     name: string
     startingXp: number
     endingXp: number
@@ -197,7 +204,7 @@ const OSRS_SKILLS: Record<string, string> = {
     RANG: 'ranged',
     PRAY: 'prayer',
     MAG: 'magic',
-    RC: 'runecrafting',
+    RC: 'runecraft',
     CON: 'construction',
     HP: 'hitpoints',
     AGI: 'agility',
@@ -426,7 +433,7 @@ const gClient: discord.Client = new discord.Client()
  */
 const load$ = (id: string, dirty: boolean): Observable<GuildData> => {
     if (dirty) {
-        this.data[id] = from(jsonfile.readFile(`./guilds/${id}.json`, {
+        loadCache[id] = from(jsonfile.readFile(`./guilds/${id}.json`, {
             // this is very fragile but works for our data structures
             reviver: ((key: string, value: unknown): unknown => {
                 if (key.toLowerCase().includes('date')) { return new Date(value as string) }
@@ -447,7 +454,16 @@ const load$ = (id: string, dirty: boolean): Observable<GuildData> => {
                 refCount()
             )
     }
-    return this.data[id]
+
+    const cached: Observable<GuildData> = loadCache[id] as unknown as Observable<GuildData>
+    const keys = Object.keys(loadCache)
+    if (keys.length >= 10000) {
+        const idxToRemove: number = Math.floor((Math.random() * 10000))
+        const keyToRemove: string = keys[idxToRemove]
+        loadCache[keyToRemove] = undefined
+        return cached
+    }
+    return cached
 }
 
 /**
@@ -523,16 +539,25 @@ const message$: Observable<discord.Message> = fromEvent(gClient as unknown as Fr
  * @param {string} rsn RSN to lookup
  * @returns {Observable<JSON>} Observable of the JSON response or Observable of null
  */
-const hiscores$ = (rsn: string): Observable<JSON> => from(hiscores.getPlayer(rsn))
-    .pipe(
-        publishReplay(1, 10 * 60 * 1000),
-        refCount(),
-        catchError((error: Error): Observable<JSON> => {
-            logError(error)
-            return of<JSON>(null)
-        })
-    )
+const hiscores$ = (rsn: string): Observable<hiscores.HiscoreResponse> => {
+    if (hiscoreCache[rsn] === undefined) {
+        hiscoreCache[rsn] = from(hiscores.getPlayer(rsn))
+            .pipe(retry(1000), publishReplay(1, 10 * 60 * 1000), refCount(), catchError((error: Error): Observable<JSON> => {
+                logError(error)
+                throw error
+            })) as unknown as Observable<hiscores.HiscoreResponse>
+    }
 
+    const cached: Observable<hiscores.HiscoreResponse> = hiscoreCache[rsn]
+    const keys = Object.keys(hiscoreCache)
+    if (keys.length >= 10000) {
+        const idxToRemove: number = Math.floor((Math.random() * 10000))
+        const keyToRemove: string = keys[idxToRemove]
+        hiscoreCache[keyToRemove] = undefined
+        return cached
+    }
+    return cached
+}
 
 /**
  * @function
@@ -935,7 +960,7 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
         boolean => BOT_COMMANDS.SIGNUP_UPCOMING.accessControl.controlFunction(
             command.author, command.guildData
         )),
-        switchMap((command: InputCommand): Observable<[GuildData, discord.Message, JSON]> => {
+        switchMap((command: InputCommand): Observable<[GuildData, discord.Message, hiscores.HiscoreResponse]> => {
             const compoundRegex: string = commandRegex(signupTermRegex)
             const skillsRegex = [
                 new RegExp(`event${compoundRegex}`, 'gim'),
@@ -945,7 +970,7 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`${command.author.id} entered invalid signup data`)
                 command.message.reply(`invalid input\n${BOT_COMMANDS.SIGNUP_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message, JSON]>(null)
+                return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
             }
 
             // get upcoming events
@@ -957,7 +982,7 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
                 command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.SIGNUP_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message, JSON]>(null)
+                return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
             }
 
             // get event to modify and its type
@@ -974,7 +999,7 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
                 const idSignedUp: string = filteredParticipants[0].id
                 const playerSignedUp: string = filteredParticipants[0].rsn
                 command.message.reply(`<@${idSignedUp}> already signed up ${playerSignedUp}`)
-                return of<[GuildData, discord.Message, JSON]>(null)
+                return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
             }
 
             // get the participant to modify and return
@@ -987,9 +1012,9 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
             if (eventToModifyType === EVENT_TYPE.XP) {
                 // TODO: refactor this to a function
                 // add skills to user
-                const skills: XpClanEventParticipantComponent[] = (eventToModify as XpClanEvent)
+                const skills: XpClanEventParticipantSkillsComponent[] = (eventToModify as XpClanEvent)
                     .skills.map(
-                        (skillName: string): XpClanEventParticipantComponent => ({
+                        (skillName: string): XpClanEventParticipantSkillsComponent => ({
                             name: skillName,
                             startingXp: -1,
                             endingXp: -1
@@ -1030,12 +1055,12 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
                     hiscores$(rsnToAdd)
                 )
             }
-            return of<[GuildData, discord.Message, JSON]>(null)
+            return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
         }),
-        filter((dataMsgHiArr: [GuildData, discord.Message, JSON]):
+        filter((dataMsgHiArr: [GuildData, discord.Message, hiscores.HiscoreResponse]):
         boolean => dataMsgHiArr !== null),
 
-        switchMap((dataMsgHiArr: [GuildData, discord.Message, JSON]):
+        switchMap((dataMsgHiArr: [GuildData, discord.Message, hiscores.HiscoreResponse]):
         Observable<[GuildData, discord.Message]> => {
             if (dataMsgHiArr[2] === null) {
                 logger.debug('User entered invalid RSN')
@@ -1225,6 +1250,18 @@ const help$: Observable<void> = filteredMessage$(BOT_COMMANDS.HELP.command)
 //
 //--------------
 
+/**
+ * @function
+ * @description Gets currently running events
+ * @param {GuildData} guildData The GuildData to check
+ * @returns {ClanEvent[]} The array of ongoing clan events for Guild id
+ */
+const getInFlightEvents = (guildData: GuildData): ClanEvent[] => guildData.events.filter(
+    (event: ClanEvent): boolean => {
+        const now: Date = new Date()
+        return event.startingDate < now && event.endingDate > now
+    }
+)
 connect$.subscribe((): void => {
     logger.info('Connected')
     logger.info('Logged in as:')
@@ -1238,6 +1275,77 @@ connect$.subscribe((): void => {
         load$(guild.id, true).subscribe((data: GuildData): void => {
             logger.debug(`Loaded json for guild ${guild.id}`)
             logger.silly(`${JSON.stringify(data)}`)
+
+            // startup tasks
+            // are we in flight for an event?
+            // make sure they are properly setup
+            const inFlightEvents: ClanEvent[] = getInFlightEvents(data)
+            inFlightEvents.forEach((event: ClanEvent): void => {
+                switch (event.type) {
+                    case EVENT_TYPE.XP: {
+                        event.participants.forEach((xpParticipant: XpClanEventParticipant): void => {
+                            xpParticipant.skills.forEach((xpComponent: XpClanEventParticipantSkillsComponent): void => {
+                                if (xpComponent.startingXp < 0) {
+                                    hiscores$(xpParticipant.rsn)
+                                        .pipe(
+                                            switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
+                                                const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
+                                                    startingXp: hiscore.skills[xpComponent.name].xp
+                                                }) as XpClanEventParticipantSkillsComponent
+                                                const newXpParticipant: XpClanEventParticipant = update(xpParticipant, {
+                                                    skills: newXpComponent
+                                                }) as XpClanEventParticipant
+                                                const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
+                                                const newEvent: ClanEvent = update(event, {
+                                                    participants: newXpParticipants
+                                                }) as ClanEvent
+                                                // TODO: this doesn't work for non unique event names and dates
+                                                const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
+                                                const newData: GuildData = update(data, {
+                                                    events: newEvents
+                                                }) as GuildData
+                                                return save$(guild.id, newData)
+                                            })
+                                        )
+                                        .subscribe((guildData: GuildData): void => {
+                                            logger.debug('updated user that did not have starting xp data')
+                                        })
+                                }
+                                /* Incorrect logic, we need to find already ended events instead
+                                if (xpComponent.endingXp < 0) {
+                                    hiscores$(xpParticipant.rsn)
+                                        .pipe(
+                                            switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
+                                                const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
+                                                    endingXp: hiscore.skills[xpComponent.name].xp
+                                                }) as XpClanEventParticipantSkillsComponent
+                                                const newXpParticipant: XpClanEventParticipant = update(xpParticipant, {
+                                                    skills: newXpComponent
+                                                }) as XpClanEventParticipant
+                                                const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
+                                                const newEvent: ClanEvent = update(event, {
+                                                    participants: newXpParticipants
+                                                }) as ClanEvent
+                                                // TODO: this doesn't work for non unique event names and dates
+                                                const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
+                                                const newData: GuildData = update(data, {
+                                                    events: newEvents
+                                                }) as GuildData
+                                                return save$(guild.id, newData)
+                                            })
+                                        )
+                                        .subscribe((guildData: GuildData): void => {
+                                            logger.debug('updated user that did not have ending xp data')
+                                        })
+                                } 
+                                */
+                            })
+                        })
+                        break
+                    }
+                    default:
+                }
+            })
         })
     })
 })
@@ -1302,5 +1410,4 @@ help$.subscribe((): void => {
 //
 //--------------
 
-this.data = {}
 gClient.login(auth.token)
