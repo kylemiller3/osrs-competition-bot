@@ -1,0 +1,24 @@
+{
+    "spellright.language": [
+        "English (American)"
+    ],
+    "spellright.documentTypes": [
+        "markdown",
+        "latex",
+        "plaintext",
+        "typescript"
+    ],
+    "cSpell.words": [
+        "AMISIGNEDUP",
+        "OSRS",
+        "SIGNUP",
+        "UNSIGNUP",
+        "firemaking",
+        "herblore",
+        "hiscores",
+        "hitpoints",
+        "regexes",
+        "runecrafting",
+        "smithing"
+    ]
+}
