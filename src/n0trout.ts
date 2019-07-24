@@ -6,6 +6,7 @@
 import * as discord from 'discord.js'
 import * as winston from 'winston'
 import * as jsonfile from 'jsonfile'
+import uuidv4 from 'uuid/v4'
 import {
     fromEvent, from, Observable, of, forkJoin
 } from 'rxjs'
@@ -24,6 +25,7 @@ import auth from './auth.json'
 //-------------
 const loadCache: Record<string, Observable<JSON>> = {}
 const hiscoreCache: Record<string, Observable<hiscores.HiscoreResponse>> = {}
+const timers: Record<string, NodeJS.Timeout[]> = {}
 
 /**
  * @function
@@ -96,6 +98,7 @@ interface BotCommands extends Record<string, BotCommand> {
     AMISIGNEDUP_UPCOMING: BotCommand
     LIST_PARTICIPANTS_UPCOMING: BotCommand
     HELP: BotCommand
+    SET_CHANNEL: BotCommand
 }
 
 /**
@@ -104,7 +107,7 @@ interface BotCommands extends Record<string, BotCommand> {
  */
 interface ClanEventParticipant extends Record<string, unknown> {
     rsn: string
-    id: string
+    discordId: string
 }
 
 /**
@@ -131,6 +134,7 @@ interface XpClanEventParticipantSkillsComponent extends Record<string, unknown> 
  */
 interface ClanEvent extends Record<string, unknown> {
     name: string
+    uuid: string
     startingDate: Date
     endingDate: Date
     type: string
@@ -154,6 +158,7 @@ interface XpClanEvent extends ClanEvent {
  */
 interface GuildSettings extends Record<string, unknown> {
     admins: string[]
+    notificationChannelId: string
 }
 
 /**
@@ -241,8 +246,8 @@ const hasAdmin = (guildData: GuildData): boolean => guildData.settings.admins.le
  * Guild from where it was received
  * @returns {boolean} True if the author is an administrator
  */
-// eslint-disable-next-line max-len
-const isAdmin = (author: discord.User, guildData: GuildData): boolean => guildData.settings.admins.includes(author.id)
+const isAdmin = (author: discord.User, guildData: GuildData):
+boolean => guildData.settings.admins.includes(author.id)
 
 /**
  * @description Implementation of AccessControl for unset
@@ -290,71 +295,77 @@ const BOT_COMMANDS: BotCommands = {
         command: '!f debug',
         description: 'logs debug info to console',
         accessControl: ONLY_ADMIN,
-        parameters: 'none'
+        parameters: ''
     },
 
     ADD_ADMIN: {
         command: '!f add admin ',
         description: 'adds administration for this guild',
         accessControl: ONLY_UNSET_ADMINS_OR_ADMIN,
-        parameters: '(@mentions)'
+        parameters: '(mentions)'
     },
 
     ADD_UPCOMING: {
-        command: '!f add upcoming ',
+        command: '!f add event ',
         description: 'schedules a new event',
         accessControl: ONLY_ADMIN,
-        // parameters: '(name starting ending type [xp? skills])'
-        parameters: '(name starting ending)'
+        parameters: '(name, starting, ending, type [generic? skills [skill list]?])'
     },
 
     LIST_UPCOMING: {
-        command: '!f list upcoming',
-        description: 'lists scheduled events along with scheduled index',
+        command: '!f events',
+        description: 'lists scheduled events along and event number',
         accessControl: ANY_USER,
-        parameters: 'none'
+        parameters: ''
     },
 
     DELETE_UPCOMING: {
-        command: '!f delete upcoming ',
-        description: 'deletes an event by index (use with \'list upcoming\')',
+        command: '!f delete ',
+        description: 'deletes an event by event number (use with \'!f events\')',
         accessControl: ONLY_ADMIN,
-        parameters: '(index)'
+        parameters: '(event number)'
     },
 
     SIGNUP_UPCOMING: {
         command: '!f signup ',
-        description: 'signs up for a scheduled event with RuneScape name (use with \'list upcoming\')',
+        description: 'signs up for a scheduled event number with RuneScape name (use with \'!f events\')',
         accessControl: ANY_USER,
-        parameters: '(RSN event)'
+        parameters: '(RSN, event number)'
     },
 
     UNSIGNUP_UPCOMING: {
         command: '!f unsignup ',
-        description: 'un-signs up for a scheduled event (use with \'list upcoming\')',
+        description: 'un-signs up for a scheduled event number (use with \'!f events\')',
         accessControl: ANY_USER,
-        parameters: '(index)'
+        parameters: '(event number)'
     },
 
     AMISIGNEDUP_UPCOMING: {
         command: '!f amisignedup ',
-        description: 'checks to see if you are signed up for a scheduled event (use with \'list upcoming\')',
+        description: 'checks to see if you are signed up for a scheduled event number (use with \'!f events\')',
         accessControl: ANY_USER,
-        parameters: '(index)'
+        parameters: '(event number)'
     },
 
     LIST_PARTICIPANTS_UPCOMING: {
-        command: '!f list participants ',
-        description: 'lists all participants in an event',
+        command: '!f list ',
+        description: 'lists all participants in an event number (use with \'!f events\')',
         accessControl: ANY_USER,
-        parameters: '(index)'
+        parameters: '(event number)'
     },
 
     HELP: {
         command: '!f help',
         description: 'prints this help',
         accessControl: ANY_USER,
-        parameters: 'none'
+        parameters: ''
+    },
+
+    SET_CHANNEL: {
+        command: '!f set channel ',
+        description: 'sets the channel for notifications - must be set or there will be no notifications',
+        accessControl: ONLY_ADMIN,
+        parameters: '(channel mention)'
     }
 }
 
@@ -378,7 +389,8 @@ const EVENT_TYPE: Record<string, string> = {
  */
 const GUILD_DATA_DEFAULT: GuildData = {
     settings: {
-        admins: []
+        admins: [],
+        notificationChannelId: undefined
     },
 
     events: []
@@ -392,7 +404,13 @@ const GUILD_DATA_DEFAULT: GuildData = {
 // create our winston logger
 const logger: winston.Logger = winston.createLogger({
     level: 'debug',
-    format: winston.format.json(),
+    format: winston.format.combine(
+        winston.format.json(),
+        winston.format.colorize(),
+        winston.format.timestamp({
+            format: 'YYYY-MM-DD HH:mm:ss'
+        })
+    ),
     transports: [
         new winston.transports.File({
             filename: 'log'
@@ -420,11 +438,28 @@ const logError = (error: Error): void => {
  */
 const gClient: discord.Client = new discord.Client()
 
-
 //----------------------
 // Observables & helpers
 //
 //----------------------
+
+/**
+ * @function
+ * @description Returns a new Record with an updated entry
+ * @param {Record<string, T>} record The Record to edit
+ * @param {T} entry The new entry
+ * @returns {Record<string, T>} The new Record object
+ */
+const update = <T>(record: Record<string, T>, entry: T):
+Record<string, T> => Object.assign({}, record, entry)
+
+/**
+ * @function
+ * @description Checks to see if a Date is valid
+ * @param {Date} date The date to check
+ * @returns {boolean} Whether the date is valid
+ */
+const isValidDate = (date: Date): boolean => date instanceof Date && !Number.isNaN(date.getTime())
 
 /**
  * @function
@@ -492,6 +527,155 @@ const save$ = (id: string, guildData: GuildData): Observable<GuildData> => of<Gu
             throw error
         })
     )
+
+/**
+ * @function
+ * @description Notifies the users of 2 hour warning
+ * @param {ClanEvent} event The event to notify participants of
+ * @param {discord.Guild} guild The guild to notify
+ */
+const notifyTwoHourWarning = (event: ClanEvent, guild: discord.Guild, channelId: string): void => {
+    // message participants here
+    const participants: string[] = event.participants.map(
+        (participant: ClanEventParticipant): string => participant.discordId
+    )
+    const mentions: string = participants.map(
+        (participant: string): string => `<@${participant}>`
+    ).join(', ')
+    const channel: discord.TextChannel = guild.channels.get(channelId) as discord.TextChannel
+    if (channel === undefined || channel.type !== 'text') return
+    logger.debug('Sending 2 hour notification to default channel')
+    channel.send(`event '${event.name}' will begin within 2 hours ${mentions}`)
+}
+
+/**
+ * @function
+ * @description Notifies the users of event start
+ * @param {ClanEvent} event The event to notify participants of
+ * @param {discord.Guild} guild The guild to notify
+ */
+const notifyEventStart = (event: ClanEvent, guild: discord.Guild, channelId: string): void => {
+    // message participants here
+    const participants: string[] = event.participants.map(
+        (participant: ClanEventParticipant): string => participant.discordId
+    )
+    const mentions: string = participants.map(
+        (participant: string): string => `<@${participant}>`
+    ).join(', ')
+    const channel: discord.TextChannel = guild.channels.get(channelId) as discord.TextChannel
+    if (channel === undefined || channel.type !== 'text') return
+    logger.debug('Sending event start notification to default channel')
+    channel.send(`event '${event.name}' has started ${mentions}`)
+}
+
+/**
+ * @function
+ * @description Notifies the users of event end
+ * @param {ClanEvent} event The event to notify participants of
+ * @param {discord.Guild} guild The guild to notify
+ */
+const notifyEventEnd = (event: ClanEvent, guild: discord.Guild, channelId: string): void => {
+    // message participants here
+    const mentions: string = event.participants.map(
+        (participant: ClanEventParticipant): string => `<@${participant.discordId}> -> ${participant.rsn}`
+    ).join('\n')
+    const channel: discord.TextChannel = guild.channels.get(channelId) as discord.TextChannel
+    if (channel === undefined || channel.type !== 'text') return
+    logger.debug('Sending event end notification to default channel')
+    channel.send(`event '${event.name}' has ended ${mentions}`)
+}
+
+/**
+ * @function
+ * @description Adds ClanEvent 2 hour warning timer to global state and messages and updates
+ * notification structure on fire
+ * @param clanEvent The ClanEvent to add timers for
+ * @param guild The Guild to notify
+ * @param guildData The GuildData to update on notification
+ */
+const setTimerTwoHoursBefore = (clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
+NodeJS.Timeout => {
+    const now: Date = new Date()
+    const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
+    twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
+    return setTimeout((): void => {
+        notifyTwoHourWarning(clanEvent, guild, guildData.settings.notificationChannelId)
+        // mark 2 hour warning as completed
+        const newEvent: ClanEvent = update(clanEvent, {
+            hasNotifiedTwoHourWarning: true
+        }) as ClanEvent
+        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+            if (newEvent.uuid === event.uuid) {
+                return newEvent
+            }
+            return event
+        })
+        const newData: GuildData = update(guildData, {
+            events: newEvents
+        }) as GuildData
+        save$(guild.id, newData).subscribe((): void => {})
+    }, twoHoursBeforeStart.getTime() - now.getTime())
+}
+
+/**
+ * @function
+ * @description Adds ClanEvent start timer to global state and messages and updates
+ * notification structure on fire
+ * @param clanEvent The ClanEvent to add timers for
+ * @param guild The Guild to notify
+ * @param guildData The GuildData to update on notification
+ */
+const setTimerStart = (clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
+NodeJS.Timeout => {
+    const now: Date = new Date()
+    return setTimeout((): void => {
+        notifyEventStart(clanEvent, guild, guildData.settings.notificationChannelId)
+        // mark start date as completed
+        const newEvent: ClanEvent = update(clanEvent, {
+            hasNotifiedStarted: true
+        }) as ClanEvent
+        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+            if (newEvent.uuid === event.uuid) {
+                return newEvent
+            }
+            return event
+        })
+        const newData: GuildData = update(guildData, {
+            events: newEvents
+        }) as GuildData
+        save$(guild.id, newData).subscribe((): void => {})
+    }, clanEvent.startingDate.getTime() - now.getTime())
+}
+
+/**
+ * @function
+ * @description Adds ClanEvent end timer to global state and messages and updates
+ * notification structure on fire
+ * @param clanEvent The ClanEvent to add timers for
+ * @param guild The Guild to notify
+ * @param guildData The GuildData to update on notification
+ */
+function setTimerEnd(clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
+NodeJS.Timeout {
+    const now: Date = new Date()
+    return setTimeout((): void => {
+        notifyEventEnd(clanEvent, guild, guildData.settings.notificationChannelId)
+        // mark end date as completed
+        const newEvent: ClanEvent = update(clanEvent, {
+            hasNotifiedEnded: true
+        }) as ClanEvent
+        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+            if (newEvent.uuid === event.uuid) {
+                return newEvent
+            }
+            return event
+        })
+        const newData: GuildData = update(guildData, {
+            events: newEvents
+        }) as GuildData
+        save$(guild.id, newData).subscribe((): void => {})
+    }, clanEvent.endingDate.getTime() - now.getTime())
+}
 
 /**
  * @description Observable of discord ready events
@@ -565,25 +749,6 @@ const hiscores$ = (rsn: string): Observable<hiscores.HiscoreResponse> => {
     }
     return cached
 }
-
-/**
- * @function
- * @description Returns a new Record with an updated entry
- * @param {Record<string, T>} record The Record to edit
- * @param {T} entry The new entry
- * @returns {Record<string, T>} The new Record object
- */
-// eslint-disable-next-line max-len
-const update = <T>(record: Record<string, T>, entry: T): Record<string, T> => Object.assign({}, record, entry)
-
-/**
- * @function
- * @description Checks to see if a Date is valid
- * @param {Date} date The date to check
- * @returns {boolean} Whether the date is valid
- */
-const isValidDate = (date: Date): boolean => date instanceof Date && !Number.isNaN(date.getTime())
-
 
 /**
  * @function
@@ -723,7 +888,7 @@ const commandRegex = (term: string): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term
  * @type {Observable<any>}
  * @constant
  */
-const prepareGenericUpcomingEvent$: Observable<[InputCommand, ClanEvent]> = filteredMessage$(
+const prepareUpcomingGenericEvent$: Observable<[InputCommand, ClanEvent]> = filteredMessage$(
     BOT_COMMANDS.ADD_UPCOMING.command
 )
     .pipe(
@@ -731,8 +896,15 @@ const prepareGenericUpcomingEvent$: Observable<[InputCommand, ClanEvent]> = filt
         boolean => BOT_COMMANDS.ADD_UPCOMING.accessControl.controlFunction(
             command.author, command.guildData
         )),
-        // we need at least a name, starting date and end date
+        // we need at least a name, starting date and end date, and type
         map((command: InputCommand): [InputCommand, ClanEvent] => {
+            // let's only allow 10 events per Guild
+            if (command.guildData.events.length >= 10) {
+                logger.debug(`Guild ${command.guild.name} added too many events`)
+                command.message.reply('this guild has too many events scheduled')
+                return null
+            }
+
             const compoundRegex: string = commandRegex(eventTermRegex)
             const regexes: RegExp[] = [
                 new RegExp(`name${compoundRegex}`, 'gim'),
@@ -752,12 +924,15 @@ const prepareGenericUpcomingEvent$: Observable<[InputCommand, ClanEvent]> = filt
             const endingDate: Date = dateA > dateB ? dateA : dateB
 
             const inputType: string = parsedRegexes[3].toUpperCase()
-            const type = EVENT_TYPE[inputType] === undefined
-                ? EVENT_TYPE.GENERIC
-                : EVENT_TYPE[inputType]
-
+            if (EVENT_TYPE[inputType] === undefined) {
+                logger.debug(`Admin ${command.author.username} entered invalid event type`)
+                command.message.reply(`invalid event type\n${BOT_COMMANDS.ADD_UPCOMING.parameters}`)
+                return null
+            }
+            const type = EVENT_TYPE[inputType]
             const clanEvent: ClanEvent = {
                 name: parsedRegexes[0],
+                uuid: uuidv4(),
                 startingDate,
                 endingDate,
                 type,
@@ -771,11 +946,29 @@ const prepareGenericUpcomingEvent$: Observable<[InputCommand, ClanEvent]> = filt
                 command.message.reply('starting date or ending date is invalid use IS0 8601 standard')
                 return null
             }
-            if (startingDate <= new Date()) {
+            const now: Date = new Date()
+            if (startingDate <= now) {
                 logger.debug(`Admin ${command.author.username} entered a start date in the past`)
                 command.message.reply('cannot start an event in the past')
                 return null
             }
+            const threeWeeksFromNow: Date = new Date()
+            threeWeeksFromNow.setDate(threeWeeksFromNow.getDate() + 21)
+            if (endingDate > threeWeeksFromNow) {
+                logger.debug(`Admin ${command.author.username} entered a end date too far in the future`)
+                command.message.reply('event must end within 3 weeks of now')
+                return null
+            }
+            if (endingDate.getTime() - startingDate.getTime() <= 30 * 60 * 1000) {
+                logger.debug(`Admin ${command.author.username} entered a start date and end date too close together`)
+                command.message.reply('events must be at least 30 minutes long')
+                return null
+            }
+            /*
+            if (startingDate.getDate() - now.getDate() <= 2 * 60 * 60 * 1000) {
+                logger.debug(`Admin ${command.author.username} entered a start date without warning`)
+                command.message.reply('you must give at least 2 hours advance notice of the event')
+            } */
             return [command, clanEvent]
         }),
         filter((commandEventArr: [InputCommand, ClanEvent]): boolean => commandEventArr !== null),
@@ -795,12 +988,13 @@ const prepareGenericUpcomingEvent$: Observable<[InputCommand, ClanEvent]> = filt
  * @type {Observable<any>}
  * @constant
  */
-const addUpcomingGenericEvent$: Observable<[GuildData, discord.Message]> = prepareGenericUpcomingEvent$
+const addUpcomingGenericEvent$:
+Observable<[GuildData, discord.Message, ClanEvent]> = prepareUpcomingGenericEvent$
     .pipe(
         filter((commandEventArr: [InputCommand, ClanEvent]): boolean => commandEventArr[1].type
         === EVENT_TYPE.GENERIC),
         switchMap((commandEventArr: [InputCommand, ClanEvent]):
-        Observable<[GuildData, discord.Message]> => {
+        Observable<[GuildData, discord.Message, ClanEvent]> => {
             const events: ClanEvent[] = commandEventArr[0].guildData.events.concat(
                 commandEventArr[1]
             )
@@ -813,7 +1007,8 @@ const addUpcomingGenericEvent$: Observable<[GuildData, discord.Message]> = prepa
             }) as GuildData
             return forkJoin(
                 save$(commandEventArr[0].guild.id, newGuildData),
-                of<discord.Message>(commandEventArr[0].message)
+                of<discord.Message>(commandEventArr[0].message),
+                of<ClanEvent>(commandEventArr[1])
             )
         })
     )
@@ -823,12 +1018,13 @@ const addUpcomingGenericEvent$: Observable<[GuildData, discord.Message]> = prepa
  * @type {Observable<any>}
  * @constant
  */
-const addUpcomingXpEvent$: Observable<[GuildData, discord.Message]> = prepareGenericUpcomingEvent$
+const addUpcomingXpEvent$:
+Observable<[GuildData, discord.Message, ClanEvent]> = prepareUpcomingGenericEvent$
     .pipe(
         filter((commandEventArr: [InputCommand, ClanEvent]): boolean => commandEventArr[1].type
             === EVENT_TYPE.XP),
         switchMap((commandEventArr: [InputCommand, ClanEvent]):
-        Observable<[GuildData, discord.Message]> => {
+        Observable<[GuildData, discord.Message, ClanEvent]> => {
             const compoundRegex: string = commandRegex(eventTermRegex)
             const skillsRegex = [
                 new RegExp(`skills${compoundRegex}`, 'gim')
@@ -837,7 +1033,7 @@ const addUpcomingXpEvent$: Observable<[GuildData, discord.Message]> = prepareGen
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`Admin ${commandEventArr[0].author.id} entered no skills`)
                 commandEventArr[0].message.reply(`no skills specified\n${BOT_COMMANDS.ADD_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message]>(null)
+                return of<[GuildData, discord.Message, ClanEvent]>(null)
             }
             const skills = parsedRegex[0]
             const skillsArr: string[] = skills.split(' ').map(
@@ -852,7 +1048,7 @@ const addUpcomingXpEvent$: Observable<[GuildData, discord.Message]> = prepareGen
             if (skillsArr.length !== filteredSkills.length) {
                 logger.debug(`Admin ${commandEventArr[0].author.id} entered some invalid skill names`)
                 commandEventArr[0].message.reply(`some skill names entered are invalid\nchoices are: [${OSRS_SKILLS.toString}]`)
-                return of<[GuildData, discord.Message]>(null)
+                return of<[GuildData, discord.Message, ClanEvent]>(null)
             }
             const xpClanEvent: XpClanEvent = update(commandEventArr[1], {
                 skills: skillsArr
@@ -867,11 +1063,15 @@ const addUpcomingXpEvent$: Observable<[GuildData, discord.Message]> = prepareGen
             }) as GuildData
             return forkJoin(
                 save$(commandEventArr[0].guild.id, newGuildData),
-                of<discord.Message>(commandEventArr[0].message)
+                of<discord.Message>(commandEventArr[0].message),
+                of<ClanEvent>(commandEventArr[1])
             )
         }),
-        filter((saveMsgArr: [GuildData, discord.Message]): boolean => saveMsgArr !== null)
+        filter((saveMsgArr: [GuildData, discord.Message, ClanEvent]):
+        boolean => saveMsgArr !== null)
     )
+
+// observe event creation and set timers
 
 /**
  * @function
@@ -899,8 +1099,8 @@ const listUpcomingEvent$: Observable<void> = filteredMessage$(BOT_COMMANDS.LIST_
             const eventsStr = upcomingEvents.map(
                 (event: ClanEvent, idx: number): string => {
                     const { name } = event
-                    const startingDateStr = event.startingDate.toDateString()
-                    const endingDateStr = event.endingDate.toDateString()
+                    const startingDateStr = event.startingDate.toString()
+                    const endingDateStr = event.endingDate.toString()
                     const { type } = event
                     const retStr = `\n${idx}: ${name} starting: ${startingDateStr} ending: ${endingDateStr} type: ${type}`
                     if (event.skills !== undefined) {
@@ -923,7 +1123,7 @@ const listUpcomingEvent$: Observable<void> = filteredMessage$(BOT_COMMANDS.LIST_
  * @type {Observable<any>}
  * @constant
  */
-const deleteUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
+const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, ClanEvent]> = filteredMessage$(
     BOT_COMMANDS.DELETE_UPCOMING.command
 )
     .pipe(
@@ -935,26 +1135,29 @@ const deleteUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
         tap((): void => {
             logger.debug('Admin called delete upcoming event')
         }),
-        switchMap((command: InputCommand): Observable<[GuildData, discord.Message]> => {
+        switchMap((command: InputCommand): Observable<[GuildData, discord.Message, ClanEvent]> => {
             const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
             const idxToRemove: number = parseInt(command.input, 10)
+            const removedEvent: ClanEvent = upcomingEvents[idxToRemove]
             const filteredEvents: ClanEvent[] = upcomingEvents.filter(
                 (event: ClanEvent, idx: number): boolean => idx !== idxToRemove
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
                 command.message.reply(`invalid index ${idxToRemove}\n${BOT_COMMANDS.DELETE_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message]>(null)
+                return of<[GuildData, discord.Message, ClanEvent]>(null)
             }
             const newGuildData: GuildData = update(command.guildData, {
                 events: filteredEvents
             }) as GuildData
             return forkJoin(
                 save$(command.guild.id, newGuildData),
-                of<discord.Message>(command.message)
+                of<discord.Message>(command.message),
+                of<ClanEvent>(removedEvent)
             )
         }),
-        filter((saveMsgArr: [GuildData, discord.Message]): boolean => saveMsgArr !== null)
+        filter((saveMsgArr: [GuildData, discord.Message, ClanEvent]):
+        boolean => saveMsgArr !== null)
     )
 
 
@@ -1026,11 +1229,11 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
             // is the player already added?
             const filteredParticipants: ClanEventParticipant[] = eventToModify.participants.filter(
                 (participant: ClanEventParticipant): boolean => participant.rsn === rsnToAdd
-                    || participant.id === userIdToAdd
+                    || participant.discordId === userIdToAdd
             )
             if (filteredParticipants.length > 0) {
                 logger.debug('Player already exists')
-                const idSignedUp: string = filteredParticipants[0].id
+                const idSignedUp: string = filteredParticipants[0].discordId
                 const playerSignedUp: string = filteredParticipants[0].rsn
                 command.message.reply(`<@${idSignedUp}> already signed up ${playerSignedUp}`)
                 return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
@@ -1040,7 +1243,7 @@ const signupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredM
             // or create a new one and continue
             const participantToAdd = {
                 rsn: rsnToAdd,
-                id: command.author.id
+                discordId: command.author.id
             }
 
             if (eventToModifyType) {
@@ -1170,7 +1373,8 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
             const eventToModify: ClanEvent = upcomingEvents[idxToModify]
             const participantCount: number = eventToModify.participants.length
             const newEventParticipants: ClanEventParticipant[] = eventToModify.participants.filter(
-                (participant: ClanEventParticipant): boolean => participant.id !== command.author.id
+                (participant: ClanEventParticipant):
+                boolean => participant.discordId !== command.author.id
             )
 
             // user was not signed up
@@ -1231,7 +1435,7 @@ const amISignedUp$: Observable<void> = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP
             const filteredEventParticipants: ClanEventParticipant[] = eventToCheck
                 .participants.filter(
                     (participant: ClanEventParticipant):
-                    boolean => participant.id === command.author.id
+                    boolean => participant.discordId === command.author.id
                 )
 
             const filteredParticipant: ClanEventParticipant = filteredEventParticipants.length > 0
@@ -1268,7 +1472,7 @@ const listParticipant$: Observable<void> = filteredMessage$(
             const eventToList: ClanEvent = upcomingEvents[idxToCheck]
             const formattedStr: string = eventToList.participants.map(
                 (participant: ClanEventParticipant, idx: number): string => {
-                    const nickname: string = userIdToNickname(command.guild, participant.id)
+                    const nickname: string = userIdToNickname(command.guild, participant.discordId)
                     return `\n${idx}: ${nickname} signed up ${participant.rsn}`
                 }
             ).join('')
@@ -1291,15 +1495,23 @@ const help$: Observable<void> = filteredMessage$(BOT_COMMANDS.HELP.command)
             command.author, command.guildData
         )),
         map((command: InputCommand): void => {
-            const commandValues: BotCommand[] = Object.keys(BOT_COMMANDS).map(
+            const keys: string[] = Object.keys(BOT_COMMANDS).filter(
+                (key: string): boolean => {
+                    const admin: boolean = isAdmin(command.author, command.guildData)
+                    const botCommand: BotCommand = BOT_COMMANDS[key]
+                    return (admin && (botCommand.accessControl === ONLY_ADMIN
+                        || botCommand.accessControl === ONLY_UNSET_ADMINS_OR_ADMIN))
+                        || botCommand.accessControl === ANY_USER
+                }
+            )
+            const commandValues: BotCommand[] = keys.map(
                 (key: string): BotCommand => BOT_COMMANDS[key] as BotCommand
             )
             const outerStr: string[] = commandValues.map((commandInfo: BotCommand): string => {
                 const innerStr: string[] = [
-                    `\n'${commandInfo.command}'`,
+                    `\n'${commandInfo.command}${commandInfo.parameters}'`,
                     `\ndescription: ${commandInfo.description}`,
-                    `\naccess control: ${commandInfo.accessControl.description}`,
-                    `\nparameters: ${commandInfo.parameters}`
+                    `\naccess control: ${commandInfo.accessControl.description}`
                 ]
                 return innerStr.join('')
             })
@@ -1311,11 +1523,39 @@ const help$: Observable<void> = filteredMessage$(BOT_COMMANDS.HELP.command)
         })
     )
 
+// eslint-disable-next-line max-len
+const setChannel$: Observable<[GuildData, discord.Message, discord.Channel]> = filteredMessage$(BOT_COMMANDS.SET_CHANNEL.command)
+    .pipe(
+        filter((command: InputCommand):
+        boolean => BOT_COMMANDS.SET_CHANNEL.accessControl.controlFunction(
+            command.author, command.guildData
+        )),
+        filter((command: InputCommand): boolean => {
+            const channel = command.message.mentions.channels.first()
+            if (channel === undefined) return false
+            return command.guild.channels.get(channel.id) !== undefined
+        }),
+        switchMap((command: InputCommand):
+        Observable<[GuildData, discord.Message, discord.Channel]> => {
+            const channel: discord.Channel = command.message.mentions.channels.first()
+            const newSettings: GuildSettings = update(command.guildData.settings, {
+                notificationChannelId: channel.id
+            }) as GuildSettings
+            const newData: GuildData = update(command.guildData, {
+                settings: newSettings
+            }) as GuildData
+            return forkJoin(
+                save$(command.guild.id, newData),
+                of<discord.Message>(command.message),
+                of<discord.Channel>(channel)
+            )
+        })
+    )
 
-//--------------
-// Subscriptions
+//------------------------
+// Subscriptions & helpers
 //
-//--------------
+//------------------------
 
 /**
  * @function
@@ -1323,13 +1563,13 @@ const help$: Observable<void> = filteredMessage$(BOT_COMMANDS.HELP.command)
  * @param {GuildData} guildData The GuildData to check
  * @returns {ClanEvent[]} The array of ongoing clan events for Guild id
  */
+
 const getInFlightEvents = (guildData: GuildData): ClanEvent[] => guildData.events.filter(
     (event: ClanEvent): boolean => {
         const now: Date = new Date()
         return event.startingDate < now && event.endingDate > now
     }
 )
-
 
 /**
  * @function
@@ -1340,7 +1580,10 @@ const getInFlightEvents = (guildData: GuildData): ClanEvent[] => guildData.event
 const getUnnotifiedEvents = (guildData: GuildData):
 ClanEvent[] => guildData.events.filter(
     (event: ClanEvent): boolean => !event.hasNotifiedTwoHourWarning
+    || !event.hasNotifiedStarted
+    || !event.hasNotifiedEnded
 )
+
 connect$.subscribe((): void => {
     logger.info('Connected')
     logger.info('Logged in as:')
@@ -1351,30 +1594,30 @@ connect$.subscribe((): void => {
     gClient.guilds.forEach((guild): void => {
         logger.verbose(`* ${guild.name} (${guild.id})`)
         logger.verbose('* Loading guild json')
-        load$(guild.id, true).subscribe((data: GuildData): void => {
+        load$(guild.id, true).subscribe((guildData: GuildData): void => {
             logger.debug(`Loaded json for guild ${guild.id}`)
-            logger.silly(`${JSON.stringify(data)}`)
+            logger.silly(`${JSON.stringify(guildData)}`)
 
             // startup tasks
             // handle generic events here
 
-            const unnotifiedEvents = getUnnotifiedEvents(data)
-            unnotifiedEvents.forEach((event: ClanEvent): void => {
+            const unnotifiedEvents = getUnnotifiedEvents(guildData)
+            unnotifiedEvents.forEach((clanEvent: ClanEvent): void => {
+                const uuidToCheck: string = clanEvent.uuid
                 // we should probably notify in flight events but not so much of ended events
-                // TODO: find events within 2 hours of start date
                 // if we are within tolerance, notify if we haven't already
                 // if we are not within tolerance, write an apology if we haven't notified
                 const now: Date = new Date()
-                const twoHoursBeforeStart: Date = new Date(event.startingDate.getTime())
+                const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
                 twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
 
-                const toleranceAfterStart: Date = new Date(event.startingDate.getTime())
+                const toleranceAfterStart: Date = new Date(clanEvent.startingDate.getTime())
                 toleranceAfterStart.setMinutes(toleranceAfterStart.getMinutes() + 30)
 
-                const toleranceAfterEnd: Date = new Date(event.endingDate.getTime())
+                const toleranceAfterEnd: Date = new Date(clanEvent.endingDate.getTime())
                 toleranceAfterEnd.setMinutes(toleranceAfterEnd.getMinutes() + 30)
 
-                const toleranceAfterEndTolerance: Date = new Date(event.endingDate.getTime())
+                const toleranceAfterEndTolerance: Date = new Date(clanEvent.endingDate.getTime())
                 toleranceAfterEndTolerance.setHours(toleranceAfterEndTolerance.getHours() + 2)
 
                 // if we are before 2 hour warning, schedule warnings
@@ -1383,131 +1626,221 @@ connect$.subscribe((): void => {
                     // schedule 2 hour warning
                     // schedule start date notification
                     // schedule end date notification
-                } else if (now >= twoHoursBeforeStart && now < event.startingDate) {
+                    timers[clanEvent.uuid] = [
+                        setTimerTwoHoursBefore(clanEvent, guild, guildData),
+                        setTimerStart(clanEvent, guild, guildData),
+                        setTimerEnd(clanEvent, guild, guildData)
+                    ]
+                } else if (now >= twoHoursBeforeStart && now < clanEvent.startingDate) {
                     logger.debug('after 2 hour warning')
-                    if (!event.hasNotifiedTwoHourWarning) {
+                    if (!clanEvent.hasNotifiedTwoHourWarning) {
                         logger.debug('notification had not fired')
-                        // fire 2 hour notification
+                        notifyTwoHourWarning(clanEvent, guild, guildData.settings.notificationChannelId)
                         // mark 2 hour warning as completed
+                        const newEvent: ClanEvent = update(clanEvent, {
+                            hasNotifiedTwoHourWarning: true
+                        }) as ClanEvent
+                        const newEvents: ClanEvent[] = guildData.events.map(
+                            (event: ClanEvent): ClanEvent => {
+                                if (event.uuid === uuidToCheck) {
+                                    return newEvent
+                                }
+                                return event
+                            }
+                        )
+                        const newData: GuildData = update(guildData, {
+                            events: newEvents
+                        }) as GuildData
+                        save$(guild.id, newData).subscribe((): void => {})
                     }
                     // schedule start date notification
                     // schedule end date notification
-                } else if (now >= event.startingDate && now < toleranceAfterStart) {
+                    timers[clanEvent.uuid] = [
+                        setTimerStart(clanEvent, guild, guildData),
+                        setTimerEnd(clanEvent, guild, guildData)
+                    ]
+                } else if (now >= clanEvent.startingDate && now < toleranceAfterStart) {
                     logger.debug('after event started')
-                    if (!event.hasNotifiedStarted) {
+                    if (!clanEvent.hasNotifiedStarted) {
                         logger.debug('notification had not fired')
                         // fire start notification
-                        // mark 2 hour warning as completed (unnecessary)
+                        // mark 2 hour warning as completed
                         // mark start notification as complete
+                        notifyEventStart(clanEvent, guild, guildData.settings.notificationChannelId)
+                        const newEvent: ClanEvent = update(clanEvent, {
+                            hasNotifiedTwoHourWarning: true,
+                            hasNotifiedStarted: true
+                        }) as ClanEvent
+                        const newEvents: ClanEvent[] = guildData.events.map(
+                            (event: ClanEvent): ClanEvent => {
+                                if (event.uuid === uuidToCheck) {
+                                    return newEvent
+                                }
+                                return event
+                            }
+                        )
+                        const newData: GuildData = update(guildData, {
+                            events: newEvents
+                        }) as GuildData
+                        save$(guild.id, newData).subscribe((): void => {})
                     }
-                    // schedule end date notification
-                } else if (now >= toleranceAfterStart && now < event.endingDate) {
+                    timers[clanEvent.uuid] = [
+                        setTimerEnd(clanEvent, guild, guildData)
+                    ]
+                } else if (now >= toleranceAfterStart && now < clanEvent.endingDate) {
                     logger.debug('after 30 min start tolerance')
-                    if (!event.hasNotifiedStarted) {
+                    if (!clanEvent.hasNotifiedStarted) {
                         logger.error('notification had not fired')
                         // fire start notification
-                        // apologize lol
-                        // mark 2 hour warning as completed (unnecessary)
+                        // mark 2 hour warning as completed
                         // mark start notification as complete
+                        // TODO: apologize lol
+                        notifyEventStart(clanEvent, guild, guildData.settings.notificationChannelId)
+                        const newEvent: ClanEvent = update(clanEvent, {
+                            hasNotifiedTwoHourWarning: true,
+                            hasNotifiedStarted: true
+                        }) as ClanEvent
+                        const newEvents: ClanEvent[] = guildData.events.map(
+                            (event: ClanEvent): ClanEvent => {
+                                if (event.uuid === uuidToCheck) {
+                                    return newEvent
+                                }
+                                return event
+                            }
+                        )
+                        const newData: GuildData = update(guildData, {
+                            events: newEvents
+                        }) as GuildData
+                        save$(guild.id, newData).subscribe((): void => {})
                     }
                     // schedule end date notification
-                } else if (now >= event.endingDate && now < toleranceAfterEnd) {
-                    logger.debug('after event ended')
-                    if (!event.hasNotifiedEnded) {
-                        logger.debug('notification had not fired')
-                        // fire end notification
-                        // mark 2 hour warning as complete (unnecessary)
-                        // mark start notification as complete (unnecessary)
-                        // mark end notification as complete
-                    }
+                    timers[clanEvent.uuid] = [
+                        setTimerEnd(clanEvent, guild, guildData)
+                    ]
                 } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
                     logger.debug('after 2 hour end tolerance')
-                    if (!event.hasNotifiedEnded) {
+                    if (!clanEvent.hasNotifiedEnded) {
                         logger.error('notification had not fired')
                         // fire end notification
                         // apologize
                         // mark 2 hour warning as complete (unnecessary)
                         // mark start notification as complete (unnecessary)
                         // mark end notification as complete
+                        notifyEventEnd(clanEvent, guild, guildData.settings.notificationChannelId)
+                        const newEvent: ClanEvent = update(clanEvent, {
+                            hasNotifiedTwoHourWarning: true,
+                            hasNotifiedStarted: true,
+                            hasNotifiedEnded: true
+                        }) as ClanEvent
+                        const newEvents: ClanEvent[] = guildData.events.map(
+                            (event: ClanEvent): ClanEvent => {
+                                if (event.uuid === uuidToCheck) {
+                                    return newEvent
+                                }
+                                return event
+                            }
+                        )
+                        const newData: GuildData = update(guildData, {
+                            events: newEvents
+                        }) as GuildData
+                        save$(guild.id, newData).subscribe((): void => {})
                     }
                 } else {
                     // too late to do anything
                     // just mark it as fired
+                    const newEvent: ClanEvent = update(clanEvent, {
+                        hasNotifiedTwoHourWarning: true,
+                        hasNotifiedStarted: true,
+                        hasNotifiedEnded: true
+                    }) as ClanEvent
+                    const newEvents: ClanEvent[] = guildData.events.map(
+                        (event: ClanEvent): ClanEvent => {
+                            if (event.uuid === uuidToCheck) {
+                                return newEvent
+                            }
+                            return event
+                        }
+                    )
+                    const newData: GuildData = update(guildData, {
+                        events: newEvents
+                    }) as GuildData
+                    save$(guild.id, newData).subscribe((): void => {})
                 }
             })
 
 
             // are we in flight for an event?
             // make sure they are properly setup
-            const inFlightEvents: ClanEvent[] = getInFlightEvents(data)
-            inFlightEvents.forEach((event: ClanEvent): void => {
-                switch (event.type) {
-                    // TODO: incomplete - implement ended logic
-                    case EVENT_TYPE.XP: {
-                        event.participants.forEach((xpParticipant: XpClanEventParticipant): void => {
-                            xpParticipant.skills.forEach((xpComponent: XpClanEventParticipantSkillsComponent): void => {
-                                if (xpComponent.startingXp < 0) {
-                                    hiscores$(xpParticipant.rsn)
-                                        .pipe(
-                                            switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
-                                                const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
-                                                    startingXp: hiscore.skills[xpComponent.name].xp
-                                                }) as XpClanEventParticipantSkillsComponent
-                                                const newXpParticipant: XpClanEventParticipant = update(xpParticipant, {
-                                                    skills: newXpComponent
-                                                }) as XpClanEventParticipant
-                                                const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
-                                                const newEvent: ClanEvent = update(event, {
-                                                    participants: newXpParticipants
-                                                }) as ClanEvent
-                                                // TODO: this doesn't work for non unique event names and dates
-                                                const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
-                                                const newData: GuildData = update(data, {
-                                                    events: newEvents
-                                                }) as GuildData
-                                                // TODO: very inefficient - implement a flag to trigger automatic load or manual
-                                                return save$(guild.id, newData)
-                                            })
-                                        )
-                                        .subscribe((guildData: GuildData): void => {
-                                            logger.debug('updated user that did not have starting xp data')
-                                        })
-                                }
-                                /* Incorrect logic, we need to find already ended events instead
-                                if (xpComponent.endingXp < 0) {
-                                    hiscores$(xpParticipant.rsn)
-                                        .pipe(
-                                            switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
-                                                const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
-                                                    endingXp: hiscore.skills[xpComponent.name].xp
-                                                }) as XpClanEventParticipantSkillsComponent
-                                                const newXpParticipant: XpClanEventParticipant = update(xpParticipant, {
-                                                    skills: newXpComponent
-                                                }) as XpClanEventParticipant
-                                                const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
-                                                const newEvent: ClanEvent = update(event, {
-                                                    participants: newXpParticipants
-                                                }) as ClanEvent
-                                                // TODO: this doesn't work for non unique event names and dates
-                                                const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
-                                                const newData: GuildData = update(data, {
-                                                    events: newEvents
-                                                }) as GuildData
-                                                return save$(guild.id, newData)
-                                            })
-                                        )
-                                        .subscribe((guildData: GuildData): void => {
-                                            logger.debug('updated user that did not have ending xp data')
-                                        })
-                                }
-                                */
-                            })
-                        })
-                        break
-                    }
-                    default:
-                }
-            })
+            // TODO: full implementation
+            // const inFlightEvents: ClanEvent[] = getInFlightEvents(guildData)
+            // inFlightEvents.forEach((event: ClanEvent): void => {
+            //     switch (event.type) {
+            //         // TODO: incomplete - implement ended logic
+            //         case EVENT_TYPE.XP: {
+            //             event.participants.forEach((xpParticipant: XpClanEventParticipant): void => {
+            //                 xpParticipant.skills.forEach((xpComponent: XpClanEventParticipantSkillsComponent): void => {
+            //                     if (xpComponent.startingXp < 0) {
+            //                         hiscores$(xpParticipant.rsn)
+            //                             .pipe(
+            //                                 switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
+            //                                     const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
+            //                                         startingXp: hiscore.skills[xpComponent.name].xp
+            //                                     }) as XpClanEventParticipantSkillsComponent
+            //                                     const newXpParticipant: XpClanEventParticipant = update(xpParticipant, {
+            //                                         skills: newXpComponent
+            //                                     }) as XpClanEventParticipant
+            //                                     const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
+            //                                     const newEvent: ClanEvent = update(event, {
+            //                                         participants: newXpParticipants
+            //                                     }) as ClanEvent
+            //                                     // TODO: this doesn't work for non unique event names and dates
+            //                                     const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
+            //                                     const newData: GuildData = update(guildData, {
+            //                                         events: newEvents
+            //                                     }) as GuildData
+            //                                     // TODO: very inefficient - implement a flag to trigger automatic load or manual
+            //                                     return save$(guild.id, newData)
+            //                                 })
+            //                             )
+            //                             .subscribe((data: GuildData): void => {
+            //                                 logger.debug('updated user that did not have starting xp data')
+            //                             })
+            //                     }
+            //                     /* Incorrect logic, we need to find already ended events instead
+            //                     if (xpComponent.endingXp < 0) {
+            //                         hiscores$(xpParticipant.rsn)
+            //                             .pipe(
+            //                                 switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
+            //                                     const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
+            //                                         endingXp: hiscore.skills[xpComponent.name].xp
+            //                                     }) as XpClanEventParticipantSkillsComponent
+            //                                     const newXpParticipant: XpClanEventParticipant = update(xpParticipant, {
+            //                                         skills: newXpComponent
+            //                                     }) as XpClanEventParticipant
+            //                                     const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
+            //                                     const newEvent: ClanEvent = update(event, {
+            //                                         participants: newXpParticipants
+            //                                     }) as ClanEvent
+            //                                     // TODO: this doesn't work for non unique event names and dates
+            //                                     const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
+            //                                     const newData: GuildData = update(data, {
+            //                                         events: newEvents
+            //                                     }) as GuildData
+            //                                     return save$(guild.id, newData)
+            //                                 })
+            //                             )
+            //                             .subscribe((guildData: GuildData): void => {
+            //                                 logger.debug('updated user that did not have ending xp data')
+            //                             })
+            //                     }
+            //                     */
+            //                 })
+            //             })
+            //             break
+            //         }
+            //         default:
+            //     }
+            // })
         })
     })
 })
@@ -1530,23 +1863,58 @@ addAdmin$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
     saveMsgArr[1].reply('admin added')
 })
 
-addUpcomingGenericEvent$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
+addUpcomingGenericEvent$.subscribe((saveMsgArr: [GuildData, discord.Message, ClanEvent]): void => {
+    // add timers
+    const guildData: GuildData = saveMsgArr[0]
+    const guild: discord.Guild = saveMsgArr[1].guild
+    const clanEvent: ClanEvent = saveMsgArr[2]
+    timers[clanEvent.uuid] = [
+        setTimerTwoHoursBefore(clanEvent, guild, guildData),
+        setTimerStart(clanEvent, guild, guildData),
+        setTimerEnd(clanEvent, guild, guildData)
+    ]
     logger.debug('GENERIC event added')
-    saveMsgArr[1].reply('generic event added')
+    saveMsgArr[1].reply(`generic event '${saveMsgArr[2].name}' added`)
+    const channel: discord.TextChannel = guild.channels.get(
+        guildData.settings.notificationChannelId
+    ) as discord.TextChannel
+    if (channel === undefined || channel.type !== 'text') return
+    logger.debug('Mentioned general of new generic event')
+    channel.send(`new clan event '${clanEvent.name}' has just been added @everyone`, { disableEveryone: true })
 })
 
-addUpcomingXpEvent$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
+addUpcomingXpEvent$.subscribe((saveMsgArr: [GuildData, discord.Message, ClanEvent]): void => {
+    // add timers
+    const guildData: GuildData = saveMsgArr[0]
+    const guild: discord.Guild = saveMsgArr[1].guild
+    const clanEvent: ClanEvent = saveMsgArr[2]
+    timers[clanEvent.uuid] = [
+        setTimerTwoHoursBefore(clanEvent, guild, guildData),
+        setTimerStart(clanEvent, guild, guildData),
+        setTimerEnd(clanEvent, guild, guildData)
+    ]
     logger.debug('XP event added')
-    saveMsgArr[1].reply('xp event added')
+    saveMsgArr[1].reply(`xp event ${saveMsgArr[2].name} added`)
+    const channel: discord.TextChannel = guild.channels.get(
+        guildData.settings.notificationChannelId
+    ) as discord.TextChannel
+    if (channel === undefined || channel.type !== 'text') return
+    logger.debug('Mentioned general of new xp event')
+    channel.send(`new clan event ${clanEvent.name} has just been added @everyone`, { disableEveryone: true })
 })
 
 listUpcomingEvent$.subscribe((): void => {
     logger.debug('List upcoming events called')
 })
 
-deleteUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
+deleteUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message, ClanEvent]): void => {
+    // cancel timers
+    timers[saveMsgArr[2].uuid].forEach((timerHnd: NodeJS.Timeout): void => {
+        clearTimeout(timerHnd)
+    })
+    timers[saveMsgArr[2].uuid] = undefined
     logger.debug('Event deleted')
-    saveMsgArr[1].reply('event deleted')
+    saveMsgArr[1].reply(`'${saveMsgArr[2].name}' deleted`)
 })
 
 signupUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
@@ -1571,6 +1939,10 @@ help$.subscribe((): void => {
     logger.debug('Help called')
 })
 
+setChannel$.subscribe((saveMsgArr: [GuildData, discord.Message, discord.Channel]): void => {
+    logger.debug('Set channel called')
+    saveMsgArr[1].reply(`notification channel set to ${saveMsgArr[2]}`)
+})
 
 //--------------
 // Global script

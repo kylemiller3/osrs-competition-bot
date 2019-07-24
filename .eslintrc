@@ -18,6 +18,7 @@
   }],
     "@typescript-eslint/no-unused-vars": "warn",
     "@typescript-eslint/explicit-member-accessibility": "off",
-    "arrow-parens": "off"
+    "arrow-parens": "off",
+    "prefer-destructuring": "off"
   }
 }
