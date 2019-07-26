@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc --project ./ && jsdoc ./out -d ./docs",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node ./out/src/n0trout.js"
+    "start": "node ./out/n0trout.js"
   },
   "author": "https://github.com/kylemiller3",
   "license": "GPL-3.0",
