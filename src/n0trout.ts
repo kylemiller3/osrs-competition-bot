@@ -34,29 +34,6 @@ const timers: Record<string, NodeJS.Timeout[]> = {}
  * @param {Function} cmpFunc Comparison function for array
  * @return {T[]} The stable sorted array
  */
-// refactor this out later
-// we don't want our underlying structure order to change from us
-const stableSort = <T>(array: T[], cmpFunc: {(elementA: T, elementB: T): number}): T[] => {
-    // wrap our elements in an array with index property
-    const arrayWrapper = array.map((element, idx): Record<string, T | number> => ({
-        element,
-        idx
-    }))
-
-    // sort the wrappers, breaking sorting ties by using their elements orig index position
-    arrayWrapper.sort((
-        wrapperA: Record<string, T | number>,
-        wrapperB: Record<string, T | number>
-    ): number => {
-        const cmpDiff = cmpFunc(wrapperA.element as T, wrapperB.element as T)
-        return cmpDiff === 0
-            ? (wrapperA.idx as number) - (wrapperB.idx as number)
-            : cmpDiff
-    })
-
-    // unwrap and return the elements
-    return arrayWrapper.map((wrapper: Record<string, T>): T => wrapper.element)
-}
 
 //-----------------------------------------
 // Interface contracts & objects extensions
