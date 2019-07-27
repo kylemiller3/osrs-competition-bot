@@ -82,7 +82,7 @@ interface BotCommands extends Record<string, BotCommand> {
  * @description Contract containing information about clan event participants
  * @interface
  */
-interface ClanEventParticipant extends Record<string, unknown> {
+interface EventParticipant extends Record<string, unknown> {
     rsn: string
     discordId: string
 }
@@ -90,8 +90,8 @@ interface ClanEventParticipant extends Record<string, unknown> {
 /**
  * @description Contract extending ClanEventParticipant to include XpClanEventParticipantComponents
  */
-interface XpClanEventParticipant extends ClanEventParticipant {
-    skills: XpClanEventParticipantSkillsComponent[]
+interface XpEventParticipant extends EventParticipant {
+    skills: XpEventParticipantSkillComponent[]
 }
 
 /**
@@ -99,8 +99,8 @@ interface XpClanEventParticipant extends ClanEventParticipant {
  * a clan event participant needs for XP clan events
  * @interface
  */
-interface XpClanEventParticipantSkillsComponent extends Record<string, unknown> {
-    name: string
+interface XpEventParticipantSkillComponent extends Record<string, unknown> {
+    skillName: string
     startingXp: number
     endingXp: number
 }
@@ -109,13 +109,12 @@ interface XpClanEventParticipantSkillsComponent extends Record<string, unknown> 
  * @description Contract containing information about a specific clan event
  * @interface
  */
-interface ClanEvent extends Record<string, unknown> {
+interface Event extends Record<string, unknown> {
     name: string
-    uuid: string
     startingDate: Date
     endingDate: Date
     type: string
-    participants: ClanEventParticipant[]
+    participants: EventParticipant[]
     hasNotifiedTwoHourWarning: boolean
     hasNotifiedStarted: boolean
     hasNotifiedEnded: boolean
@@ -125,7 +124,7 @@ interface ClanEvent extends Record<string, unknown> {
  * @description Contract extending a ClanEvent with the skills tracked by a XP clan event
  * @interface
  */
-interface XpClanEvent extends ClanEvent {
+interface XpEvent extends Event {
     skills: string[]
 }
 
@@ -144,7 +143,7 @@ interface GuildSettings extends Record<string, unknown> {
  */
 interface GuildData extends Record<string, unknown> {
     settings: GuildSettings
-    events: ClanEvent[]
+    events: Event[]
 }
 
 /**
@@ -508,19 +507,19 @@ const save$ = (id: string, guildData: GuildData): Observable<GuildData> => of<Gu
 /**
  * @function
  * @description Notifies the users of a Guild signed up for a specific event
- * @param {ClanEvent} event The event to notify participants of
+ * @param {Event} event The event to notify participants of
  * @param {discord.Guild} guild The guild to notify
  * @param {string} channelId The channel to send the notification
  * @param {string} message The message to send
  */
 const notifyClanEvent = (
-    clanEvent: ClanEvent,
+    clanEvent: Event,
     guild: discord.Guild,
     channelId: string,
     message: string
 ): void => {
     const participants: string[] = clanEvent.participants.map(
-        (participant: ClanEventParticipant): string => participant.discordId
+        (participant: EventParticipant): string => participant.discordId
     )
     const mentions: string = participants.map(
         (participant: string): string => `<@${participant}>`
@@ -540,7 +539,7 @@ const notifyClanEvent = (
  * @param guildData The GuildData to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-const setTimerTwoHoursBefore = (clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
+const setTimerTwoHoursBefore = (clanEvent: Event, guild: discord.Guild, guildData: GuildData):
 NodeJS.Timeout => {
     const now: Date = new Date()
     const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
@@ -548,10 +547,10 @@ NodeJS.Timeout => {
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
         // mark 2 hour warning as completed
-        const newEvent: ClanEvent = update(clanEvent, {
+        const newEvent: Event = update(clanEvent, {
             hasNotifiedTwoHourWarning: true
-        }) as ClanEvent
-        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+        }) as Event
+        const newEvents: Event[] = guildData.events.map((event: Event): Event => {
             if (newEvent.uuid === event.uuid) {
                 return newEvent
             }
@@ -572,16 +571,16 @@ NodeJS.Timeout => {
  * @param guildData The GuildData to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-const setTimerStart = (clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
+const setTimerStart = (clanEvent: Event, guild: discord.Guild, guildData: GuildData):
 NodeJS.Timeout => {
     const now: Date = new Date()
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has started')
         // mark start date as completed
-        const newEvent: ClanEvent = update(clanEvent, {
+        const newEvent: Event = update(clanEvent, {
             hasNotifiedStarted: true
-        }) as ClanEvent
-        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+        }) as Event
+        const newEvents: Event[] = guildData.events.map((event: Event): Event => {
             if (newEvent.uuid === event.uuid) {
                 return newEvent
             }
@@ -602,16 +601,16 @@ NodeJS.Timeout => {
  * @param guildData The GuildData to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-function setTimerEnd(clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
+function setTimerEnd(clanEvent: Event, guild: discord.Guild, guildData: GuildData):
 NodeJS.Timeout {
     const now: Date = new Date()
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
         // mark end date as completed
-        const newEvent: ClanEvent = update(clanEvent, {
+        const newEvent: Event = update(clanEvent, {
             hasNotifiedEnded: true
-        }) as ClanEvent
-        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+        }) as Event
+        const newEvents: Event[] = guildData.events.map((event: Event): Event => {
             if (newEvent.uuid === event.uuid) {
                 return newEvent
             }
@@ -828,12 +827,12 @@ const commandRegex = (term: string): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term
  * @type {Observable<any>}
  * @constant
  */
-const prepareUpcomingGenericEvent$: Observable<[InputCommand, ClanEvent]> = filteredMessage$(
+const prepareUpcomingGenericEvent$: Observable<[InputCommand, Event]> = filteredMessage$(
     BOT_COMMANDS.ADD_UPCOMING
 )
     .pipe(
         // we need at least a name, starting date and end date, and type
-        map((command: InputCommand): [InputCommand, ClanEvent] => {
+        map((command: InputCommand): [InputCommand, Event] => {
             // let's only allow 10 events per Guild
             if (command.guildData.events.length >= 10) {
                 logger.debug(`Guild ${command.guild.name} added too many events`)
@@ -866,7 +865,7 @@ const prepareUpcomingGenericEvent$: Observable<[InputCommand, ClanEvent]> = filt
                 return null
             }
             const type = EVENT_TYPE[inputType]
-            const clanEvent: ClanEvent = {
+            const clanEvent: Event = {
                 name: parsedRegexes[0],
                 uuid: uuidv4(),
                 startingDate,
@@ -902,8 +901,8 @@ const prepareUpcomingGenericEvent$: Observable<[InputCommand, ClanEvent]> = filt
             }
             return [command, clanEvent]
         }),
-        filter((commandEventArr: [InputCommand, ClanEvent]): boolean => commandEventArr !== null),
-        tap((commandEventArr: [InputCommand, ClanEvent]): void => {
+        filter((commandEventArr: [InputCommand, Event]): boolean => commandEventArr !== null),
+        tap((commandEventArr: [InputCommand, Event]): void => {
             logger.debug(`Admin ${commandEventArr[0].author.username} called add event`)
             logger.debug('Event properties: ')
             logger.debug(`* ${commandEventArr[1].name}`)
@@ -920,10 +919,10 @@ const prepareUpcomingGenericEvent$: Observable<[InputCommand, ClanEvent]> = filt
  * @constant
  */
 const filterUpcomingGenericEvent$:
-Observable<[InputCommand, ClanEvent]> = prepareUpcomingGenericEvent$
+Observable<[InputCommand, Event]> = prepareUpcomingGenericEvent$
     .pipe(
-        filter((commandEventArr: [InputCommand, ClanEvent]): boolean => {
-            const clanEvent: ClanEvent = commandEventArr[1]
+        filter((commandEventArr: [InputCommand, Event]): boolean => {
+            const clanEvent: Event = commandEventArr[1]
             return clanEvent.type === EVENT_TYPE.GENERIC
         }),
     )
@@ -934,15 +933,15 @@ Observable<[InputCommand, ClanEvent]> = prepareUpcomingGenericEvent$
  * @constant
  */
 const filterAndPrepareUpcomingXpEvent$:
-Observable<[InputCommand, ClanEvent]> = prepareUpcomingGenericEvent$
+Observable<[InputCommand, Event]> = prepareUpcomingGenericEvent$
     .pipe(
-        filter((commandEventArr: [InputCommand, ClanEvent]): boolean => {
-            const clanEvent: ClanEvent = commandEventArr[1]
+        filter((commandEventArr: [InputCommand, Event]): boolean => {
+            const clanEvent: Event = commandEventArr[1]
             return clanEvent.type === EVENT_TYPE.XP
         }),
-        map((commandEventArr: [InputCommand, ClanEvent]): [InputCommand, ClanEvent] => {
+        map((commandEventArr: [InputCommand, Event]): [InputCommand, Event] => {
             const inputCommand: InputCommand = commandEventArr[0]
-            const clanEvent: ClanEvent = commandEventArr[1]
+            const clanEvent: Event = commandEventArr[1]
             const compoundRegex: string = commandRegex(eventTermRegex)
             const skillsRegex = [
                 new RegExp(`skills${compoundRegex}`, 'gim')
@@ -968,21 +967,21 @@ Observable<[InputCommand, ClanEvent]> = prepareUpcomingGenericEvent$
                 inputCommand.message.reply(`some skill names entered are invalid\nchoices are: [${OSRS_SKILLS.toString}]`)
                 return null
             }
-            const xpClanEvent: XpClanEvent = update(clanEvent, {
+            const xpClanEvent: XpEvent = update(clanEvent, {
                 skills: skillsArr
-            }) as XpClanEvent
+            }) as XpEvent
             return [inputCommand, xpClanEvent]
         }),
-        filter((commandEventArr: [InputCommand, ClanEvent]): boolean => commandEventArr !== null)
+        filter((commandEventArr: [InputCommand, Event]): boolean => commandEventArr !== null)
     )
 
 const saveEvent$ = merge(filterUpcomingGenericEvent$, filterAndPrepareUpcomingXpEvent$)
     .pipe(
-        switchMap((commandEventArr: [InputCommand, ClanEvent]):
-        Observable<[InputCommand, ClanEvent, number, GuildData]> => {
+        switchMap((commandEventArr: [InputCommand, Event]):
+        Observable<[InputCommand, Event, number, GuildData]> => {
             const inputCommand: InputCommand = commandEventArr[0]
-            const clanEvent: ClanEvent = commandEventArr[1]
-            const events: ClanEvent[] = inputCommand.guildData.events.concat(clanEvent)
+            const clanEvent: Event = commandEventArr[1]
+            const events: Event[] = inputCommand.guildData.events.concat(clanEvent)
             // const sortedEvents: ClanEvent[] = stableSort(
             //     events, (eventA: ClanEvent, eventB: ClanEvent):
             //     number => eventA.startingDate.getTime() - eventB.startingDate.getTime()
@@ -992,12 +991,12 @@ const saveEvent$ = merge(filterUpcomingGenericEvent$, filterAndPrepareUpcomingXp
             }) as GuildData
             return forkJoin(
                 of<InputCommand>(inputCommand),
-                of<ClanEvent>(clanEvent),
+                of<Event>(clanEvent),
                 of<number>(events.length - 1),
                 save$(commandEventArr[0].guild.id, newGuildData)
             )
         }),
-        filter((saveArr: [InputCommand, ClanEvent, number, GuildData]): boolean => saveArr !== null)
+        filter((saveArr: [InputCommand, Event, number, GuildData]): boolean => saveArr !== null)
     )
 
 
@@ -1006,22 +1005,22 @@ const saveEvent$ = merge(filterUpcomingGenericEvent$, filterAndPrepareUpcomingXp
 /**
  * @function
  * @description Gets all scheduled events
- * @param {ClanEvent[]} events ClanEvents source
- * @returns {ClanEvent[]} The array of upcoming ClanEvents
+ * @param {Event[]} events ClanEvents source
+ * @returns {Event[]} The array of upcoming ClanEvents
  */
-const getUpcomingEvents = (events: ClanEvent[]): ClanEvent[] => events.filter(
-    (event: ClanEvent): boolean => event.startingDate > new Date()
+const getUpcomingEvents = (events: Event[]): Event[] => events.filter(
+    (event: Event): boolean => event.startingDate > new Date()
 )
 
 /**
  * @function
  * @description Gets currently running events
  * @param {GuildData} guildData The GuildData to check
- * @returns {ClanEvent[]} The array of ongoing ClanEvents for Guild id
+ * @returns {Event[]} The array of ongoing ClanEvents for Guild id
  */
 
-const getInFlightEvents = (clanEvents: ClanEvent[]): ClanEvent[] => clanEvents.filter(
-    (event: ClanEvent): boolean => {
+const getInFlightEvents = (clanEvents: Event[]): Event[] => clanEvents.filter(
+    (event: Event): boolean => {
         const now: Date = new Date()
         return event.startingDate <= now && event.endingDate > now
     }
@@ -1030,11 +1029,11 @@ const getInFlightEvents = (clanEvents: ClanEvent[]): ClanEvent[] => clanEvents.f
 /**
  * @function
  * @description Get all completed events
- * @param {ClanEvent[]} events ClanEvents source
- * @returns {ClanEvent[]} The array of ended ClanEvents for Guild id
+ * @param {Event[]} events ClanEvents source
+ * @returns {Event[]} The array of ended ClanEvents for Guild id
  */
-const getEndedEvents = (clanEvents: ClanEvent[]): ClanEvent[] => clanEvents.filter(
-    (event: ClanEvent): boolean => {
+const getEndedEvents = (clanEvents: Event[]): Event[] => clanEvents.filter(
+    (event: Event): boolean => {
         const now: Date = new Date()
         return event.endingDate <= now
     }
@@ -1048,16 +1047,16 @@ const getEndedEvents = (clanEvents: ClanEvent[]): ClanEvent[] => clanEvents.filt
 const listUpcomingEvent$: Observable<void> = filteredMessage$(BOT_COMMANDS.LIST_UPCOMING)
     .pipe(
         map((command: InputCommand): void => {
-            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
             const eventsStr = upcomingEvents.map(
-                (event: ClanEvent, idx: number): string => {
+                (event: Event, idx: number): string => {
                     const { name } = event
                     const startingDateStr = event.startingDate.toString()
                     const endingDateStr = event.endingDate.toString()
                     const { type } = event
                     const retStr = `\n${idx}: ${name} starting: ${startingDateStr} ending: ${endingDateStr} type: ${type}`
                     if (event.skills !== undefined) {
-                        const xpEvent: XpClanEvent = event as XpClanEvent
+                        const xpEvent: XpEvent = event as XpEvent
                         const skills: string = xpEvent.skills.join(' ')
                         return retStr.concat(` skills: ${skills}`)
                     }
@@ -1076,21 +1075,21 @@ const listUpcomingEvent$: Observable<void> = filteredMessage$(BOT_COMMANDS.LIST_
  * @type {Observable<any>}
  * @constant
  */
-const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, ClanEvent]> = filteredMessage$(
+const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, Event]> = filteredMessage$(
     BOT_COMMANDS.DELETE_UPCOMING
 )
     .pipe(
-        switchMap((command: InputCommand): Observable<[GuildData, discord.Message, ClanEvent]> => {
-            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
+        switchMap((command: InputCommand): Observable<[GuildData, discord.Message, Event]> => {
+            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
             const idxToRemove: number = parseInt(command.input, 10)
-            const removedEvent: ClanEvent = upcomingEvents[idxToRemove]
-            const filteredEvents: ClanEvent[] = upcomingEvents.filter(
-                (event: ClanEvent, idx: number): boolean => idx !== idxToRemove
+            const removedEvent: Event = upcomingEvents[idxToRemove]
+            const filteredEvents: Event[] = upcomingEvents.filter(
+                (event: Event, idx: number): boolean => idx !== idxToRemove
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
                 command.message.reply(`invalid index ${idxToRemove}\n${BOT_COMMANDS.DELETE_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message, ClanEvent]>(null)
+                return of<[GuildData, discord.Message, Event]>(null)
             }
             const newGuildData: GuildData = update(command.guildData, {
                 events: filteredEvents
@@ -1098,10 +1097,10 @@ const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, ClanEvent]> 
             return forkJoin(
                 save$(command.guild.id, newGuildData),
                 of<discord.Message>(command.message),
-                of<ClanEvent>(removedEvent)
+                of<Event>(removedEvent)
             )
         }),
-        filter((saveMsgArr: [GuildData, discord.Message, ClanEvent]):
+        filter((saveMsgArr: [GuildData, discord.Message, Event]):
         boolean => saveMsgArr !== null)
     )
 
@@ -1153,7 +1152,7 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
 
             // get upcoming events
             // if index is out of range return
-            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
             const idxToModify: number = Number.parseInt(parsedRegex[0], 10)
             const userIdToAdd: string = command.author.id
             const rsnToAdd: string = parsedRegex[1]
@@ -1164,11 +1163,11 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
             }
 
             // get event to modify and its type
-            const eventToModify: ClanEvent = upcomingEvents[idxToModify]
+            const eventToModify: Event = upcomingEvents[idxToModify]
 
             // is the player already added?
-            const filteredParticipants: ClanEventParticipant[] = eventToModify.participants.filter(
-                (participant: ClanEventParticipant): boolean => participant.rsn === rsnToAdd
+            const filteredParticipants: EventParticipant[] = eventToModify.participants.filter(
+                (participant: EventParticipant): boolean => participant.rsn === rsnToAdd
                     || participant.discordId === userIdToAdd
             )
             if (filteredParticipants.length > 0) {
@@ -1187,7 +1186,7 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
             }
 
             // add participant to event array
-            const newEventParticipants: ClanEventParticipant[] = eventToModify
+            const newEventParticipants: EventParticipant[] = eventToModify
                 .participants.concat(
                     [participantToAdd]
                 )
@@ -1195,11 +1194,11 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
             // create a new event
             // create new event list
             // create new Guild data
-            const newEvent: ClanEvent = update(eventToModify, {
+            const newEvent: Event = update(eventToModify, {
                 participants: newEventParticipants
-            }) as ClanEvent
-            const newEvents: ClanEvent[] = command.guildData.events.map(
-                (event: ClanEvent, idx: number): ClanEvent => {
+            }) as Event
+            const newEvents: Event[] = command.guildData.events.map(
+                (event: Event, idx: number): Event => {
                     if (idx === idxToModify) {
                         return newEvent
                     }
@@ -1245,7 +1244,7 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
         switchMap((command: InputCommand): Observable<[GuildData, discord.Message]> => {
             // get upcoming events
             // if index is out of range return
-            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
             const idxToModify: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
@@ -1254,10 +1253,10 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
             }
 
             // does the event to modify contain our user?
-            const eventToModify: ClanEvent = upcomingEvents[idxToModify]
+            const eventToModify: Event = upcomingEvents[idxToModify]
             const participantCount: number = eventToModify.participants.length
-            const newEventParticipants: ClanEventParticipant[] = eventToModify.participants.filter(
-                (participant: ClanEventParticipant):
+            const newEventParticipants: EventParticipant[] = eventToModify.participants.filter(
+                (participant: EventParticipant):
                 boolean => participant.discordId !== command.author.id
             )
 
@@ -1271,11 +1270,11 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
             // create a new event
             // create new event list
             // create new Guild data
-            const newEvent: ClanEvent = update(eventToModify, {
+            const newEvent: Event = update(eventToModify, {
                 participants: newEventParticipants
-            }) as ClanEvent
-            const newEvents: ClanEvent[] = command.guildData.events.map(
-                (event: ClanEvent, idx: number): ClanEvent => {
+            }) as Event
+            const newEvents: Event[] = command.guildData.events.map(
+                (event: Event, idx: number): Event => {
                     if (idx === idxToModify) {
                         return newEvent
                     }
@@ -1302,7 +1301,7 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
 const amISignedUp$: Observable<void> = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP_UPCOMING)
     .pipe(
         map((command: InputCommand): void => {
-            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
@@ -1311,14 +1310,14 @@ const amISignedUp$: Observable<void> = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP
             }
 
             // does the event to modify contain our user?
-            const eventToCheck: ClanEvent = upcomingEvents[idxToCheck]
-            const filteredEventParticipants: ClanEventParticipant[] = eventToCheck
+            const eventToCheck: Event = upcomingEvents[idxToCheck]
+            const filteredEventParticipants: EventParticipant[] = eventToCheck
                 .participants.filter(
-                    (participant: ClanEventParticipant):
+                    (participant: EventParticipant):
                     boolean => participant.discordId === command.author.id
                 )
 
-            const filteredParticipant: ClanEventParticipant = filteredEventParticipants.length > 0
+            const filteredParticipant: EventParticipant = filteredEventParticipants.length > 0
                 ? filteredEventParticipants[0] : null
             const reply: string = filteredParticipant !== null
                 ? `you are signed up with RSN: ${filteredParticipant.rsn}`
@@ -1337,7 +1336,7 @@ const listParticipant$: Observable<void> = filteredMessage$(
 )
     .pipe(
         map((command: InputCommand): void => {
-            const upcomingEvents: ClanEvent[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
@@ -1345,9 +1344,9 @@ const listParticipant$: Observable<void> = filteredMessage$(
                 return
             }
 
-            const eventToList: ClanEvent = upcomingEvents[idxToCheck]
+            const eventToList: Event = upcomingEvents[idxToCheck]
             const formattedStr: string = eventToList.participants.map(
-                (participant: ClanEventParticipant, idx: number): string => {
+                (participant: EventParticipant, idx: number): string => {
                     // const nickname: string = userIdToNickname(command.guild, participant.discordId)
                     return `\n${idx}: <@${participant.discordId}> signed up ${participant.rsn}`
                 }
@@ -1431,11 +1430,11 @@ const setChannel$: Observable<[GuildData, discord.Message, discord.Channel]> = f
  * @function
  * @description Gets events that have not yet started or warned about
  * @param {GuildData} guildData The GuildData to check
- * @returns {ClanEvent[]} The array of ongoing clan events for Guild id
+ * @returns {Event[]} The array of ongoing clan events for Guild id
  */
 const getUnnotifiedEvents = (guildData: GuildData):
-ClanEvent[] => guildData.events.filter(
-    (event: ClanEvent): boolean => !event.hasNotifiedTwoHourWarning
+Event[] => guildData.events.filter(
+    (event: Event): boolean => !event.hasNotifiedTwoHourWarning
     || !event.hasNotifiedStarted
     || !event.hasNotifiedEnded
 )
@@ -1461,7 +1460,7 @@ connect$.subscribe((): void => {
             // handle generic events here
 
             const unnotifiedEvents = getUnnotifiedEvents(guildData)
-            unnotifiedEvents.forEach((clanEvent: ClanEvent): void => {
+            unnotifiedEvents.forEach((clanEvent: Event): void => {
                 const uuidToCheck: string = clanEvent.uuid
                 // we should probably notify in flight events but not so much of ended events
                 // if we are within tolerance, notify if we haven't already
@@ -1496,11 +1495,11 @@ connect$.subscribe((): void => {
                         logger.debug('notification had not fired')
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
                         // mark 2 hour warning as completed
-                        const newEvent: ClanEvent = update(clanEvent, {
+                        const newEvent: Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
+                        }) as Event
+                        const newEvents: Event[] = guildData.events.map(
+                            (event: Event): Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
@@ -1526,12 +1525,12 @@ connect$.subscribe((): void => {
                         // mark 2 hour warning as completed
                         // mark start notification as complete
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has begun')
-                        const newEvent: ClanEvent = update(clanEvent, {
+                        const newEvent: Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
+                        }) as Event
+                        const newEvents: Event[] = guildData.events.map(
+                            (event: Event): Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
@@ -1555,12 +1554,12 @@ connect$.subscribe((): void => {
                         // mark start notification as complete
                         // TODO: apologize lol
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'started more than 30 mins ago, yell at n0trout')
-                        const newEvent: ClanEvent = update(clanEvent, {
+                        const newEvent: Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
+                        }) as Event
+                        const newEvents: Event[] = guildData.events.map(
+                            (event: Event): Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
@@ -1585,13 +1584,13 @@ connect$.subscribe((): void => {
                         // mark start notification as complete (unnecessary)
                         // mark end notification as complete
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
-                        const newEvent: ClanEvent = update(clanEvent, {
+                        const newEvent: Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true,
                             hasNotifiedEnded: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
+                        }) as Event
+                        const newEvents: Event[] = guildData.events.map(
+                            (event: Event): Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
@@ -1613,13 +1612,13 @@ connect$.subscribe((): void => {
                         // mark start notification as complete (unnecessary)
                         // mark end notification as complete
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended more than 2 hours ago, yell at n0trout')
-                        const newEvent: ClanEvent = update(clanEvent, {
+                        const newEvent: Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true,
                             hasNotifiedEnded: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
+                        }) as Event
+                        const newEvents: Event[] = guildData.events.map(
+                            (event: Event): Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
@@ -1634,13 +1633,13 @@ connect$.subscribe((): void => {
                 } else {
                     // too late to do anything
                     // just mark it as fired
-                    const newEvent: ClanEvent = update(clanEvent, {
+                    const newEvent: Event = update(clanEvent, {
                         hasNotifiedTwoHourWarning: true,
                         hasNotifiedStarted: true,
                         hasNotifiedEnded: true
-                    }) as ClanEvent
-                    const newEvents: ClanEvent[] = guildData.events.map(
-                        (event: ClanEvent): ClanEvent => {
+                    }) as Event
+                    const newEvents: Event[] = guildData.events.map(
+                        (event: Event): Event => {
                             if (event.uuid === uuidToCheck) {
                                 return newEvent
                             }
@@ -1753,11 +1752,11 @@ addAdmin$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
     saveMsgArr[1].reply('admin added')
 })
 
-saveEvent$.subscribe((saveArr: [InputCommand, ClanEvent, number, GuildData]): void => {
+saveEvent$.subscribe((saveArr: [InputCommand, Event, number, GuildData]): void => {
     // add timers
     const inputCommand: InputCommand = saveArr[0]
     const guild: discord.Guild = inputCommand.guild
-    const clanEvent: ClanEvent = saveArr[1]
+    const clanEvent: Event = saveArr[1]
     const idx: number = saveArr[2]
     const guildData: GuildData = saveArr[3]
     timers[clanEvent.uuid] = [
@@ -1779,7 +1778,7 @@ listUpcomingEvent$.subscribe((): void => {
     logger.debug('ListUpcomingEvents called')
 })
 
-deleteUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message, ClanEvent]): void => {
+deleteUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message, Event]): void => {
     // cancel timers
     timers[saveMsgArr[2].uuid].forEach((timerHnd: NodeJS.Timeout): void => {
         clearTimeout(timerHnd)
