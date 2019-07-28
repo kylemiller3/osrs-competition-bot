@@ -6,6 +6,8 @@
 import * as discord from 'discord.js'
 import * as winston from 'winston'
 import * as jsonfile from 'jsonfile'
+import * as Runescape from 'Runescape'
+import * as Bot from 'Bot'
 import uuidv4 from 'uuid/v4'
 import {
     fromEvent, from, Observable, of, forkJoin, merge
@@ -19,146 +21,6 @@ import {
 import { EventEmitter } from 'events'
 import auth from './auth.json'
 
-//-------------
-// Global state
-//
-//-------------
-const loadCache: Record<string, Observable<JSON>> = {}
-const hiscoreCache: Record<string, Observable<hiscores.HiscoreResponse>> = {}
-const timers: Record<string, NodeJS.Timeout[]> = {}
-
-/**
- * @function
- * @description Wraps an array of javascript objects and sorts it in a stable manner
- * @param {T[]} array Array of same typed javascript objects
- * @param {Function} cmpFunc Comparison function for array
- * @return {T[]} The stable sorted array
- */
-
-//-----------------------------------------
-// Interface contracts & objects extensions
-//
-//-----------------------------------------
-
-/**
- * @description Contract for access controls which applies to each BotCommand
- * @interface
- */
-interface AccessControl {
-    controlFunction: (author: discord.User, guildData: GuildData) => boolean
-    description: string
-}
-
-/**
- * @description Contract describing each user input commands
- * @interface
- */
-interface BotCommand extends Record<string, unknown> {
-    description: string
-    accessControl: AccessControl
-    parameters: string
-    command: string
-}
-
-/**
- * @description Contract containing all BotCommands
- * @interface
- */
-interface BotCommands extends Record<string, BotCommand> {
-    DEBUG: BotCommand
-    ADD_ADMIN: BotCommand
-    ADD_UPCOMING: BotCommand
-    LIST_UPCOMING: BotCommand
-    DELETE_UPCOMING: BotCommand
-    SIGNUP_UPCOMING: BotCommand
-    UNSIGNUP_UPCOMING: BotCommand
-    AMISIGNEDUP_UPCOMING: BotCommand
-    LIST_PARTICIPANTS_UPCOMING: BotCommand
-    HELP: BotCommand
-    SET_CHANNEL: BotCommand
-}
-
-/**
- * @description Contract containing information about clan event participants
- * @interface
- */
-interface EventParticipant extends Record<string, unknown> {
-    rsn: string
-    discordId: string
-}
-
-/**
- * @description Contract extending ClanEventParticipant to include XpClanEventParticipantComponents
- */
-interface XpEventParticipant extends EventParticipant {
-    skills: XpEventParticipantSkillComponent[]
-}
-
-/**
- * @description Contract component containing the tracking information
- * a clan event participant needs for XP clan events
- * @interface
- */
-interface XpEventParticipantSkillComponent extends Record<string, unknown> {
-    skillName: string
-    startingXp: number
-    endingXp: number
-}
-
-/**
- * @description Contract containing information about a specific clan event
- * @interface
- */
-interface Event extends Record<string, unknown> {
-    name: string
-    startingDate: Date
-    endingDate: Date
-    type: string
-    participants: EventParticipant[]
-    hasNotifiedTwoHourWarning: boolean
-    hasNotifiedStarted: boolean
-    hasNotifiedEnded: boolean
-}
-
-/**
- * @description Contract extending a ClanEvent with the skills tracked by a XP clan event
- * @interface
- */
-interface XpEvent extends Event {
-    skills: string[]
-}
-
-/**
- * @description Contract for each Guild's configuration
- * @interface
- */
-interface GuildSettings extends Record<string, unknown> {
-    admins: string[]
-    notificationChannelId: string
-}
-
-/**
- * @description Top level contract for each Guild's configuration
- * @interface
- */
-interface GuildData extends Record<string, unknown> {
-    settings: GuildSettings
-    events: Event[]
-}
-
-/**
- * @description Contract containing the parsed information of a input command
- * including the originating Guild's configuration data
- * @interface
- */
-interface InputCommand extends Record<string, unknown> {
-    message: discord.Message
-    author: discord.User
-    guild: discord.Guild
-    input: string
-    guildData: GuildData
-}
-
 /**
  * @description Error class extension for OS level system errors
  * @class
@@ -167,6 +29,13 @@ class SystemError extends Error {
     errno: number
 }
 
+//-------------
+// Global state
+//
+//-------------
+const loadCache: Record<string, Observable<JSON>> = {}
+const hiscoreCache: Record<string, Observable<hiscores.LookupResponse>> = {}
+const timers: Record<string, NodeJS.Timeout[]> = {}
 
 //---------------
 // OSRS constants
@@ -208,65 +77,65 @@ const OSRS_SKILLS: Record<string, string> = {
 /**
  * @function
  * @description Checks the Guild configuration for any administrators
- * @param {GuildData} guildData Guild data to check
+ * @param {Bot.Database} guildData Guild data to check
  * @returns {boolean} If the Guild has the administrator array set
  */
-const hasAdmin = (guildData: GuildData): boolean => guildData.settings.admins.length > 0
+const hasAdmin = (guildData: Bot.Database): boolean => guildData.settings.admins.length > 0
 
 /**
  * @function
  * @description Checks if the author of a discord message is on
  * the administrator list for that Guild
  * @param {discord.User} author The author of the message
- * @param {GuildData} guildData The Guild configuration of the message's
+ * @param {Bot.Database} guildData The Guild configuration of the message's
  * Guild from where it was received
  * @returns {boolean} True if the author is an administrator
  */
-const isAdmin = (author: discord.User, guildData: GuildData):
+const isAdmin = (author: discord.User, guildData: Bot.Database):
 boolean => guildData.settings.admins.includes(author.id)
 
 /**
- * @description Implementation of AccessControl for unset
+ * @description Implementation of Bot.AccessControl for unset
  * Guild configuration or admin users only access
- * @type {AccessControl}
+ * @type {Bot.AccessControl}
  * @constant
  */
-const ONLY_UNSET_ADMINS_OR_ADMIN: AccessControl = {
+const ONLY_UNSET_ADMINS_OR_ADMIN: Bot.AccessControl = {
     controlFunction: (
-        author: discord.User, guildData: GuildData
+        author: discord.User, guildData: Bot.Database
     ): boolean => !hasAdmin(guildData) || isAdmin(author, guildData),
     description: 'unset guild configuration or have admin privileges'
 }
 
 /**
- * @description Implementation of AccessControl for admin users only access
- * @type {AccessControl}
+ * @description Implementation of Bot.AccessControl for admin users only access
+ * @type {Bot.AccessControl}
  * @constant
  */
-const ONLY_ADMIN: AccessControl = {
+const ONLY_ADMIN: Bot.AccessControl = {
     controlFunction: (
-        author: discord.User, guildData: GuildData
+        author: discord.User, guildData: Bot.Database
     ): boolean => isAdmin(author, guildData),
     description: 'have admin privileges'
 }
 
 /**
- * @description Implementation of AccessControl for any user access
- * @type {AccessControl}
+ * @description Implementation of Bot.AccessControl for any user access
+ * @type {Bot.AccessControl}
  * @constant
  */
-const ANY_USER: AccessControl = {
+const ANY_USER: Bot.AccessControl = {
     controlFunction: (): boolean => true,
     description: 'any user'
 }
 
 /**
- * @description Implementation of all recognized BotCommands
+ * @description Implementation of all recognized Bot.Commands
  * @constant
- * @type {BotCommands}
+ * @type {Bot.Commands}
  * @default
  */
-const BOT_COMMANDS: BotCommands = {
+const BOT_COMMANDS: Bot.Commands = {
     DEBUG: {
         command: '!f debug',
         description: 'logs debug info to console',
@@ -353,17 +222,17 @@ const BOT_COMMANDS: BotCommands = {
  * @default
  */
 const EVENT_TYPE: Record<string, string> = {
-    // XP: 'XP',
-    GENERIC: 'GENERIC'
+    COMPETITIVE: 'COMPETITIVE',
+    REGULAR: 'REGULAR'
 }
 
 /**
- * @description Empty GuildData default
+ * @description Empty Bot.Database default
  * @constant
- * @type {GuildData}
+ * @type {Bot.Database}
  * @default
  */
-const GUILD_DATA_DEFAULT: GuildData = {
+const GUILD_DATA_DEFAULT: Bot.Database = {
     settings: {
         admins: [],
         notificationChannelId: undefined
@@ -442,10 +311,10 @@ const isValidDate = (date: Date): boolean => date instanceof Date && !Number.isN
  * @description Loads the Guild configuration using cache or GUILD_DEFAULT_DATA if none
  * @param {string} id Guild id configuration to load
  * @param {boolean} dirty Loads configuration from disk if set
- * @returns {Observable<GuildData>} Observable of the load
+ * @returns {Observable<Bot.Database>} Observable of the load
  * @throws If the OS rejects our load
  */
-const load$ = (id: string, dirty: boolean): Observable<GuildData> => {
+const load$ = (id: string, dirty: boolean): Observable<Bot.Database> => {
     if (dirty) {
         loadCache[id] = from(jsonfile.readFile(`./guilds/${id}.json`, {
             // this is very fragile but works for our data structures
@@ -455,21 +324,21 @@ const load$ = (id: string, dirty: boolean): Observable<GuildData> => {
             })
         }))
             .pipe(
-                catchError((error: SystemError): Observable<GuildData> => {
+                catchError((error: SystemError): Observable<Bot.Database> => {
                     if (error.errno === -2) logger.info('Guild has no configuration')
                     else {
                         logError(error)
                         logger.error(`Error loading ${id} from disk`)
                         throw error
                     }
-                    return of<GuildData>(GUILD_DATA_DEFAULT)
+                    return of<Bot.Database>(GUILD_DATA_DEFAULT)
                 }),
                 publishReplay(1),
                 refCount()
             )
     }
 
-    const cached: Observable<GuildData> = loadCache[id] as unknown as Observable<GuildData>
+    const cached: Observable<Bot.Database> = loadCache[id] as unknown as Observable<Bot.Database>
     const keys = Object.keys(loadCache)
     if (keys.length >= 10) {
         const idxToRemove: number = Math.floor((Math.random() * 10))
@@ -484,20 +353,20 @@ const load$ = (id: string, dirty: boolean): Observable<GuildData> => {
  * @function
  * @description Saves the Guild configuration and then triggers a dirty load$
  * @param {string} id Guild id configuration to save
- * @param {GuildData} guildData The GuildData to save to disk
- * @returns {Observable<GuildData>} Observable of the load
+ * @param {Bot.Database} guildData The Bot.Database to save to disk
+ * @returns {Observable<Bot.Database>} Observable of the load
  * @throws If the OS rejects our save
  */
-const save$ = (id: string, guildData: GuildData): Observable<GuildData> => of<GuildData>(null)
+const save$ = (id: string, guildData: Bot.Database): Observable<Bot.Database> => of<Bot.Database>(null)
     .pipe(
-        switchMap((): Observable<GuildData> => from(jsonfile.writeFile(`./guilds/${id}.json`, guildData))
+        switchMap((): Observable<Bot.Database> => from(jsonfile.writeFile(`./guilds/${id}.json`, guildData))
             .pipe(
-                switchMap((): Observable<GuildData> => load$(id, true))
+                switchMap((): Observable<Bot.Database> => load$(id, true))
             )),
         tap((): void => {
             logger.debug(`Wrote settings to ${id}`)
         }),
-        catchError((error: SystemError): Observable<GuildData> => {
+        catchError((error: SystemError): Observable<Bot.Database> => {
             logError(error)
             logger.error(`Error writing ${id} to disk`)
             throw error
@@ -507,19 +376,19 @@ const save$ = (id: string, guildData: GuildData): Observable<GuildData> => of<Gu
 /**
  * @function
  * @description Notifies the users of a Guild signed up for a specific event
- * @param {Event} event The event to notify participants of
+ * @param {Runescape.Event} event The event to notify participants of
  * @param {discord.Guild} guild The guild to notify
  * @param {string} channelId The channel to send the notification
  * @param {string} message The message to send
  */
 const notifyClanEvent = (
-    clanEvent: Event,
+    clanEvent: Runescape.Event,
     guild: discord.Guild,
     channelId: string,
     message: string
 ): void => {
     const participants: string[] = clanEvent.participants.map(
-        (participant: EventParticipant): string => participant.discordId
+        (participant: Runescape.EventParticipant): string => participant.discordId
     )
     const mentions: string = participants.map(
         (participant: string): string => `<@${participant}>`
@@ -536,10 +405,10 @@ const notifyClanEvent = (
  * and notifies the Guild of the event on fire
  * @param clanEvent The ClanEvent to add timers for
  * @param guild The Guild to notify
- * @param guildData The GuildData to update on notification
+ * @param guildData The Bot.Database to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-const setTimerTwoHoursBefore = (clanEvent: Event, guild: discord.Guild, guildData: GuildData):
+const setTimerTwoHoursBefore = (clanEvent: Runescape.Event, guild: discord.Guild, guildData: Bot.Database):
 NodeJS.Timeout => {
     const now: Date = new Date()
     const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
@@ -547,18 +416,18 @@ NodeJS.Timeout => {
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
         // mark 2 hour warning as completed
-        const newEvent: Event = update(clanEvent, {
+        const newEvent: Runescape.Event = update(clanEvent, {
             hasNotifiedTwoHourWarning: true
-        }) as Event
-        const newEvents: Event[] = guildData.events.map((event: Event): Event => {
+        }) as Runescape.Event
+        const newEvents: Runescape.Event[] = guildData.events.map((event: Runescape.Event): Runescape.Event => {
             if (newEvent.uuid === event.uuid) {
                 return newEvent
             }
             return event
         })
-        const newData: GuildData = update(guildData, {
+        const newData: Bot.Database = update(guildData, {
             events: newEvents
-        }) as GuildData
+        }) as Bot.Database
         save$(guild.id, newData).subscribe((): void => {})
     }, twoHoursBeforeStart.getTime() - now.getTime())
 }
@@ -568,27 +437,27 @@ NodeJS.Timeout => {
  * @description Adds a global ClanEvent start timer and notifies the Guild of the event on fire
  * @param clanEvent The ClanEvent to add timers for
  * @param guild The Guild to notify
- * @param guildData The GuildData to update on notification
+ * @param guildData The Bot.Database to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-const setTimerStart = (clanEvent: Event, guild: discord.Guild, guildData: GuildData):
+const setTimerStart = (clanEvent: Runescape.Event, guild: discord.Guild, guildData: Bot.Database):
 NodeJS.Timeout => {
     const now: Date = new Date()
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has started')
         // mark start date as completed
-        const newEvent: Event = update(clanEvent, {
+        const newEvent: Runescape.Event = update(clanEvent, {
             hasNotifiedStarted: true
-        }) as Event
-        const newEvents: Event[] = guildData.events.map((event: Event): Event => {
+        }) as Runescape.Event
+        const newEvents: Runescape.Event[] = guildData.events.map((event: Runescape.Event): Runescape.Event => {
             if (newEvent.uuid === event.uuid) {
                 return newEvent
             }
             return event
         })
-        const newData: GuildData = update(guildData, {
+        const newData: Bot.Database = update(guildData, {
             events: newEvents
-        }) as GuildData
+        }) as Bot.Database
         save$(guild.id, newData).subscribe((): void => {})
     }, clanEvent.startingDate.getTime() - now.getTime())
 }
@@ -598,27 +467,27 @@ NodeJS.Timeout => {
  * @description Adds a global ClanEvent end timer and notifies the Guild of the event on fire
  * @param clanEvent The ClanEvent to add timers for
  * @param guild The Guild to notify
- * @param guildData The GuildData to update on notification
+ * @param guildData The Bot.Database to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-function setTimerEnd(clanEvent: Event, guild: discord.Guild, guildData: GuildData):
+function setTimerEnd(clanEvent: Runescape.Event, guild: discord.Guild, guildData: Bot.Database):
 NodeJS.Timeout {
     const now: Date = new Date()
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
         // mark end date as completed
-        const newEvent: Event = update(clanEvent, {
+        const newEvent: Runescape.Event = update(clanEvent, {
             hasNotifiedEnded: true
-        }) as Event
-        const newEvents: Event[] = guildData.events.map((event: Event): Event => {
+        }) as Runescape.Event
+        const newEvents: Runescape.Event[] = guildData.events.map((event: Runescape.Event): Runescape.Event => {
             if (newEvent.uuid === event.uuid) {
                 return newEvent
             }
             return event
         })
-        const newData: GuildData = update(guildData, {
+        const newData: Bot.Database = update(guildData, {
             events: newEvents
-        }) as GuildData
+        }) as Bot.Database
         save$(guild.id, newData).subscribe((): void => {})
     }, clanEvent.endingDate.getTime() - now.getTime())
 }
@@ -673,7 +542,7 @@ const message$: Observable<discord.Message> = fromEvent(gClient as unknown as Ev
  * @returns {Observable<JSON>} Observable of the JSON response or Observable of null
  * @todo handle the error properly
  */
-const hiscores$ = (rsn: string): Observable<hiscores.HiscoreResponse> => {
+const hiscores$ = (rsn: string): Observable<hiscores.LookupResponse> => {
     if (hiscoreCache[rsn] === undefined) {
         hiscoreCache[rsn] = from(hiscores.getPlayer(rsn))
             .pipe(
@@ -683,10 +552,10 @@ const hiscores$ = (rsn: string): Observable<hiscores.HiscoreResponse> => {
                     logError(error)
                     throw error
                 })
-            ) as unknown as Observable<hiscores.HiscoreResponse>
+            ) as unknown as Observable<hiscores.LookupResponse>
     }
 
-    const cached: Observable<hiscores.HiscoreResponse> = hiscoreCache[rsn]
+    const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn]
     const keys = Object.keys(hiscoreCache)
     if (keys.length >= 10000) {
         const idxToRemove: number = Math.floor((Math.random() * 10000))
@@ -701,9 +570,9 @@ const hiscores$ = (rsn: string): Observable<hiscores.HiscoreResponse> => {
  * @function
  * @description A new Observable of messages containing find
  * @param {string} find The excitation string
- * @returns {Observable<InputCommand>} Observable of the transformed InputCommand object
+ * @returns {Observable<Bot.Input>} Observable of the transformed Bot.Input object
  */
-const filteredMessage$ = (botCommand: BotCommand): Observable<InputCommand> => message$
+const filteredMessage$ = (botCommand: Bot.Command): Observable<Bot.Input> => message$
     .pipe(
         // filter our messages with find
         // and necessary discord checks
@@ -715,9 +584,9 @@ const filteredMessage$ = (botCommand: BotCommand): Observable<InputCommand> => m
         // containing the original message
         // the command and the Guild json
         // for error handling of load
-        switchMap((msg: discord.Message): Observable<InputCommand> => of<discord.Message>(msg)
+        switchMap((msg: discord.Message): Observable<Bot.Input> => of<discord.Message>(msg)
             .pipe(
-                switchMap((): Observable<InputCommand> => forkJoin(
+                switchMap((): Observable<Bot.Input> => forkJoin(
                     {
                         message: of<discord.Message>(msg),
                         author: of<discord.User>(msg.author),
@@ -726,7 +595,7 @@ const filteredMessage$ = (botCommand: BotCommand): Observable<InputCommand> => m
                         guildData: load$(msg.guild.id, false)
                     }
                 ))
-                // catchError((error: Error): Observable<InputCommand> => {
+                // catchError((error: Error): Observable<Bot.Input> => {
                 //     logError(error)
                 //     return forkJoin(
                 //         {
@@ -734,48 +603,48 @@ const filteredMessage$ = (botCommand: BotCommand): Observable<InputCommand> => m
                 //             author: of<discord.User>(msg.author),
                 //             guild: of<discord.Guild>(msg.guild),
                 //             input: of<string>(msg.content.slice(find.length)),
-                //             guildData: of<GuildData>(GUILD_DATA_DEFAULT)
+                //             guildData: of<Bot.Database>(GUILD_DATA_DEFAULT)
                 //         }
                 //     )
                 // })
             )),
-        tap((command: InputCommand): void => {
+        tap((command: Bot.Input): void => {
             logger.debug(`message: ${command.message.content}`)
             logger.debug(`author: ${command.author.username}`)
             logger.debug(`guild: ${command.guild.name}`)
             logger.debug(`input: ${command.input}`)
             logger.silly(`guildData: ${(JSON.stringify(command.guildData))}`)
         }),
-        filter((command: InputCommand): boolean => botCommand.accessControl.controlFunction(
+        filter((command: Bot.Input): boolean => botCommand.accessControl.controlFunction(
             command.author, command.guildData
         ))
     )
 
 /**
  * @description An Observable that handles the DEBUG command
- * @type {Observable<InputCommand>}
+ * @type {Observable<Bot.Input>}
  * @constant
  */
-const debug$: Observable<InputCommand> = filteredMessage$(BOT_COMMANDS.DEBUG)
+const debug$: Observable<Bot.Input> = filteredMessage$(BOT_COMMANDS.DEBUG)
 
 /**
  * @description An Observable that handles the ADD_ADMIN command
  * @type {Observable<any>}
  * @constant
  */
-const addAdmin$: Observable<[GuildData, discord.Message]> = filteredMessage$(BOT_COMMANDS.ADD_ADMIN)
+const addAdmin$: Observable<[Bot.Database, discord.Message]> = filteredMessage$(BOT_COMMANDS.ADD_ADMIN)
     .pipe(
-        filter((command: InputCommand):
+        filter((command: Bot.Input):
         boolean => command.message.mentions.members.array().length > 0),
-        switchMap((command: InputCommand): Observable<[GuildData, discord.Message]> => {
+        switchMap((command: Bot.Input): Observable<[Bot.Database, discord.Message]> => {
             const mentions: string[] = command.message.mentions.members.array()
                 .map((member: discord.GuildMember): string => member.id)
-            const newSettings: GuildSettings = update(command.guildData.settings, {
+            const newSettings: Bot.Settings = update(command.guildData.settings, {
                 admins: Array.from(new Set(command.guildData.settings.admins.concat(mentions)))
-            }) as GuildSettings
-            const newData: GuildData = update(command.guildData, {
+            }) as Bot.Settings
+            const newData: Bot.Database = update(command.guildData, {
                 settings: newSettings
-            }) as GuildData
+            }) as Bot.Database
             return forkJoin(
                 save$(command.guild.id, newData),
                 of(command.message)
@@ -827,12 +696,12 @@ const commandRegex = (term: string): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term
  * @type {Observable<any>}
  * @constant
  */
-const prepareUpcomingGenericEvent$: Observable<[InputCommand, Event]> = filteredMessage$(
+const prepareUpcomingGenericEvent$: Observable<[Bot.Input, Runescape.Event]> = filteredMessage$(
     BOT_COMMANDS.ADD_UPCOMING
 )
     .pipe(
         // we need at least a name, starting date and end date, and type
-        map((command: InputCommand): [InputCommand, Event] => {
+        map((command: Bot.Input): [Bot.Input, Runescape.Event] => {
             // let's only allow 10 events per Guild
             if (command.guildData.events.length >= 10) {
                 logger.debug(`Guild ${command.guild.name} added too many events`)
@@ -865,7 +734,7 @@ const prepareUpcomingGenericEvent$: Observable<[InputCommand, Event]> = filtered
                 return null
             }
             const type = EVENT_TYPE[inputType]
-            const clanEvent: Event = {
+            const clanEvent: Runescape.Event = {
                 name: parsedRegexes[0],
                 uuid: uuidv4(),
                 startingDate,
@@ -901,10 +770,10 @@ const prepareUpcomingGenericEvent$: Observable<[InputCommand, Event]> = filtered
             }
             return [command, clanEvent]
         }),
-        filter((commandEventArr: [InputCommand, Event]): boolean => commandEventArr !== null),
-        tap((commandEventArr: [InputCommand, Event]): void => {
+        filter((commandEventArr: [Bot.Input, Runescape.Event]): boolean => commandEventArr !== null),
+        tap((commandEventArr: [Bot.Input, Runescape.Event]): void => {
             logger.debug(`Admin ${commandEventArr[0].author.username} called add event`)
-            logger.debug('Event properties: ')
+            logger.debug('Runescape.Event properties: ')
             logger.debug(`* ${commandEventArr[1].name}`)
             logger.debug(`* ${commandEventArr[1].startingDate.toDateString()}`)
             logger.debug(`* ${commandEventArr[1].endingDate.toDateString()}`)
@@ -919,10 +788,10 @@ const prepareUpcomingGenericEvent$: Observable<[InputCommand, Event]> = filtered
  * @constant
  */
 const filterUpcomingGenericEvent$:
-Observable<[InputCommand, Event]> = prepareUpcomingGenericEvent$
+Observable<[Bot.Input, Runescape.Event]> = prepareUpcomingGenericEvent$
     .pipe(
-        filter((commandEventArr: [InputCommand, Event]): boolean => {
-            const clanEvent: Event = commandEventArr[1]
+        filter((commandEventArr: [Bot.Input, Runescape.Event]): boolean => {
+            const clanEvent: Runescape.Event = commandEventArr[1]
             return clanEvent.type === EVENT_TYPE.GENERIC
         }),
     )
@@ -933,15 +802,15 @@ Observable<[InputCommand, Event]> = prepareUpcomingGenericEvent$
  * @constant
  */
 const filterAndPrepareUpcomingXpEvent$:
-Observable<[InputCommand, Event]> = prepareUpcomingGenericEvent$
+Observable<[Bot.Input, Runescape.Event]> = prepareUpcomingGenericEvent$
     .pipe(
-        filter((commandEventArr: [InputCommand, Event]): boolean => {
-            const clanEvent: Event = commandEventArr[1]
+        filter((commandEventArr: [Bot.Input, Runescape.Event]): boolean => {
+            const clanEvent: Runescape.Event = commandEventArr[1]
             return clanEvent.type === EVENT_TYPE.XP
         }),
-        map((commandEventArr: [InputCommand, Event]): [InputCommand, Event] => {
-            const inputCommand: InputCommand = commandEventArr[0]
-            const clanEvent: Event = commandEventArr[1]
+        map((commandEventArr: [Bot.Input, Runescape.Event]): [Bot.Input, Runescape.Event] => {
+            const inputCommand: Bot.Input = commandEventArr[0]
+            const clanEvent: Runescape.Event = commandEventArr[1]
             const compoundRegex: string = commandRegex(eventTermRegex)
             const skillsRegex = [
                 new RegExp(`skills${compoundRegex}`, 'gim')
@@ -967,36 +836,38 @@ Observable<[InputCommand, Event]> = prepareUpcomingGenericEvent$
                 inputCommand.message.reply(`some skill names entered are invalid\nchoices are: [${OSRS_SKILLS.toString}]`)
                 return null
             }
-            const xpClanEvent: XpEvent = update(clanEvent, {
-                skills: skillsArr
-            }) as XpEvent
-            return [inputCommand, xpClanEvent]
+
+            // const xpClanEvent: XpEvent = update(clanEvent, {
+            //     skills: skillsArr
+            // }) as XpEvent
+            // return [inputCommand, xpClanEvent]
+            return null
         }),
-        filter((commandEventArr: [InputCommand, Event]): boolean => commandEventArr !== null)
+        filter((commandEventArr: [Bot.Input, Runescape.Event]): boolean => commandEventArr !== null)
     )
 
 const saveEvent$ = merge(filterUpcomingGenericEvent$, filterAndPrepareUpcomingXpEvent$)
     .pipe(
-        switchMap((commandEventArr: [InputCommand, Event]):
-        Observable<[InputCommand, Event, number, GuildData]> => {
-            const inputCommand: InputCommand = commandEventArr[0]
-            const clanEvent: Event = commandEventArr[1]
-            const events: Event[] = inputCommand.guildData.events.concat(clanEvent)
+        switchMap((commandEventArr: [Bot.Input, Runescape.Event]):
+        Observable<[Bot.Input, Runescape.Event, number, Bot.Database]> => {
+            const inputCommand: Bot.Input = commandEventArr[0]
+            const clanEvent: Runescape.Event = commandEventArr[1]
+            const events: Runescape.Event[] = inputCommand.guildData.events.concat(clanEvent)
             // const sortedEvents: ClanEvent[] = stableSort(
             //     events, (eventA: ClanEvent, eventB: ClanEvent):
             //     number => eventA.startingDate.getTime() - eventB.startingDate.getTime()
             // ) as ClanEvent[]
-            const newGuildData: GuildData = update(commandEventArr[0].guildData, {
+            const newGuildData: Bot.Database = update(commandEventArr[0].guildData, {
                 events
-            }) as GuildData
+            }) as Bot.Database
             return forkJoin(
-                of<InputCommand>(inputCommand),
-                of<Event>(clanEvent),
+                of<Bot.Input>(inputCommand),
+                of<Runescape.Event>(clanEvent),
                 of<number>(events.length - 1),
                 save$(commandEventArr[0].guild.id, newGuildData)
             )
         }),
-        filter((saveArr: [InputCommand, Event, number, GuildData]): boolean => saveArr !== null)
+        filter((saveArr: [Bot.Input, Runescape.Event, number, Bot.Database]): boolean => saveArr !== null)
     )
 
 
@@ -1005,22 +876,22 @@ const saveEvent$ = merge(filterUpcomingGenericEvent$, filterAndPrepareUpcomingXp
 /**
  * @function
  * @description Gets all scheduled events
- * @param {Event[]} events ClanEvents source
- * @returns {Event[]} The array of upcoming ClanEvents
+ * @param {Runescape.Event[]} events ClanEvents source
+ * @returns {Runescape.Event[]} The array of upcoming ClanEvents
  */
-const getUpcomingEvents = (events: Event[]): Event[] => events.filter(
-    (event: Event): boolean => event.startingDate > new Date()
+const getUpcomingEvents = (events: Runescape.Event[]): Runescape.Event[] => events.filter(
+    (event: Runescape.Event): boolean => event.startingDate > new Date()
 )
 
 /**
  * @function
  * @description Gets currently running events
- * @param {GuildData} guildData The GuildData to check
- * @returns {Event[]} The array of ongoing ClanEvents for Guild id
+ * @param {Bot.Database} guildData The Bot.Database to check
+ * @returns {Runescape.Event[]} The array of ongoing ClanEvents for Guild id
  */
 
-const getInFlightEvents = (clanEvents: Event[]): Event[] => clanEvents.filter(
-    (event: Event): boolean => {
+const getInFlightEvents = (clanEvents: Runescape.Event[]): Runescape.Event[] => clanEvents.filter(
+    (event: Runescape.Event): boolean => {
         const now: Date = new Date()
         return event.startingDate <= now && event.endingDate > now
     }
@@ -1029,11 +900,11 @@ const getInFlightEvents = (clanEvents: Event[]): Event[] => clanEvents.filter(
 /**
  * @function
  * @description Get all completed events
- * @param {Event[]} events ClanEvents source
- * @returns {Event[]} The array of ended ClanEvents for Guild id
+ * @param {Runescape.Event[]} events ClanEvents source
+ * @returns {Runescape.Event[]} The array of ended ClanEvents for Guild id
  */
-const getEndedEvents = (clanEvents: Event[]): Event[] => clanEvents.filter(
-    (event: Event): boolean => {
+const getEndedEvents = (clanEvents: Runescape.Event[]): Runescape.Event[] => clanEvents.filter(
+    (event: Runescape.Event): boolean => {
         const now: Date = new Date()
         return event.endingDate <= now
     }
@@ -1046,20 +917,21 @@ const getEndedEvents = (clanEvents: Event[]): Event[] => clanEvents.filter(
  */
 const listUpcomingEvent$: Observable<void> = filteredMessage$(BOT_COMMANDS.LIST_UPCOMING)
     .pipe(
-        map((command: InputCommand): void => {
-            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
+        map((command: Bot.Input): void => {
+            const upcomingEvents: Runescape.Event[] = getUpcomingEvents(command.guildData.events)
             const eventsStr = upcomingEvents.map(
-                (event: Event, idx: number): string => {
+                (event: Runescape.Event, idx: number): string => {
                     const { name } = event
                     const startingDateStr = event.startingDate.toString()
                     const endingDateStr = event.endingDate.toString()
                     const { type } = event
                     const retStr = `\n${idx}: ${name} starting: ${startingDateStr} ending: ${endingDateStr} type: ${type}`
-                    if (event.skills !== undefined) {
-                        const xpEvent: XpEvent = event as XpEvent
-                        const skills: string = xpEvent.skills.join(' ')
-                        return retStr.concat(` skills: ${skills}`)
-                    }
+                    // TODO: update me
+                    // if (event.skills !== undefined) {
+                    //     const xpEvent: XpEvent = event as XpEvent
+                    //     const skills: string = xpEvent.skills.join(' ')
+                    //     return retStr.concat(` skills: ${skills}`)
+                    // }
                     return retStr
                 }
             )
@@ -1075,32 +947,32 @@ const listUpcomingEvent$: Observable<void> = filteredMessage$(BOT_COMMANDS.LIST_
  * @type {Observable<any>}
  * @constant
  */
-const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, Event]> = filteredMessage$(
+const deleteUpcomingEvent$: Observable<[Bot.Database, discord.Message, Runescape.Event]> = filteredMessage$(
     BOT_COMMANDS.DELETE_UPCOMING
 )
     .pipe(
-        switchMap((command: InputCommand): Observable<[GuildData, discord.Message, Event]> => {
-            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
+        switchMap((command: Bot.Input): Observable<[Bot.Database, discord.Message, Runescape.Event]> => {
+            const upcomingEvents: Runescape.Event[] = getUpcomingEvents(command.guildData.events)
             const idxToRemove: number = parseInt(command.input, 10)
-            const removedEvent: Event = upcomingEvents[idxToRemove]
-            const filteredEvents: Event[] = upcomingEvents.filter(
-                (event: Event, idx: number): boolean => idx !== idxToRemove
+            const removedEvent: Runescape.Event = upcomingEvents[idxToRemove]
+            const filteredEvents: Runescape.Event[] = upcomingEvents.filter(
+                (event: Runescape.Event, idx: number): boolean => idx !== idxToRemove
             )
             if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
                 command.message.reply(`invalid index ${idxToRemove}\n${BOT_COMMANDS.DELETE_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message, Event]>(null)
+                return of<[Bot.Database, discord.Message, Runescape.Event]>(null)
             }
-            const newGuildData: GuildData = update(command.guildData, {
+            const newGuildData: Bot.Database = update(command.guildData, {
                 events: filteredEvents
-            }) as GuildData
+            }) as Bot.Database
             return forkJoin(
                 save$(command.guild.id, newGuildData),
                 of<discord.Message>(command.message),
-                of<Event>(removedEvent)
+                of<Runescape.Event>(removedEvent)
             )
         }),
-        filter((saveMsgArr: [GuildData, discord.Message, Event]):
+        filter((saveMsgArr: [Bot.Database, discord.Message, Runescape.Event]):
         boolean => saveMsgArr !== null)
     )
 
@@ -1112,11 +984,12 @@ const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, Event]> = fi
  * @param {string} userId The Discord Id to lookup
  * @returns {string} The user's Guild nickname
  */
-const userIdToNickname = (guild: discord.Guild, userId: string): string => {
+const userIdToDisplayName = (guild: discord.Guild, userId: string): string => {
+    if (!guild.available) return 'unknown (guild unavailable)'
     const members: discord.Collection<string, discord.GuildMember> = guild.members.filter(
         (member: discord.GuildMember): boolean => member.id === userId
     )
-    const name: string = members.size > 0 ? members.first().nickname : null
+    const name: string = members.size > 0 ? members.first().displayName : null
     return name
 }
 
@@ -1132,12 +1005,12 @@ const signupTermRegex = 'event|rsn|$'
  * @type {Observable<any>}
  * @constant
  */
-const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
+const signupEvent$: Observable<[Bot.Database, discord.Message]> = filteredMessage$(
     BOT_COMMANDS.SIGNUP_UPCOMING
 )
     .pipe(
-        switchMap((command: InputCommand):
-        Observable<[GuildData, discord.Message, hiscores.HiscoreResponse]> => {
+        switchMap((command: Bot.Input):
+        Observable<[Bot.Database, discord.Message, hiscores.LookupResponse]> => {
             const compoundRegex: string = commandRegex(signupTermRegex)
             const skillsRegex = [
                 new RegExp(`event${compoundRegex}`, 'gim'),
@@ -1147,89 +1020,92 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
             if (parsedRegex.length !== skillsRegex.length) {
                 logger.debug(`${command.author.id} entered invalid signup data`)
                 command.message.reply(`invalid input\n${BOT_COMMANDS.SIGNUP_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
+                return of<[Bot.Database, discord.Message, hiscores.LookupResponse]>(null)
             }
 
             // get upcoming events
             // if index is out of range return
-            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Runescape.Event[] = getUpcomingEvents(command.guildData.events)
             const idxToModify: number = Number.parseInt(parsedRegex[0], 10)
             const userIdToAdd: string = command.author.id
             const rsnToAdd: string = parsedRegex[1]
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
                 command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.SIGNUP_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
+                return of<[Bot.Database, discord.Message, hiscores.LookupResponse]>(null)
             }
 
             // get event to modify and its type
-            const eventToModify: Event = upcomingEvents[idxToModify]
+            const eventToModify: Runescape.Event = upcomingEvents[idxToModify]
 
             // is the player already added?
-            const filteredParticipants: EventParticipant[] = eventToModify.participants.filter(
-                (participant: EventParticipant): boolean => participant.rsn === rsnToAdd
+            const filteredParticipants: Runescape.EventParticipant[] = eventToModify.participants.filter(
+                (participant: Runescape.EventParticipant): boolean => participant.rsn === rsnToAdd
                     || participant.discordId === userIdToAdd
             )
             if (filteredParticipants.length > 0) {
                 logger.debug('Player already exists')
+                // TODO: change me
                 const idSignedUp: string = filteredParticipants[0].discordId
-                const playerSignedUp: string = filteredParticipants[0].rsn
-                command.message.reply(`<@${idSignedUp}> already signed up ${playerSignedUp}`)
-                return of<[GuildData, discord.Message, hiscores.HiscoreResponse]>(null)
+                // const playerSignedUp: string = filteredParticipants[0].rsn
+                // command.message.reply(`<@${idSignedUp}> already signed up ${playerSignedUp}`)
+                return of<[Bot.Database, discord.Message, hiscores.LookupResponse]>(null)
             }
 
             // get the participant to modify and return
             // or create a new one and continue
-            const participantToAdd = {
-                rsn: rsnToAdd,
-                discordId: command.author.id
-            }
+            // TODO: fix me
+            // const participantToAdd: Runescape.EventParticipant = {
+            //     rsn: rsnToAdd,
+            //     discordId: command.author.id
+            // }
 
-            // add participant to event array
-            const newEventParticipants: EventParticipant[] = eventToModify
-                .participants.concat(
-                    [participantToAdd]
-                )
+            // // add participant to event array
+            // const newEventParticipants: Runescape.EventParticipant[] = eventToModify
+            //     .participants.concat(
+            //         [participantToAdd]
+            //     )
 
             // create a new event
             // create new event list
             // create new Guild data
-            const newEvent: Event = update(eventToModify, {
-                participants: newEventParticipants
-            }) as Event
-            const newEvents: Event[] = command.guildData.events.map(
-                (event: Event, idx: number): Event => {
-                    if (idx === idxToModify) {
-                        return newEvent
-                    }
-                    return event
-                }
-            )
-            const newData: GuildData = update(command.guildData, {
-                events: newEvents
-            }) as GuildData
+            // const newEvent: Runescape.Event = update(eventToModify, {
+            //     participants: newEventParticipants
+            // }) as Runescape.Event
+            // const newEvents: Runescape.Event[] = command.guildData.events.map(
+            //     (event: Runescape.Event, idx: number): Runescape.Event => {
+            //         if (idx === idxToModify) {
+            //             return newEvent
+            //         }
+            //         return event
+            //     }
+            // )
+            // const newData: Bot.Database = update(command.guildData, {
+            //     events: newEvents
+            // }) as Bot.Database
 
-            return forkJoin(
-                of<GuildData>(newData),
-                of<discord.Message>(command.message),
-                hiscores$(rsnToAdd)
-            )
+            // return forkJoin(
+            //     of<Bot.Database>(newData),
+            //     of<discord.Message>(command.message),
+            //     hiscores$(rsnToAdd)
+            // )
+            return of(null)
         }),
-        filter((dataMsgHiArr: [GuildData, discord.Message, hiscores.HiscoreResponse]):
+        filter((dataMsgHiArr: [Bot.Database, discord.Message, hiscores.LookupResponse]):
         boolean => dataMsgHiArr !== null),
-        switchMap((dataMsgHiArr: [GuildData, discord.Message, hiscores.HiscoreResponse]):
-        Observable<[GuildData, discord.Message]> => {
+        switchMap((dataMsgHiArr: [Bot.Database, discord.Message, hiscores.LookupResponse]):
+        Observable<[Bot.Database, discord.Message]> => {
             if (dataMsgHiArr[2] === null) {
                 logger.debug('User entered invalid RSN')
                 dataMsgHiArr[1].reply('cannot find RSN on hiscores')
-                return of<[GuildData, discord.Message]>(null)
+                return of<[Bot.Database, discord.Message]>(null)
             }
             return forkJoin(
                 save$(dataMsgHiArr[1].guild.id, dataMsgHiArr[0]),
                 of<discord.Message>(dataMsgHiArr[1])
             )
         }),
-        filter((saveMsgArr: [GuildData, discord.Message]): boolean => saveMsgArr !== null)
+        filter((saveMsgArr: [Bot.Database, discord.Message]): boolean => saveMsgArr !== null)
     )
 
 /**
@@ -1237,26 +1113,26 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
  * @type {Observable<any>}
  * @constant
  */
-const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
+const unsignupUpcomingEvent$: Observable<[Bot.Database, discord.Message]> = filteredMessage$(
     BOT_COMMANDS.UNSIGNUP_UPCOMING
 )
     .pipe(
-        switchMap((command: InputCommand): Observable<[GuildData, discord.Message]> => {
+        switchMap((command: Bot.Input): Observable<[Bot.Database, discord.Message]> => {
             // get upcoming events
             // if index is out of range return
-            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
+            const upcomingEvents: Runescape.Event[] = getUpcomingEvents(command.guildData.events)
             const idxToModify: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
                 command.message.reply(`invalid index ${idxToModify}\n${BOT_COMMANDS.UNSIGNUP_UPCOMING.parameters}`)
-                return of<[GuildData, discord.Message]>(null)
+                return of<[Bot.Database, discord.Message]>(null)
             }
 
             // does the event to modify contain our user?
-            const eventToModify: Event = upcomingEvents[idxToModify]
+            const eventToModify: Runescape.Event = upcomingEvents[idxToModify]
             const participantCount: number = eventToModify.participants.length
-            const newEventParticipants: EventParticipant[] = eventToModify.participants.filter(
-                (participant: EventParticipant):
+            const newEventParticipants: Runescape.EventParticipant[] = eventToModify.participants.filter(
+                (participant: Runescape.EventParticipant):
                 boolean => participant.discordId !== command.author.id
             )
 
@@ -1264,33 +1140,33 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
             if (participantCount === newEventParticipants.length) {
                 logger.debug('User was not signed up')
                 command.message.reply('you were not signed up for this event')
-                return of<[GuildData, discord.Message]>(null)
+                return of<[Bot.Database, discord.Message]>(null)
             }
 
             // create a new event
             // create new event list
             // create new Guild data
-            const newEvent: Event = update(eventToModify, {
+            const newEvent: Runescape.Event = update(eventToModify, {
                 participants: newEventParticipants
-            }) as Event
-            const newEvents: Event[] = command.guildData.events.map(
-                (event: Event, idx: number): Event => {
+            }) as Runescape.Event
+            const newEvents: Runescape.Event[] = command.guildData.events.map(
+                (event: Runescape.Event, idx: number): Runescape.Event => {
                     if (idx === idxToModify) {
                         return newEvent
                     }
                     return event
                 }
             )
-            const newData: GuildData = update(command.guildData, {
+            const newData: Bot.Database = update(command.guildData, {
                 events: newEvents
-            }) as GuildData
+            }) as Bot.Database
 
             return forkJoin(
                 save$(command.guild.id, newData),
                 of<discord.Message>(command.message)
             )
         }),
-        filter((saveMsgArr: [GuildData, discord.Message]): boolean => saveMsgArr !== null)
+        filter((saveMsgArr: [Bot.Database, discord.Message]): boolean => saveMsgArr !== null)
     )
 
 /**
@@ -1300,8 +1176,8 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
  */
 const amISignedUp$: Observable<void> = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP_UPCOMING)
     .pipe(
-        map((command: InputCommand): void => {
-            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
+        map((command: Bot.Input): void => {
+            const upcomingEvents: Runescape.Event[] = getUpcomingEvents(command.guildData.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
@@ -1310,14 +1186,14 @@ const amISignedUp$: Observable<void> = filteredMessage$(BOT_COMMANDS.AMISIGNEDUP
             }
 
             // does the event to modify contain our user?
-            const eventToCheck: Event = upcomingEvents[idxToCheck]
-            const filteredEventParticipants: EventParticipant[] = eventToCheck
+            const eventToCheck: Runescape.Event = upcomingEvents[idxToCheck]
+            const filteredEventParticipants: Runescape.EventParticipant[] = eventToCheck
                 .participants.filter(
-                    (participant: EventParticipant):
+                    (participant: Runescape.EventParticipant):
                     boolean => participant.discordId === command.author.id
                 )
 
-            const filteredParticipant: EventParticipant = filteredEventParticipants.length > 0
+            const filteredParticipant: Runescape.EventParticipant = filteredEventParticipants.length > 0
                 ? filteredEventParticipants[0] : null
             const reply: string = filteredParticipant !== null
                 ? `you are signed up with RSN: ${filteredParticipant.rsn}`
@@ -1335,8 +1211,8 @@ const listParticipant$: Observable<void> = filteredMessage$(
     BOT_COMMANDS.LIST_PARTICIPANTS_UPCOMING
 )
     .pipe(
-        map((command: InputCommand): void => {
-            const upcomingEvents: Event[] = getUpcomingEvents(command.guildData.events)
+        map((command: Bot.Input): void => {
+            const upcomingEvents: Runescape.Event[] = getUpcomingEvents(command.guildData.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
             if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
@@ -1344,12 +1220,10 @@ const listParticipant$: Observable<void> = filteredMessage$(
                 return
             }
 
-            const eventToList: Event = upcomingEvents[idxToCheck]
+            const eventToList: Runescape.Event = upcomingEvents[idxToCheck]
             const formattedStr: string = eventToList.participants.map(
-                (participant: EventParticipant, idx: number): string => {
-                    // const nickname: string = userIdToNickname(command.guild, participant.discordId)
-                    return `\n${idx}: <@${participant.discordId}> signed up ${participant.rsn}`
-                }
+                (participant: Runescape.EventParticipant, idx: number): string => `\n${idx}: <@${participant.discordId}> signed up ${participant.rsn}`
+
             ).join('')
 
             const reply: string = eventToList.participants.length > 0
@@ -1366,20 +1240,20 @@ const listParticipant$: Observable<void> = filteredMessage$(
  */
 const help$: Observable<void> = filteredMessage$(BOT_COMMANDS.HELP)
     .pipe(
-        map((command: InputCommand): void => {
+        map((command: Bot.Input): void => {
             const keys: string[] = Object.keys(BOT_COMMANDS).filter(
                 (key: string): boolean => {
                     const admin: boolean = isAdmin(command.author, command.guildData)
-                    const botCommand: BotCommand = BOT_COMMANDS[key]
+                    const botCommand: Bot.Command = BOT_COMMANDS[key]
                     return (admin && (botCommand.accessControl === ONLY_ADMIN
                         || botCommand.accessControl === ONLY_UNSET_ADMINS_OR_ADMIN))
                         || botCommand.accessControl === ANY_USER
                 }
             )
-            const commandValues: BotCommand[] = keys.map(
-                (key: string): BotCommand => BOT_COMMANDS[key] as BotCommand
+            const commandValues: Bot.Command[] = keys.map(
+                (key: string): Bot.Command => BOT_COMMANDS[key] as Bot.Command
             )
-            const outerStr: string[] = commandValues.map((commandInfo: BotCommand): string => {
+            const outerStr: string[] = commandValues.map((commandInfo: Bot.Command): string => {
                 const innerStr: string[] = [
                     `\n'${commandInfo.command}${commandInfo.parameters}'`,
                     `\ndescription: ${commandInfo.description}`,
@@ -1395,24 +1269,24 @@ const help$: Observable<void> = filteredMessage$(BOT_COMMANDS.HELP)
         })
     )
 
-const setChannel$: Observable<[GuildData, discord.Message, discord.Channel]> = filteredMessage$(
+const setChannel$: Observable<[Bot.Database, discord.Message, discord.Channel]> = filteredMessage$(
     BOT_COMMANDS.SET_CHANNEL
 )
     .pipe(
-        filter((command: InputCommand): boolean => {
+        filter((command: Bot.Input): boolean => {
             const channel = command.message.mentions.channels.first()
             if (channel === undefined) return false
             return command.guild.channels.get(channel.id) !== undefined
         }),
-        switchMap((command: InputCommand):
-        Observable<[GuildData, discord.Message, discord.Channel]> => {
+        switchMap((command: Bot.Input):
+        Observable<[Bot.Database, discord.Message, discord.Channel]> => {
             const channel: discord.Channel = command.message.mentions.channels.first()
-            const newSettings: GuildSettings = update(command.guildData.settings, {
+            const newSettings: Bot.Settings = update(command.guildData.settings, {
                 notificationChannelId: channel.id
-            }) as GuildSettings
-            const newData: GuildData = update(command.guildData, {
+            }) as Bot.Settings
+            const newData: Bot.Database = update(command.guildData, {
                 settings: newSettings
-            }) as GuildData
+            }) as Bot.Database
             return forkJoin(
                 save$(command.guild.id, newData),
                 of<discord.Message>(command.message),
@@ -1429,12 +1303,12 @@ const setChannel$: Observable<[GuildData, discord.Message, discord.Channel]> = f
 /**
  * @function
  * @description Gets events that have not yet started or warned about
- * @param {GuildData} guildData The GuildData to check
- * @returns {Event[]} The array of ongoing clan events for Guild id
+ * @param {Bot.Database} guildData The Bot.Database to check
+ * @returns {Runescape.Event[]} The array of ongoing clan events for Guild id
  */
-const getUnnotifiedEvents = (guildData: GuildData):
-Event[] => guildData.events.filter(
-    (event: Event): boolean => !event.hasNotifiedTwoHourWarning
+const getUnnotifiedEvents = (guildData: Bot.Database):
+Runescape.Event[] => guildData.events.filter(
+    (event: Runescape.Event): boolean => !event.hasNotifiedTwoHourWarning
     || !event.hasNotifiedStarted
     || !event.hasNotifiedEnded
 )
@@ -1452,7 +1326,7 @@ connect$.subscribe((): void => {
         // TODO: Fix this code!
         // race condition between saving and loading data!
         // refactor this into a switch map and call save there!
-        load$(guild.id, true).subscribe((guildData: GuildData): void => {
+        load$(guild.id, true).subscribe((guildData: Bot.Database): void => {
             logger.debug(`Loaded json for guild ${guild.id}`)
             logger.silly(`${JSON.stringify(guildData)}`)
 
@@ -1460,8 +1334,9 @@ connect$.subscribe((): void => {
             // handle generic events here
 
             const unnotifiedEvents = getUnnotifiedEvents(guildData)
-            unnotifiedEvents.forEach((clanEvent: Event): void => {
-                const uuidToCheck: string = clanEvent.uuid
+            unnotifiedEvents.forEach((clanEvent: Runescape.Event): void => {
+                // TODO: change me
+                const uuidToCheck: string = clanEvent.name
                 // we should probably notify in flight events but not so much of ended events
                 // if we are within tolerance, notify if we haven't already
                 // if we are not within tolerance, write an apology if we haven't notified
@@ -1484,7 +1359,8 @@ connect$.subscribe((): void => {
                     // schedule 2 hour warning
                     // schedule start date notification
                     // schedule end date notification
-                    timers[clanEvent.uuid] = [
+                    // TODO: change me
+                    timers[clanEvent.name] = [
                         setTimerTwoHoursBefore(clanEvent, guild, guildData),
                         setTimerStart(clanEvent, guild, guildData),
                         setTimerEnd(clanEvent, guild, guildData)
@@ -1495,25 +1371,26 @@ connect$.subscribe((): void => {
                         logger.debug('notification had not fired')
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
                         // mark 2 hour warning as completed
-                        const newEvent: Event = update(clanEvent, {
+                        const newEvent: Runescape.Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true
-                        }) as Event
-                        const newEvents: Event[] = guildData.events.map(
-                            (event: Event): Event => {
+                        }) as Runescape.Event
+                        const newEvents: Runescape.Event[] = guildData.events.map(
+                            (event: Runescape.Event): Runescape.Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
                                 return event
                             }
                         )
-                        const newData: GuildData = update(guildData, {
+                        const newData: Bot.Database = update(guildData, {
                             events: newEvents
-                        }) as GuildData
+                        }) as Bot.Database
                         save$(guild.id, newData).subscribe((): void => {})
                     }
                     // schedule start date notification
                     // schedule end date notification
-                    timers[clanEvent.uuid] = [
+                    // TODO: change me
+                    timers[clanEvent.name] = [
                         setTimerStart(clanEvent, guild, guildData),
                         setTimerEnd(clanEvent, guild, guildData)
                     ]
@@ -1525,24 +1402,25 @@ connect$.subscribe((): void => {
                         // mark 2 hour warning as completed
                         // mark start notification as complete
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has begun')
-                        const newEvent: Event = update(clanEvent, {
+                        const newEvent: Runescape.Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true
-                        }) as Event
-                        const newEvents: Event[] = guildData.events.map(
-                            (event: Event): Event => {
+                        }) as Runescape.Event
+                        const newEvents: Runescape.Event[] = guildData.events.map(
+                            (event: Runescape.Event): Runescape.Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
                                 return event
                             }
                         )
-                        const newData: GuildData = update(guildData, {
+                        const newData: Bot.Database = update(guildData, {
                             events: newEvents
-                        }) as GuildData
+                        }) as Bot.Database
                         save$(guild.id, newData).subscribe((): void => {})
                     }
-                    timers[clanEvent.uuid] = [
+                    // TODO: change me
+                    timers[clanEvent.name] = [
                         setTimerEnd(clanEvent, guild, guildData)
                     ]
                 } else if (now >= toleranceAfterStart && now < clanEvent.endingDate) {
@@ -1554,25 +1432,26 @@ connect$.subscribe((): void => {
                         // mark start notification as complete
                         // TODO: apologize lol
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'started more than 30 mins ago, yell at n0trout')
-                        const newEvent: Event = update(clanEvent, {
+                        const newEvent: Runescape.Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true
-                        }) as Event
-                        const newEvents: Event[] = guildData.events.map(
-                            (event: Event): Event => {
+                        }) as Runescape.Event
+                        const newEvents: Runescape.Event[] = guildData.events.map(
+                            (event: Runescape.Event): Runescape.Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
                                 return event
                             }
                         )
-                        const newData: GuildData = update(guildData, {
+                        const newData: Bot.Database = update(guildData, {
                             events: newEvents
-                        }) as GuildData
+                        }) as Bot.Database
                         save$(guild.id, newData).subscribe((): void => {})
                     }
                     // schedule end date notification
-                    timers[clanEvent.uuid] = [
+                    // TODO: change me
+                    timers[clanEvent.name] = [
                         setTimerEnd(clanEvent, guild, guildData)
                     ]
                 } else if (now >= clanEvent.endingDate && now < toleranceAfterEnd) {
@@ -1584,22 +1463,22 @@ connect$.subscribe((): void => {
                         // mark start notification as complete (unnecessary)
                         // mark end notification as complete
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
-                        const newEvent: Event = update(clanEvent, {
+                        const newEvent: Runescape.Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true,
                             hasNotifiedEnded: true
-                        }) as Event
-                        const newEvents: Event[] = guildData.events.map(
-                            (event: Event): Event => {
+                        }) as Runescape.Event
+                        const newEvents: Runescape.Event[] = guildData.events.map(
+                            (event: Runescape.Event): Runescape.Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
                                 return event
                             }
                         )
-                        const newData: GuildData = update(guildData, {
+                        const newData: Bot.Database = update(guildData, {
                             events: newEvents
-                        }) as GuildData
+                        }) as Bot.Database
                         save$(guild.id, newData).subscribe((): void => {})
                     }
                 } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
@@ -1612,43 +1491,43 @@ connect$.subscribe((): void => {
                         // mark start notification as complete (unnecessary)
                         // mark end notification as complete
                         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended more than 2 hours ago, yell at n0trout')
-                        const newEvent: Event = update(clanEvent, {
+                        const newEvent: Runescape.Event = update(clanEvent, {
                             hasNotifiedTwoHourWarning: true,
                             hasNotifiedStarted: true,
                             hasNotifiedEnded: true
-                        }) as Event
-                        const newEvents: Event[] = guildData.events.map(
-                            (event: Event): Event => {
+                        }) as Runescape.Event
+                        const newEvents: Runescape.Event[] = guildData.events.map(
+                            (event: Runescape.Event): Runescape.Event => {
                                 if (event.uuid === uuidToCheck) {
                                     return newEvent
                                 }
                                 return event
                             }
                         )
-                        const newData: GuildData = update(guildData, {
+                        const newData: Bot.Database = update(guildData, {
                             events: newEvents
-                        }) as GuildData
+                        }) as Bot.Database
                         save$(guild.id, newData).subscribe((): void => {})
                     }
                 } else {
                     // too late to do anything
                     // just mark it as fired
-                    const newEvent: Event = update(clanEvent, {
+                    const newEvent: Runescape.Event = update(clanEvent, {
                         hasNotifiedTwoHourWarning: true,
                         hasNotifiedStarted: true,
                         hasNotifiedEnded: true
-                    }) as Event
-                    const newEvents: Event[] = guildData.events.map(
-                        (event: Event): Event => {
+                    }) as Runescape.Event
+                    const newEvents: Runescape.Event[] = guildData.events.map(
+                        (event: Runescape.Event): Runescape.Event => {
                             if (event.uuid === uuidToCheck) {
                                 return newEvent
                             }
                             return event
                         }
                     )
-                    const newData: GuildData = update(guildData, {
+                    const newData: Bot.Database = update(guildData, {
                         events: newEvents
-                    }) as GuildData
+                    }) as Bot.Database
                     save$(guild.id, newData).subscribe((): void => {})
                 }
             })
@@ -1674,7 +1553,7 @@ connect$.subscribe((): void => {
             //                 if (xpComponent.startingXp < 0) {
             //                     hiscores$(xpParticipant.rsn)
             //                         .pipe(
-            //                             switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
+            //                             switchMap((hiscore: hiscores.HiscoreResponse): Observable<Bot.Database> => {
             //                                 const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
             //                                     startingXp: hiscore.skills[xpComponent.name].xp
             //                                 }) as XpClanEventParticipantSkillsComponent
@@ -1687,14 +1566,14 @@ connect$.subscribe((): void => {
             //                                 }) as ClanEvent
             //                                 // TODO: this doesn't work for non unique event names and dates
             //                                 const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
-            //                                 const newData: GuildData = update(guildData, {
+            //                                 const newData: Bot.Database = update(guildData, {
             //                                     events: newEvents
-            //                                 }) as GuildData
+            //                                 }) as Bot.Database
             //                                 // TODO: very inefficient - implement a flag to trigger automatic load or manual
             //                                 return save$(guild.id, newData)
             //                             })
             //                         )
-            //                         .subscribe((data: GuildData): void => {
+            //                         .subscribe((data: Bot.Database): void => {
             //                             logger.debug('updated user that did not have starting xp data')
             //                         })
             //                 }
@@ -1702,7 +1581,7 @@ connect$.subscribe((): void => {
             //                 if (xpComponent.endingXp < 0) {
             //                     hiscores$(xpParticipant.rsn)
             //                         .pipe(
-            //                             switchMap((hiscore: hiscores.HiscoreResponse): Observable<GuildData> => {
+            //                             switchMap((hiscore: hiscores.HiscoreResponse): Observable<Bot.Database> => {
             //                                 const newXpComponent: XpClanEventParticipantSkillsComponent = update(xpComponent, {
             //                                     endingXp: hiscore.skills[xpComponent.name].xp
             //                                 }) as XpClanEventParticipantSkillsComponent
@@ -1715,13 +1594,13 @@ connect$.subscribe((): void => {
             //                                 }) as ClanEvent
             //                                 // TODO: this doesn't work for non unique event names and dates
             //                                 const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
-            //                                 const newData: GuildData = update(data, {
+            //                                 const newData: Bot.Database = update(data, {
             //                                     events: newEvents
-            //                                 }) as GuildData
+            //                                 }) as Bot.Database
             //                                 return save$(guild.id, newData)
             //                             })
             //                         )
-            //                         .subscribe((guildData: GuildData): void => {
+            //                         .subscribe((guildData: Bot.Database): void => {
             //                             logger.debug('updated user that did not have ending xp data')
             //                         })
             //                 }
@@ -1742,24 +1621,25 @@ error$.subscribe((error: Error): void => {
     logger.error(error.message)
 })
 
-debug$.subscribe((command: InputCommand): void => {
+debug$.subscribe((command: Bot.Input): void => {
     logger.info('Debug called')
     logger.debug(JSON.stringify(command.guildData, null, 4))
 })
 
-addAdmin$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
+addAdmin$.subscribe((saveMsgArr: [Bot.Database, discord.Message]): void => {
     logger.debug('Admin added')
     saveMsgArr[1].reply('admin added')
 })
 
-saveEvent$.subscribe((saveArr: [InputCommand, Event, number, GuildData]): void => {
+saveEvent$.subscribe((saveArr: [Bot.Input, Runescape.Event, number, Bot.Database]): void => {
     // add timers
-    const inputCommand: InputCommand = saveArr[0]
+    const inputCommand: Bot.Input = saveArr[0]
     const guild: discord.Guild = inputCommand.guild
-    const clanEvent: Event = saveArr[1]
+    const clanEvent: Runescape.Event = saveArr[1]
     const idx: number = saveArr[2]
-    const guildData: GuildData = saveArr[3]
-    timers[clanEvent.uuid] = [
+    const guildData: Bot.Database = saveArr[3]
+    // TODO: change me
+    timers[clanEvent.name] = [
         setTimerTwoHoursBefore(clanEvent, guild, guildData),
         setTimerStart(clanEvent, guild, guildData),
         setTimerEnd(clanEvent, guild, guildData)
@@ -1778,22 +1658,24 @@ listUpcomingEvent$.subscribe((): void => {
     logger.debug('ListUpcomingEvents called')
 })
 
-deleteUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message, Event]): void => {
+deleteUpcomingEvent$.subscribe((saveMsgArr: [Bot.Database, discord.Message, Runescape.Event]): void => {
     // cancel timers
-    timers[saveMsgArr[2].uuid].forEach((timerHnd: NodeJS.Timeout): void => {
+    // TODO: change me
+    timers[saveMsgArr[2].name].forEach((timerHnd: NodeJS.Timeout): void => {
         clearTimeout(timerHnd)
     })
-    timers[saveMsgArr[2].uuid] = undefined
-    logger.debug('Event deleted')
+    // TODO: change me
+    timers[saveMsgArr[2].name] = undefined
+    logger.debug('Runescape.Event deleted')
     saveMsgArr[1].reply(`'${saveMsgArr[2].name}' deleted`)
 })
 
-signupEvent$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
+signupEvent$.subscribe((saveMsgArr: [Bot.Database, discord.Message]): void => {
     logger.debug('Signup called')
     saveMsgArr[1].reply('signed up for event')
 })
 
-unsignupUpcomingEvent$.subscribe((saveMsgArr: [GuildData, discord.Message]): void => {
+unsignupUpcomingEvent$.subscribe((saveMsgArr: [Bot.Database, discord.Message]): void => {
     logger.debug('Unsignup called')
     saveMsgArr[1].reply('removed from event')
 })
@@ -1810,7 +1692,7 @@ help$.subscribe((): void => {
     logger.debug('Help called')
 })
 
-setChannel$.subscribe((saveMsgArr: [GuildData, discord.Message, discord.Channel]): void => {
+setChannel$.subscribe((saveMsgArr: [Bot.Database, discord.Message, discord.Channel]): void => {
     logger.debug('Set channel called')
     saveMsgArr[1].reply(`notification channel set to ${saveMsgArr[2]}`)
 })
@@ -1821,3 +1703,87 @@ setChannel$.subscribe((saveMsgArr: [GuildData, discord.Message, discord.Channel]
 //--------------
 
 gClient.login(auth.token)
+
+// const regularEventParticipant: Runescape.RegularEventAccountInfo = {
+//     rsn: 'n0trout'
+// }
+// const eventParticipant1: Runescape.EventParticipant = {
+//     discordId: '12452345',
+//     runescapeAccounts: [regularEventParticipant]
+// }
+
+// const event1: Runescape.Event = {
+//     name: 'Regular Test',
+//     startingDate: new Date(),
+//     endingDate: new Date(),
+//     type: EVENT_TYPE.REGULAR,
+//     participants: [eventParticipant1],
+//     hasNotifiedTwoHourWarning: false,
+//     hasNotifiedStarted: false,
+//     hasNotifiedEnded: false
+// }
+
+// const botSettings1: Bot.Settings = {
+//     admins: ['242323592035'],
+//     notificationChannelId: '124970105256'
+// }
+
+// const botDatabase1: Bot.Database = {
+//     settings: botSettings1,
+//     events: [event1]
+// }
+
+// logger.debug(JSON.stringify(botDatabase1))
+
+// hiscores.getPlayer('n0trout').then((json: JSON): void => {
+//     const response: hiscores.LookupResponse = json as unknown as hiscores.LookupResponse
+//     const skillsEventParticipantComponent: Runescape.SkillsEventParticipantComponent = {
+//         starting: response.skills,
+//         ending: null
+//     }
+
+//     const bhEventParticipantComponent: Runescape.BhEventParticipantComponent = {
+//         starting: response.bh,
+//         ending: null
+//     }
+
+//     const cluesEventParticipantComponent: Runescape.CluesEventParticipantComponent = {
+//         starting: response.clues,
+//         ending: null
+//     }
+
+//     const competitiveEventAccountInfo: Runescape.CompetitiveEventAccountInfo = {
+//         rsn: 'n0trout',
+//         skills: skillsEventParticipantComponent,
+//         bh: bhEventParticipantComponent,
+//         clues: cluesEventParticipantComponent
+//     }
+
+//     const eventParticipant2: Runescape.EventParticipant = {
+//         discordId: '123489710234',
+//         runescapeAccounts: [competitiveEventAccountInfo]
+//     }
+
+//     const event2: Runescape.Event = {
+//         name: 'Competitive Test',
+//         startingDate: new Date(),
+//         endingDate: new Date(),
+//         type: EVENT_TYPE.COMPETITIVE,
+//         participants: [eventParticipant2],
+//         hasNotifiedTwoHourWarning: false,
+//         hasNotifiedStarted: false,
+//         hasNotifiedEnded: false
+//     }
+
+//     const botSettings2: Bot.Settings = {
+//         admins: ['242323592035'],
+//         notificationChannelId: '124970105256'
+//     }
+
+//     const botDatabase2: Bot.Database = {
+//         settings: botSettings2,
+//         events: [event2]
+//     }
+
+//     logger.debug(JSON.stringify(botDatabase2))
+// })
