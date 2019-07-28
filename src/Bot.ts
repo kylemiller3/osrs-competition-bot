@@ -2,18 +2,18 @@ declare module 'Bot' {
     import * as discord from 'discord.js'
     import * as Runescape from 'Runescape'
     /**
- * @description Contract for access controls which applies to each BotCommand
- * @interface
- */
+    * @description Contract for describing access controls for each command
+    * @interface
+    */
     export interface AccessControl {
         controlFunction: (author: discord.User, guildData: Database) => boolean
         description: string
     }
 
     /**
- * @description Contract describing each user input commands
- * @interface
- */
+    * @description Contract describing each possible command
+    * @interface
+    */
     export interface Command extends Record<string, unknown> {
         description: string
         accessControl: AccessControl
@@ -22,9 +22,9 @@ declare module 'Bot' {
     }
 
     /**
- * @description Contract containing all BotCommands
- * @interface
- */
+    * @description Contract containing all known commands
+    * @interface
+    */
     export interface Commands extends Record<string, Command> {
         DEBUG: Command
         ADD_ADMIN: Command
