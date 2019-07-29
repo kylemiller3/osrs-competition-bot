@@ -2103,62 +2103,62 @@ gClient.login(auth.token)
 
 // logger.debug(JSON.stringify(botDatabase1))
 
-// hiscores.getPlayer('n0trout').then((json: JSON): void => {
-//     const response: hiscores.LookupResponse = json as unknown as hiscores.LookupResponse
-//     const skillsEventParticipantComponent: Runescape.SkillsEventParticipantComponent = {
-//         starting: response.skills,
-//         ending: null
-//     }
+hiscores.getPlayer('n0trout').then((json: JSON): void => {
+    const response: hiscores.LookupResponse = json as unknown as hiscores.LookupResponse
+    const skillsEventParticipantComponent: Runescape.SkillsEventParticipantComponent = {
+        starting: response.skills,
+        ending: null,
+    }
 
-//     const bhEventParticipantComponent: Runescape.BhEventParticipantComponent = {
-//         starting: response.bh,
-//         ending: null
-//     }
+    const bhEventParticipantComponent: Runescape.BhEventParticipantComponent = {
+        starting: response.bh,
+        ending: null,
+    }
 
-//     const cluesEventParticipantComponent: Runescape.CluesEventParticipantComponent = {
-//         starting: response.clues,
-//         ending: null
-//     }
+    const cluesEventParticipantComponent: Runescape.CluesEventParticipantComponent = {
+        starting: response.clues,
+        ending: null,
+    }
 
-//     const competitiveEventAccountInfo: Runescape.CompetitiveEventAccountInfo = {
-//         rsn: 'n0trout',
-//         skills: skillsEventParticipantComponent,
-//         bh: bhEventParticipantComponent,
-//         clues: cluesEventParticipantComponent
-//     }
+    const competitiveEventAccountInfo: Runescape.CompetitiveEventAccountInfo = {
+        rsn: 'n0trout',
+        skills: skillsEventParticipantComponent,
+        bh: bhEventParticipantComponent,
+        clues: cluesEventParticipantComponent,
+    }
 
-//     const eventParticipant2: Runescape.EventParticipant = {
-//         discordId: '123489710234',
-//         runescapeAccounts: [competitiveEventAccountInfo]
-//     }
+    const eventParticipant2: Runescape.DiscordParticipant = {
+        discordId: '123489710234',
+        runescapeAccounts: [competitiveEventAccountInfo],
+    }
 
-//     const tracking: Runescape.Tracking = {
-//         skills: [Runescape.SkillsEnum.AGILITY, Runescape.SkillsEnum.RUNECRAFT],
-//         bh: [Runescape.BountyHunterEnum.HUNTER],
-//         clues: [Runescape.CluesEnum.HARD, Runescape.CluesEnum.MASTER, Runescape.CluesEnum.ELITE]
-//     }
+    const tracking: Runescape.Tracking = {
+        skills: [Runescape.SkillsEnum.AGILITY, Runescape.SkillsEnum.RUNECRAFT],
+        bh: [Runescape.BountyHunterEnum.HUNTER],
+        clues: [Runescape.CluesEnum.HARD, Runescape.CluesEnum.MASTER, Runescape.CluesEnum.ELITE],
+    }
 
-//     const event2: Runescape.Event = {
-//         name: 'Competitive Test',
-//         startingDate: new Date(),
-//         endingDate: new Date(),
-//         type: EVENT_TYPE.COMPETITIVE,
-//         tracking,
-//         participants: [eventParticipant2],
-//         hasNotifiedTwoHourWarning: false,
-//         hasNotifiedStarted: false,
-//         hasNotifiedEnded: false
-//     }
+    const event2: Runescape.Event = {
+        name: 'Competitive Test',
+        startingDate: new Date(),
+        endingDate: new Date(),
+        type: EVENT_TYPE.COMPETITIVE,
+        tracking,
+        participants: [eventParticipant2],
+        hasNotifiedTwoHourWarning: false,
+        hasNotifiedStarted: false,
+        hasNotifiedEnded: false,
+    }
 
-//     const botSettings2: Bot.Settings = {
-//         admins: ['242323592035'],
-//         notificationChannelId: '124970105256'
-//     }
+    const botSettings2: Bot.Settings = {
+        admins: ['242323592035'],
+        notificationChannelId: '124970105256',
+    }
 
-//     const botDatabase2: Bot.Database = {
-//         settings: botSettings2,
-//         events: [event2]
-//     }
+    const botDatabase2: Bot.Database = {
+        settings: botSettings2,
+        events: [event2],
+    }
 
-//     logger.debug(JSON.stringify(botDatabase2))
-// })
+    logger.debug(JSON.stringify(botDatabase2))
+})
