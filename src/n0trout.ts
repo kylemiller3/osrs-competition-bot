@@ -545,22 +545,24 @@ NodeJS.Timeout => {
     const now: Date = new Date()
     const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
     twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
+    // this is broken code
+    // we would need to grab the updated guild data
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
         // mark 2 hour warning as completed
-        const newEvent: ClanEvent = update(clanEvent, {
-            hasNotifiedTwoHourWarning: true
-        }) as ClanEvent
-        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
-            if (newEvent.uuid === event.uuid) {
-                return newEvent
-            }
-            return event
-        })
-        const newData: GuildData = update(guildData, {
-            events: newEvents
-        }) as GuildData
-        save$(guild.id, newData).subscribe((): void => {})
+        // const newEvent: ClanEvent = update(clanEvent, {
+        //     hasNotifiedTwoHourWarning: true
+        // }) as ClanEvent
+        // const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+        //     if (newEvent.uuid === event.uuid) {
+        //         return newEvent
+        //     }
+        //     return event
+        // })
+        // const newData: GuildData = update(guildData, {
+        //     events: newEvents
+        // }) as GuildData
+        // save$(guild.id, newData).subscribe((): void => {})
     }, twoHoursBeforeStart.getTime() - now.getTime())
 }
 
@@ -575,22 +577,24 @@ NodeJS.Timeout => {
 const setTimerStart = (clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
 NodeJS.Timeout => {
     const now: Date = new Date()
+    // this is broken code
+    // we would need to grab the updated guild data
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has started')
         // mark start date as completed
-        const newEvent: ClanEvent = update(clanEvent, {
-            hasNotifiedStarted: true
-        }) as ClanEvent
-        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
-            if (newEvent.uuid === event.uuid) {
-                return newEvent
-            }
-            return event
-        })
-        const newData: GuildData = update(guildData, {
-            events: newEvents
-        }) as GuildData
-        save$(guild.id, newData).subscribe((): void => {})
+        // const newEvent: ClanEvent = update(clanEvent, {
+        //     hasNotifiedStarted: true
+        // }) as ClanEvent
+        // const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+        //     if (newEvent.uuid === event.uuid) {
+        //         return newEvent
+        //     }
+        //     return event
+        // })
+        // const newData: GuildData = update(guildData, {
+        //     events: newEvents
+        // }) as GuildData
+        // save$(guild.id, newData).subscribe((): void => {})
     }, clanEvent.startingDate.getTime() - now.getTime())
 }
 
@@ -605,22 +609,24 @@ NodeJS.Timeout => {
 function setTimerEnd(clanEvent: ClanEvent, guild: discord.Guild, guildData: GuildData):
 NodeJS.Timeout {
     const now: Date = new Date()
+    // this is broken code
+    // we would need to grab the updated guild data
     return setTimeout((): void => {
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
         // mark end date as completed
-        const newEvent: ClanEvent = update(clanEvent, {
-            hasNotifiedEnded: true
-        }) as ClanEvent
-        const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
-            if (newEvent.uuid === event.uuid) {
-                return newEvent
-            }
-            return event
-        })
-        const newData: GuildData = update(guildData, {
-            events: newEvents
-        }) as GuildData
-        save$(guild.id, newData).subscribe((): void => {})
+        // const newEvent: ClanEvent = update(clanEvent, {
+        //     hasNotifiedEnded: true
+        // }) as ClanEvent
+        // const newEvents: ClanEvent[] = guildData.events.map((event: ClanEvent): ClanEvent => {
+        //     if (newEvent.uuid === event.uuid) {
+        //         return newEvent
+        //     }
+        //     return event
+        // })
+        // const newData: GuildData = update(guildData, {
+        //     events: newEvents
+        // }) as GuildData
+        // save$(guild.id, newData).subscribe((): void => {})
     }, clanEvent.endingDate.getTime() - now.getTime())
 }
 
@@ -1464,200 +1470,200 @@ connect$.subscribe((): void => {
 
             // startup tasks
             // handle generic events here
+            // let's not worry about this right now
+            // const unnotifiedEvents = getUnnotifiedEvents(guildData)
+            // unnotifiedEvents.forEach((clanEvent: ClanEvent): void => {
+            //     const uuidToCheck: string = clanEvent.uuid
+            //     // we should probably notify in flight events but not so much of ended events
+            //     // if we are within tolerance, notify if we haven't already
+            //     // if we are not within tolerance, write an apology if we haven't notified
+            //     const now: Date = new Date()
+            //     const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
+            //     twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
 
-            const unnotifiedEvents = getUnnotifiedEvents(guildData)
-            unnotifiedEvents.forEach((clanEvent: ClanEvent): void => {
-                const uuidToCheck: string = clanEvent.uuid
-                // we should probably notify in flight events but not so much of ended events
-                // if we are within tolerance, notify if we haven't already
-                // if we are not within tolerance, write an apology if we haven't notified
-                const now: Date = new Date()
-                const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
-                twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
+            //     const toleranceAfterStart: Date = new Date(clanEvent.startingDate.getTime())
+            //     toleranceAfterStart.setMinutes(toleranceAfterStart.getMinutes() + 30)
 
-                const toleranceAfterStart: Date = new Date(clanEvent.startingDate.getTime())
-                toleranceAfterStart.setMinutes(toleranceAfterStart.getMinutes() + 30)
+            //     const toleranceAfterEnd: Date = new Date(clanEvent.endingDate.getTime())
+            //     toleranceAfterEnd.setMinutes(toleranceAfterEnd.getMinutes() + 30)
 
-                const toleranceAfterEnd: Date = new Date(clanEvent.endingDate.getTime())
-                toleranceAfterEnd.setMinutes(toleranceAfterEnd.getMinutes() + 30)
+            //     const toleranceAfterEndTolerance: Date = new Date(clanEvent.endingDate.getTime())
+            //     toleranceAfterEndTolerance.setHours(toleranceAfterEndTolerance.getHours() + 2)
 
-                const toleranceAfterEndTolerance: Date = new Date(clanEvent.endingDate.getTime())
-                toleranceAfterEndTolerance.setHours(toleranceAfterEndTolerance.getHours() + 2)
-
-                // if we are before 2 hour warning, schedule warnings
-                if (now < twoHoursBeforeStart) {
-                    logger.debug('before 2 hour warning')
-                    // schedule 2 hour warning
-                    // schedule start date notification
-                    // schedule end date notification
-                    timers[clanEvent.uuid] = [
-                        setTimerTwoHoursBefore(clanEvent, guild, guildData),
-                        setTimerStart(clanEvent, guild, guildData),
-                        setTimerEnd(clanEvent, guild, guildData)
-                    ]
-                } else if (now >= twoHoursBeforeStart && now < clanEvent.startingDate) {
-                    logger.debug('after 2 hour warning')
-                    if (!clanEvent.hasNotifiedTwoHourWarning) {
-                        logger.debug('notification had not fired')
-                        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
-                        // mark 2 hour warning as completed
-                        const newEvent: ClanEvent = update(clanEvent, {
-                            hasNotifiedTwoHourWarning: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
-                                if (event.uuid === uuidToCheck) {
-                                    return newEvent
-                                }
-                                return event
-                            }
-                        )
-                        const newData: GuildData = update(guildData, {
-                            events: newEvents
-                        }) as GuildData
-                        save$(guild.id, newData).subscribe((): void => {})
-                    }
-                    // schedule start date notification
-                    // schedule end date notification
-                    timers[clanEvent.uuid] = [
-                        setTimerStart(clanEvent, guild, guildData),
-                        setTimerEnd(clanEvent, guild, guildData)
-                    ]
-                } else if (now >= clanEvent.startingDate && now < toleranceAfterStart) {
-                    logger.debug('after event started')
-                    if (!clanEvent.hasNotifiedStarted) {
-                        logger.debug('notification had not fired')
-                        // fire start notification
-                        // mark 2 hour warning as completed
-                        // mark start notification as complete
-                        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has begun')
-                        const newEvent: ClanEvent = update(clanEvent, {
-                            hasNotifiedTwoHourWarning: true,
-                            hasNotifiedStarted: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
-                                if (event.uuid === uuidToCheck) {
-                                    return newEvent
-                                }
-                                return event
-                            }
-                        )
-                        const newData: GuildData = update(guildData, {
-                            events: newEvents
-                        }) as GuildData
-                        save$(guild.id, newData).subscribe((): void => {})
-                    }
-                    timers[clanEvent.uuid] = [
-                        setTimerEnd(clanEvent, guild, guildData)
-                    ]
-                } else if (now >= toleranceAfterStart && now < clanEvent.endingDate) {
-                    logger.debug('after 30 min start tolerance')
-                    if (!clanEvent.hasNotifiedStarted) {
-                        logger.error('notification had not fired')
-                        // fire start notification
-                        // mark 2 hour warning as completed
-                        // mark start notification as complete
-                        // TODO: apologize lol
-                        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'started more than 30 mins ago, yell at n0trout')
-                        const newEvent: ClanEvent = update(clanEvent, {
-                            hasNotifiedTwoHourWarning: true,
-                            hasNotifiedStarted: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
-                                if (event.uuid === uuidToCheck) {
-                                    return newEvent
-                                }
-                                return event
-                            }
-                        )
-                        const newData: GuildData = update(guildData, {
-                            events: newEvents
-                        }) as GuildData
-                        save$(guild.id, newData).subscribe((): void => {})
-                    }
-                    // schedule end date notification
-                    timers[clanEvent.uuid] = [
-                        setTimerEnd(clanEvent, guild, guildData)
-                    ]
-                } else if (now >= clanEvent.endingDate && now < toleranceAfterEnd) {
-                    logger.debug('after ended')
-                    if (!clanEvent.hasNotifiedEnded) {
-                        logger.error('notification had not fired')
-                        // fire end notification
-                        // mark 2 hour warning as complete (unnecessary)
-                        // mark start notification as complete (unnecessary)
-                        // mark end notification as complete
-                        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
-                        const newEvent: ClanEvent = update(clanEvent, {
-                            hasNotifiedTwoHourWarning: true,
-                            hasNotifiedStarted: true,
-                            hasNotifiedEnded: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
-                                if (event.uuid === uuidToCheck) {
-                                    return newEvent
-                                }
-                                return event
-                            }
-                        )
-                        const newData: GuildData = update(guildData, {
-                            events: newEvents
-                        }) as GuildData
-                        save$(guild.id, newData).subscribe((): void => {})
-                    }
-                } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
-                    logger.debug('after 2 hour end tolerance')
-                    if (!clanEvent.hasNotifiedEnded) {
-                        logger.error('notification had not fired')
-                        // fire end notification
-                        // apologize
-                        // mark 2 hour warning as complete (unnecessary)
-                        // mark start notification as complete (unnecessary)
-                        // mark end notification as complete
-                        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended more than 2 hours ago, yell at n0trout')
-                        const newEvent: ClanEvent = update(clanEvent, {
-                            hasNotifiedTwoHourWarning: true,
-                            hasNotifiedStarted: true,
-                            hasNotifiedEnded: true
-                        }) as ClanEvent
-                        const newEvents: ClanEvent[] = guildData.events.map(
-                            (event: ClanEvent): ClanEvent => {
-                                if (event.uuid === uuidToCheck) {
-                                    return newEvent
-                                }
-                                return event
-                            }
-                        )
-                        const newData: GuildData = update(guildData, {
-                            events: newEvents
-                        }) as GuildData
-                        save$(guild.id, newData).subscribe((): void => {})
-                    }
-                } else {
-                    // too late to do anything
-                    // just mark it as fired
-                    const newEvent: ClanEvent = update(clanEvent, {
-                        hasNotifiedTwoHourWarning: true,
-                        hasNotifiedStarted: true,
-                        hasNotifiedEnded: true
-                    }) as ClanEvent
-                    const newEvents: ClanEvent[] = guildData.events.map(
-                        (event: ClanEvent): ClanEvent => {
-                            if (event.uuid === uuidToCheck) {
-                                return newEvent
-                            }
-                            return event
-                        }
-                    )
-                    const newData: GuildData = update(guildData, {
-                        events: newEvents
-                    }) as GuildData
-                    save$(guild.id, newData).subscribe((): void => {})
-                }
-            })
+            //     // if we are before 2 hour warning, schedule warnings
+            //     if (now < twoHoursBeforeStart) {
+            //         logger.debug('before 2 hour warning')
+            //         // schedule 2 hour warning
+            //         // schedule start date notification
+            //         // schedule end date notification
+            //         timers[clanEvent.uuid] = [
+            //             setTimerTwoHoursBefore(clanEvent, guild, guildData),
+            //             setTimerStart(clanEvent, guild, guildData),
+            //             setTimerEnd(clanEvent, guild, guildData)
+            //         ]
+            //     } else if (now >= twoHoursBeforeStart && now < clanEvent.startingDate) {
+            //         logger.debug('after 2 hour warning')
+            //         if (!clanEvent.hasNotifiedTwoHourWarning) {
+            //             logger.debug('notification had not fired')
+            //             notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
+            //             // mark 2 hour warning as completed
+            //             const newEvent: ClanEvent = update(clanEvent, {
+            //                 hasNotifiedTwoHourWarning: true
+            //             }) as ClanEvent
+            //             const newEvents: ClanEvent[] = guildData.events.map(
+            //                 (event: ClanEvent): ClanEvent => {
+            //                     if (event.uuid === uuidToCheck) {
+            //                         return newEvent
+            //                     }
+            //                     return event
+            //                 }
+            //             )
+            //             const newData: GuildData = update(guildData, {
+            //                 events: newEvents
+            //             }) as GuildData
+            //             save$(guild.id, newData).subscribe((): void => {})
+            //         }
+            //         // schedule start date notification
+            //         // schedule end date notification
+            //         timers[clanEvent.uuid] = [
+            //             setTimerStart(clanEvent, guild, guildData),
+            //             setTimerEnd(clanEvent, guild, guildData)
+            //         ]
+            //     } else if (now >= clanEvent.startingDate && now < toleranceAfterStart) {
+            //         logger.debug('after event started')
+            //         if (!clanEvent.hasNotifiedStarted) {
+            //             logger.debug('notification had not fired')
+            //             // fire start notification
+            //             // mark 2 hour warning as completed
+            //             // mark start notification as complete
+            //             notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has begun')
+            //             const newEvent: ClanEvent = update(clanEvent, {
+            //                 hasNotifiedTwoHourWarning: true,
+            //                 hasNotifiedStarted: true
+            //             }) as ClanEvent
+            //             const newEvents: ClanEvent[] = guildData.events.map(
+            //                 (event: ClanEvent): ClanEvent => {
+            //                     if (event.uuid === uuidToCheck) {
+            //                         return newEvent
+            //                     }
+            //                     return event
+            //                 }
+            //             )
+            //             const newData: GuildData = update(guildData, {
+            //                 events: newEvents
+            //             }) as GuildData
+            //             save$(guild.id, newData).subscribe((): void => {})
+            //         }
+            //         timers[clanEvent.uuid] = [
+            //             setTimerEnd(clanEvent, guild, guildData)
+            //         ]
+            //     } else if (now >= toleranceAfterStart && now < clanEvent.endingDate) {
+            //         logger.debug('after 30 min start tolerance')
+            //         if (!clanEvent.hasNotifiedStarted) {
+            //             logger.error('notification had not fired')
+            //             // fire start notification
+            //             // mark 2 hour warning as completed
+            //             // mark start notification as complete
+            //             // TODO: apologize lol
+            //             notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'started more than 30 mins ago, yell at n0trout')
+            //             const newEvent: ClanEvent = update(clanEvent, {
+            //                 hasNotifiedTwoHourWarning: true,
+            //                 hasNotifiedStarted: true
+            //             }) as ClanEvent
+            //             const newEvents: ClanEvent[] = guildData.events.map(
+            //                 (event: ClanEvent): ClanEvent => {
+            //                     if (event.uuid === uuidToCheck) {
+            //                         return newEvent
+            //                     }
+            //                     return event
+            //                 }
+            //             )
+            //             const newData: GuildData = update(guildData, {
+            //                 events: newEvents
+            //             }) as GuildData
+            //             save$(guild.id, newData).subscribe((): void => {})
+            //         }
+            //         // schedule end date notification
+            //         timers[clanEvent.uuid] = [
+            //             setTimerEnd(clanEvent, guild, guildData)
+            //         ]
+            //     } else if (now >= clanEvent.endingDate && now < toleranceAfterEnd) {
+            //         logger.debug('after ended')
+            //         if (!clanEvent.hasNotifiedEnded) {
+            //             logger.error('notification had not fired')
+            //             // fire end notification
+            //             // mark 2 hour warning as complete (unnecessary)
+            //             // mark start notification as complete (unnecessary)
+            //             // mark end notification as complete
+            //             notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
+            //             const newEvent: ClanEvent = update(clanEvent, {
+            //                 hasNotifiedTwoHourWarning: true,
+            //                 hasNotifiedStarted: true,
+            //                 hasNotifiedEnded: true
+            //             }) as ClanEvent
+            //             const newEvents: ClanEvent[] = guildData.events.map(
+            //                 (event: ClanEvent): ClanEvent => {
+            //                     if (event.uuid === uuidToCheck) {
+            //                         return newEvent
+            //                     }
+            //                     return event
+            //                 }
+            //             )
+            //             const newData: GuildData = update(guildData, {
+            //                 events: newEvents
+            //             }) as GuildData
+            //             save$(guild.id, newData).subscribe((): void => {})
+            //         }
+            //     } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
+            //         logger.debug('after 2 hour end tolerance')
+            //         if (!clanEvent.hasNotifiedEnded) {
+            //             logger.error('notification had not fired')
+            //             // fire end notification
+            //             // apologize
+            //             // mark 2 hour warning as complete (unnecessary)
+            //             // mark start notification as complete (unnecessary)
+            //             // mark end notification as complete
+            //             notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended more than 2 hours ago, yell at n0trout')
+            //             const newEvent: ClanEvent = update(clanEvent, {
+            //                 hasNotifiedTwoHourWarning: true,
+            //                 hasNotifiedStarted: true,
+            //                 hasNotifiedEnded: true
+            //             }) as ClanEvent
+            //             const newEvents: ClanEvent[] = guildData.events.map(
+            //                 (event: ClanEvent): ClanEvent => {
+            //                     if (event.uuid === uuidToCheck) {
+            //                         return newEvent
+            //                     }
+            //                     return event
+            //                 }
+            //             )
+            //             const newData: GuildData = update(guildData, {
+            //                 events: newEvents
+            //             }) as GuildData
+            //             save$(guild.id, newData).subscribe((): void => {})
+            //         }
+            //     } else {
+            //         // too late to do anything
+            //         // just mark it as fired
+            //         const newEvent: ClanEvent = update(clanEvent, {
+            //             hasNotifiedTwoHourWarning: true,
+            //             hasNotifiedStarted: true,
+            //             hasNotifiedEnded: true
+            //         }) as ClanEvent
+            //         const newEvents: ClanEvent[] = guildData.events.map(
+            //             (event: ClanEvent): ClanEvent => {
+            //                 if (event.uuid === uuidToCheck) {
+            //                     return newEvent
+            //                 }
+            //                 return event
+            //             }
+            //         )
+            //         const newData: GuildData = update(guildData, {
+            //             events: newEvents
+            //         }) as GuildData
+            //         save$(guild.id, newData).subscribe((): void => {})
+            //     }
+            // })
 
 
             // are we in flight for an event?
