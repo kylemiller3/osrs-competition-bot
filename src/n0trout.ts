@@ -1783,7 +1783,7 @@ saveEvent$.subscribe((saveArr: [InputCommand, ClanEvent, number, GuildData]): vo
     ) as discord.TextChannel
     if (channel === undefined || channel.type !== 'text') return
     logger.debug('Mentioned general of new generic event')
-    channel.send(`@everyone clan event '${clanEvent.name}' has just been scheduled for ${clanEvent.startingDate.toString()}\nto sign-up type: '${BOT_COMMANDS.SIGNUP_UPCOMING.command}event ${idx} rsn (your RuneScape name)'`, { disableEveryone: false })
+    channel.send(`@everyone clan event '${clanEvent.name}' has just been scheduled for ${clanEvent.startingDate.toString()}\nto sign-up type: '${BOT_COMMANDS.SIGNUP_UPCOMING.command}event ${idx} rsn (your RuneScape name)'`, { disableEveryone: true })
 })
 
 listUpcomingEvent$.subscribe((): void => {
