@@ -12,7 +12,7 @@
   "extends": ["airbnb-base", "plugin:@typescript-eslint/recommended"],
   "rules": {
     "semi": [2, "never"],
-    "comma-dangle": [2, "never"],
+    "comma-dangle": [2, "always-multiline"],
     "max-len": "warn",
     "@typescript-eslint/member-delimiter-style": ["error", {
       "multiline": {
