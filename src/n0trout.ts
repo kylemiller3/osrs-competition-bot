@@ -1198,9 +1198,10 @@ const signupEvent$: Observable<[GuildData, discord.Message]> = filteredMessage$(
             const newEvent: ClanEvent = update(eventToModify, {
                 participants: newEventParticipants
             }) as ClanEvent
+            const idxToModifyAllEvents: number = command.guildData.events.indexOf(eventToModify)
             const newEvents: ClanEvent[] = command.guildData.events.map(
                 (event: ClanEvent, idx: number): ClanEvent => {
-                    if (idx === idxToModify) {
+                    if (idx === idxToModifyAllEvents) {
                         return newEvent
                     }
                     return event
@@ -1274,9 +1275,10 @@ const unsignupUpcomingEvent$: Observable<[GuildData, discord.Message]> = filtere
             const newEvent: ClanEvent = update(eventToModify, {
                 participants: newEventParticipants
             }) as ClanEvent
+            const idxToModifyAllEvents: number = command.guildData.events.indexOf(eventToModify)
             const newEvents: ClanEvent[] = command.guildData.events.map(
                 (event: ClanEvent, idx: number): ClanEvent => {
-                    if (idx === idxToModify) {
+                    if (idx === idxToModifyAllEvents) {
                         return newEvent
                     }
                     return event
