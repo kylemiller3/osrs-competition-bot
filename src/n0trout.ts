@@ -1113,11 +1113,11 @@ const deleteUpcomingEvent$: Observable<[GuildData, discord.Message, ClanEvent]> 
  * @param {string} userId The Discord Id to lookup
  * @returns {string} The user's Guild nickname
  */
-const userIdToNickname = (guild: discord.Guild, userId: string): string => {
+const userIdToDiscordName = (guild: discord.Guild, userId: string): string => {
     const members: discord.Collection<string, discord.GuildMember> = guild.members.filter(
         (member: discord.GuildMember): boolean => member.id === userId
     )
-    const name: string = members.size > 0 ? members.first().nickname : null
+    const name: string = members.size > 0 ? members.first().displayName : null
     return name
 }
 
@@ -1350,8 +1350,11 @@ const listParticipant$: Observable<void> = filteredMessage$(
             const eventToList: ClanEvent = upcomingEvents[idxToCheck]
             const formattedStr: string = eventToList.participants.map(
                 (participant: ClanEventParticipant, idx: number): string => {
-                    // const nickname: string = userIdToNickname(command.guild, participant.discordId)
-                    return `\n${idx}: <@${participant.discordId}> signed up ${participant.rsn}`
+                    const discordName: string = userIdToDiscordName(
+                        command.guild,
+                        participant.discordId
+                    )
+                    return `\n${idx}: ${discordName} signed up ${participant.rsn}`
                 }
             ).join('')
 
