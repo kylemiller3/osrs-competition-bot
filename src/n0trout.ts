@@ -688,7 +688,7 @@ const hiscores$ = (rsn: string): Observable<hiscores.HiscoreResponse> => {
                 publishReplay(1, 10 * 60 * 1000),
                 refCount(), catchError((error: Error): Observable<JSON> => {
                     logError(error)
-                    throw error
+                    return of(null)
                 })
             ) as unknown as Observable<hiscores.HiscoreResponse>
     }
