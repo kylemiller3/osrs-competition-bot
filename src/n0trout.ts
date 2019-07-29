@@ -1578,7 +1578,10 @@ const listParticipant$: Observable<void> = filteredMessage$(
                         command.guild,
                         participant.discordId
                     )
-                    return `\n${idx}: ${displayName} signed up ${participant.rsn}`
+                    const accounts: string = participant.runescapeAccounts.map(
+                        (account: Runescape.RegularAccountInfo): string => account.rsn
+                    ).join(', ')
+                    return `\n${idx}: ${displayName} signed up ${accounts}`
                 }
             ).join('')
 
