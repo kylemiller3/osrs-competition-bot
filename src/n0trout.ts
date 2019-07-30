@@ -615,13 +615,17 @@ const notifyClanEvent = (
  * @param guildData The Bot.Database to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-const setTimerTwoHoursBefore = (clanEvent: Runescape.Event, guild: discord.Guild):
+const setTimerTwoHoursBefore = (oldEvent: Runescape.Event, guild: discord.Guild):
 NodeJS.Timeout => {
     const now: Date = new Date()
-    const twoHoursBeforeStart: Date = new Date(clanEvent.startingDate.getTime())
+    const twoHoursBeforeStart: Date = new Date(oldEvent.startingDate.getTime())
     twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
     return setTimeout((): void => {
         const guildData: Bot.Database = load(guild.id, false)
+        const clanEvents: Runescape.Event[] = guildData.events.filter(
+            (event: Runescape.Event): boolean => event.id === oldEvent.id
+        )
+        const clanEvent: Runescape.Event = clanEvents[0]
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
         // mark 2 hour warning as completed
         const newEvent: Runescape.Event = update(clanEvent, {
@@ -648,11 +652,15 @@ NodeJS.Timeout => {
  * @param guild The Guild to notify
  * @returns {NodeJS.Timeout} The global timer handle
  */
-const setTimerStart = (clanEvent: Runescape.Event, guild: discord.Guild):
+const setTimerStart = (oldEvent: Runescape.Event, guild: discord.Guild):
 NodeJS.Timeout => {
     const now: Date = new Date()
     return setTimeout((): void => {
         const guildData: Bot.Database = load(guild.id, false)
+        const clanEvents: Runescape.Event[] = guildData.events.filter(
+            (event: Runescape.Event): boolean => event.id === oldEvent.id
+        )
+        const clanEvent: Runescape.Event = clanEvents[0]
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has started')
         // mark start date as completed
         const newEvent: Runescape.Event = update(clanEvent, {
@@ -670,7 +678,7 @@ NodeJS.Timeout => {
             events: newEvents,
         }) as Bot.Database
         save(guild.id, newData)
-    }, clanEvent.startingDate.getTime() - now.getTime())
+    }, oldEvent.startingDate.getTime() - now.getTime())
 }
 
 /**
@@ -681,13 +689,15 @@ NodeJS.Timeout => {
  * @param guildData The Bot.Database to update on notification
  * @returns {NodeJS.Timeout} The global timer handle
  */
-function setTimerEnd(clanEvent: Runescape.Event, guild: discord.Guild):
+function setTimerEnd(oldEvent: Runescape.Event, guild: discord.Guild):
 NodeJS.Timeout {
     const now: Date = new Date()
-    // TODO:
-    // broken code need to refresh
     return setTimeout((): void => {
         const guildData: Bot.Database = load(guild.id, false)
+        const clanEvents: Runescape.Event[] = guildData.events.filter(
+            (event: Runescape.Event): boolean => event.id === oldEvent.id
+        )
+        const clanEvent: Runescape.Event = clanEvents[0]
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
         // mark end date as completed
         const newEvent: Runescape.Event = update(clanEvent, {
@@ -705,7 +715,7 @@ NodeJS.Timeout {
             events: newEvents,
         }) as Bot.Database
         save(guild.id, newData)
-    }, clanEvent.endingDate.getTime() - now.getTime())
+    }, oldEvent.endingDate.getTime() - now.getTime())
 }
 
 /**
@@ -1327,7 +1337,9 @@ const signupEvent$: Observable<[Bot.Database, discord.Message]> = filteredMessag
 
             // get upcoming events
             // if index is out of range return
-            const upcomingAndInFlightEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
+            const upcomingAndInFlightEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(
+                command.guildData.events
+            )
             const idxToModify: number = Number.parseInt(parsedRegex[0], 10)
             const userIdToAdd: string = command.author.id
             const rsnToAdd: string = parsedRegex[1]
@@ -1536,7 +1548,9 @@ const amISignedUp$: Observable<void> = filteredMessage$(Bot.COMMANDS.AMISIGNEDUP
             Runescape.DiscordParticipant = filteredEventParticipants.length > 0
                 ? filteredEventParticipants[0] : null
             const reply: string = filteredParticipant !== null
-                ? `you are signed up with RSN: ${filteredParticipant.rsn}`
+                ? `you are signed up with RSN: ${filteredParticipant.runescapeAccounts.map(
+                    (account: Runescape.RegularAccountInfo): string => account.rsn
+                ).join(', ')}`
                 : 'you are not signed up'
             command.message.reply(reply)
         })
