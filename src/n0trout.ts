@@ -1311,7 +1311,7 @@ const userIdToDisplayName = (guild: discord.Guild, userId: string): string => {
  * @type {string}
  * @constant
  */
-const signupTermRegex = 'event|rsn|$'
+const signupTermRegex = 'rsn|$'
 
 /**
  * @description An Observable that handles the SIGNUP_UPCOMING command
