@@ -363,36 +363,8 @@ namespace Runescape {
      * @interface
      */
     export interface CompetitiveEventAccountInfo extends RegularAccountInfo {
-        skills: SkillsEventParticipantComponent
-        bh: BhEventParticipantComponent
-        clues: CluesEventParticipantComponent
-    }
-
-    /**
-     * @description Contract component containing the tracking information for skills
-     * @interface
-     */
-    export interface SkillsEventParticipantComponent extends Record<string, hiscores.SkillsInfo> {
-        starting: hiscores.SkillsInfo
-        ending: hiscores.SkillsInfo
-    }
-
-    /**
-     * @description Contract component containing the tracking information for bounty hunter
-     * @interface
-     */
-    export interface BhEventParticipantComponent extends Record<string, hiscores.BountyHunterInfo> {
-        starting: hiscores.BountyHunterInfo
-        ending: hiscores.BountyHunterInfo
-    }
-
-    /**
-     * @description Contract component containing the tracking information for clues
-     * @interface
-     */
-    export interface CluesEventParticipantComponent extends Record<string, hiscores.CluesInfo> {
-        starting: hiscores.CluesInfo
-        ending: hiscores.CluesInfo
+        starting: hiscores.LookupResponse
+        ending: hiscores.LookupResponse
     }
 
     /**
@@ -579,13 +551,23 @@ const isValidDate = (date: Date): boolean => date instanceof Date && !Number.isN
  */
 const load = (id: string, dirty: boolean): Bot.Database => {
     if (dirty || loadCache[id] === undefined) {
-        loadCache[id] = jsonfile.readFileSync((`./guilds/${id}.json`), {
-            // this is very fragile but works for our data structures
-            reviver: ((key: string, value: unknown): unknown => {
-                if (key.toLowerCase().includes('date')) { return new Date(value as string) }
-                return value
-            }),
-        })
+        try {
+            loadCache[id] = jsonfile.readFileSync((`./guilds/${id}.json`), {
+                // this is very fragile but works for our data structures
+                reviver: ((key: string, value: unknown): unknown => {
+                    if (key.toLowerCase().includes('date')) { return new Date(value as string) }
+                    return value
+                }),
+            })
+        } catch (error) {
+            if (error.errno === -2) logger.info('Guild has no configuration')
+            else {
+                logError(error)
+                logger.error(`Error loading ${id} from disk`)
+                throw error
+            }
+        }
+
     }
 
     const cached: Bot.Database = loadCache[id]
@@ -756,9 +738,7 @@ NodeJS.Timeout => {
                                     const hiscore: hiscores.LookupResponse = response[0]
                                     if (hiscore === null) return account
                                     const newAccount: Runescape.CompetitiveEventAccountInfo = update(account, {
-                                        skills: hiscore.skills,
-                                        bh: hiscore.bh,
-                                        clues: hiscore.clues,
+                                        starting: hiscore,
                                     }) as Runescape.CompetitiveEventAccountInfo
                                     return newAccount
                                 }
