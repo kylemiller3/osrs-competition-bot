@@ -25,6 +25,16 @@ import auth from './auth.json'
 //--------
 
 /**
+ * @function
+ * @description Returns a new Record with an updated entry
+ * @param {Record<string, T>} record The Record to edit
+ * @param {T} entry The new entry
+ * @returns {Record<string, T>} The new Record object
+ */
+const update = <T>(record: Record<string, T>, entry: T):
+Record<string, T> => Object.assign({}, record, entry)
+
+/**
     * @function
     * @description Checks the Guild configuration for any administrators
     * @param {Bot.Data} guildData Guild data to check
@@ -93,6 +103,22 @@ const getEndedEvents = (clanEvents: Runescape.Event[]): Runescape.Event[] => cla
         return event.endingDate <= now
     }
 )
+
+/**
+ * @function
+ * @description Converts a users Discord Id to Guild nickname
+ * @param {discord.Guild} guild  The guild to use for user's nickname
+ * @param {string} userId The Discord Id to lookup
+ * @returns {string} The user's Guild nickname
+ */
+const userIdToDisplayName = (guild: discord.Guild, userId: string): string => {
+    if (!guild.available) return 'unknown (guild unavailable)'
+    const members: discord.Collection<string, discord.GuildMember> = guild.members.filter(
+        (member: discord.GuildMember): boolean => member.id === userId
+    )
+    const name: string = members.size > 0 ? members.first().displayName : null
+    return name
+}
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 namespace Bot {
@@ -347,14 +373,14 @@ namespace Runescape {
      */
     export interface Participant extends Record<string, unknown> {
         discordId: string
-        runescapeAccounts: RegularEventAccountInfo[]
+        runescapeAccounts: RegularRunescapeAccountInfo[]
     }
 
     /**
      * @description Contract containing information about a Runescape account
      * @interface
      */
-    export interface RegularEventAccountInfo extends Record<string, unknown> {
+    export interface RegularRunescapeAccountInfo extends Record<string, unknown> {
         rsn: string
     }
 
@@ -362,7 +388,7 @@ namespace Runescape {
      * @description Contract extending information about a Runescape account for competitive events
      * @interface
      */
-    export interface CompetitiveEventAccountInfo extends RegularEventAccountInfo {
+    export interface CompetitiveRunescapeAccountInfo extends RegularRunescapeAccountInfo {
         starting: hiscores.LookupResponse
         ending: hiscores.LookupResponse
     }
@@ -396,6 +422,133 @@ namespace Runescape {
     }
 }
 
+const updateEvent = (oldData: Bot.Data, updatedEvent: Runescape.Event): Bot.Data => {
+    const newEvents: Runescape.Event[] = oldData.events.map(
+        (event: Runescape.Event): Runescape.Event => {
+            if (event.id === updatedEvent.id) return updatedEvent
+            return event
+        }
+    )
+    const newData: Bot.Data = update(oldData, {
+        events: newEvents,
+    }) as Bot.Data
+    return newData
+}
+
+const addEvent = (oldData: Bot.Data, eventToInsert: Runescape.Event): Bot.Data => {
+    const newEvents: Runescape.Event[] = oldData.events.concat(eventToInsert)
+    const newData: Bot.Data = update(oldData, {
+        events: newEvents,
+    }) as Bot.Data
+    return newData
+}
+
+const deleteEvent = (oldData: Bot.Data, eventToDelete: Runescape.Event): Bot.Data => {
+    const newEvents: Runescape.Event[] = oldData.events.filter(
+        (event: Runescape.Event): boolean => event.id !== eventToDelete.id
+    )
+    const newData: Bot.Data = update(oldData, {
+        events: newEvents,
+    }) as Bot.Data
+    return newData
+}
+
+const updateParticipant = (
+    oldData: Bot.Data,
+    oldEvent: Runescape.Event,
+    updatedParticipant: Runescape.Participant
+): Bot.Data => {
+    const newParticipants: Runescape.Participant[] = oldEvent.participants.map(
+        (participant: Runescape.Participant): Runescape.Participant => {
+            if (participant.discordId === updatedParticipant.discordId) return updatedParticipant
+            return participant
+        }
+    )
+    const newEvent: Runescape.Event = update(oldEvent, {
+        participants: newParticipants,
+    }) as Runescape.Event
+    return updateEvent(oldData, newEvent)
+}
+
+const signupParticipant = (
+    oldData: Bot.Data,
+    oldEvent: Runescape.Event,
+    newParticipant: Runescape.Participant
+): Bot.Data => {
+    const foundParticipant: Runescape.Participant = oldEvent.participants.find(
+        (participant: Runescape.Participant):
+        boolean => participant.discordId === newParticipant.discordId
+    )
+    if (foundParticipant !== undefined) return oldData
+    const newParticipants: Runescape.Participant[] = oldEvent.participants.concat(newParticipant)
+    const newEvent: Runescape.Event = update(oldEvent, {
+        participants: newParticipants,
+    }) as Runescape.Event
+    return updateEvent(oldData, newEvent)
+}
+
+const unsignupParticipant = (
+    oldData: Bot.Data,
+    oldEvent: Runescape.Event,
+    participantToRemove: Runescape.Participant
+): Bot.Data => {
+    const newParticipants: Runescape.Participant[] = oldEvent.participants.filter(
+        (participant: Runescape.Participant):
+        boolean => participant.discordId !== participantToRemove.discordId
+    )
+    const newEvent: Runescape.Event = update(oldEvent, {
+        participants: newParticipants,
+    }) as Runescape.Event
+    return updateEvent(oldData, newEvent)
+}
+
+const setRunescapeAccountStartingInfo = (
+    oldData: Bot.Data,
+    oldEvent: Runescape.Event,
+    oldParticipant: Runescape.Participant,
+    oldAccountInfo: Runescape.CompetitiveRunescapeAccountInfo,
+    starting: hiscores.LookupResponse,
+): Bot.Data => {
+    const newAccountInfo: Runescape.CompetitiveRunescapeAccountInfo = update(oldAccountInfo, {
+        starting,
+    }) as Runescape.CompetitiveRunescapeAccountInfo
+    const newAccountInfos:
+    Runescape.CompetitiveRunescapeAccountInfo[] = oldParticipant.runescapeAccounts.map(
+        (accountInfo: Runescape.CompetitiveRunescapeAccountInfo):
+        Runescape.CompetitiveRunescapeAccountInfo => {
+            if (accountInfo.rsn === oldAccountInfo.rsn) return newAccountInfo
+            return accountInfo
+        }
+    )
+    const newParticipant = update(oldParticipant, {
+        runescapeAccounts: newAccountInfos,
+    }) as Runescape.Participant
+    return updateParticipant(oldData, oldEvent, newParticipant)
+}
+
+const setRunescapeAccountEndingInfo = (
+    oldData: Bot.Data,
+    oldEvent: Runescape.Event,
+    oldParticipant: Runescape.Participant,
+    oldAccountInfo: Runescape.CompetitiveRunescapeAccountInfo,
+    ending: hiscores.LookupResponse,
+): Bot.Data => {
+    const newAccountInfo: Runescape.CompetitiveRunescapeAccountInfo = update(oldAccountInfo, {
+        ending,
+    }) as Runescape.CompetitiveRunescapeAccountInfo
+    const newAccountInfos:
+    Runescape.CompetitiveRunescapeAccountInfo[] = oldParticipant.runescapeAccounts.map(
+        (accountInfo: Runescape.CompetitiveRunescapeAccountInfo):
+        Runescape.CompetitiveRunescapeAccountInfo => {
+            if (accountInfo.rsn === oldAccountInfo.rsn) return newAccountInfo
+            return accountInfo
+        }
+    )
+    const newParticipant = update(oldParticipant, {
+        runescapeAccounts: newAccountInfos,
+    }) as Runescape.Participant
+    return updateParticipant(oldData, oldEvent, newParticipant)
+}
 
 //-------------
 // Global state
@@ -525,16 +678,6 @@ const hiscores$ = (rsn: string): Observable<hiscores.LookupResponse> => {
 
 /**
  * @function
- * @description Returns a new Record with an updated entry
- * @param {Record<string, T>} record The Record to edit
- * @param {T} entry The new entry
- * @returns {Record<string, T>} The new Record object
- */
-const update = <T>(record: Record<string, T>, entry: T):
-Record<string, T> => Object.assign({}, record, entry)
-
-/**
- * @function
  * @description Checks to see if a Date is valid
  * @param {Date} date The date to check
  * @returns {boolean} Whether the date is valid
@@ -641,29 +784,57 @@ NodeJS.Timeout => {
     const twoHoursBeforeStart: Date = new Date(oldEvent.startingDate.getTime())
     twoHoursBeforeStart.setHours(twoHoursBeforeStart.getHours() - 2)
     return setTimeout((): void => {
-        const guildData: Bot.Data = load(guild.id, false)
-        const clanEvents: Runescape.Event[] = guildData.events.filter(
+        const data: Bot.Data = load(guild.id, false)
+        const foundEvent: Runescape.Event = data.events.find(
             (event: Runescape.Event): boolean => event.id === oldEvent.id
         )
-        if (clanEvents.length === 0) return
-        const clanEvent: Runescape.Event = clanEvents[0]
-        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
+        if (foundEvent === undefined) return
+        notifyClanEvent(foundEvent, guild, data.settings.notificationChannelId, 'will begin within 2 hours')
         // mark 2 hour warning as completed
-        const newEvent: Runescape.Event = update(clanEvent, {
+        const newEvent: Runescape.Event = update(foundEvent, {
             hasNotifiedTwoHourWarning: true,
         }) as Runescape.Event
-        const newEvents: Runescape.Event[] = guildData.events.map((event: Runescape.Event):
-        Runescape.Event => {
-            if (newEvent.id === event.id) {
-                return newEvent
-            }
-            return event
-        })
-        const newData: Bot.Data = update(guildData, {
-            events: newEvents,
-        }) as Bot.Data
+        const newData: Bot.Data = updateEvent(data, newEvent)
         save(guild.id, newData)
     }, twoHoursBeforeStart.getTime() - now.getTime())
+}
+
+const updateStartingHiscores = (foundEvent: Runescape.Event, guild: discord.Guild): void => {
+    foundEvent.participants.forEach((participant: Runescape.Participant): void => {
+        const account$ = participant.runescapeAccounts.map((account: Runescape.CompetitiveRunescapeAccountInfo): Observable<[hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo]> => forkJoin([
+            hiscores$(account.rsn),
+            of(account),
+        ]).pipe(catchError((error: Error): Observable<[hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo]> => {
+            logError(error)
+            return forkJoin([
+                of(null),
+                of(account),
+            ])
+        })))
+        forkJoin(account$).subscribe((responses: [hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo][]): void => {
+            const accounts: Runescape.CompetitiveRunescapeAccountInfo[] = responses.map((response: [hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo]): Runescape.CompetitiveRunescapeAccountInfo => {
+                const account: Runescape.CompetitiveRunescapeAccountInfo = response[1]
+                const hiscore: hiscores.LookupResponse = response[0]
+                if (hiscore === null) { return account }
+                const newAccount: Runescape.CompetitiveRunescapeAccountInfo = update(account, {
+                    starting: hiscore,
+                }) as Runescape.CompetitiveRunescapeAccountInfo
+                return newAccount
+            })
+            const newerData: Bot.Data = load(guild.id, false)
+            const newerEvents: Runescape.Event[] = newerData.events
+            const newFoundEvent: Runescape.Event = newerEvents.find((event: Runescape.Event): boolean => event.id === foundEvent.id)
+            if (newFoundEvent === undefined) { return }
+            const foundParticipant: Runescape.Participant = newFoundEvent.participants.find((p: Runescape.Participant): boolean => p.discordId === participant.discordId)
+            if (foundParticipant === undefined) { return }
+
+            const newerParticipant: Runescape.Participant = update(foundParticipant, {
+                runescapeAccounts: accounts,
+            }) as Runescape.Participant
+            const newestData: Bot.Data = updateParticipant(newerData, newFoundEvent, newerParticipant)
+            save(guild.id, newestData)
+        })
+    })
 }
 
 /**
@@ -677,112 +848,99 @@ const setTimerStart = (oldEvent: Runescape.Event, guild: discord.Guild):
 NodeJS.Timeout => {
     const now: Date = new Date()
     return setTimeout((): void => {
-        const guildData: Bot.Data = load(guild.id, false)
-        const clanEvent: Runescape.Event = guildData.events.find(
+        const data: Bot.Data = load(guild.id, false)
+        const foundEvent: Runescape.Event = data.events.find(
             (event: Runescape.Event): boolean => event.id === oldEvent.id
         )
-        if (clanEvent === undefined) return
-        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has started')
+        if (foundEvent === undefined) return
+        notifyClanEvent(foundEvent, guild, data.settings.notificationChannelId, 'has started')
         // mark start date as completed
-        const newEvent: Runescape.Event = update(clanEvent, {
+        const newEvent: Runescape.Event = update(foundEvent, {
             hasNotifiedStarted: true,
         }) as Runescape.Event
-        const newEvents: Runescape.Event[] = guildData.events.map(
-            (event: Runescape.Event): Runescape.Event => {
-                if (newEvent.id === event.id) {
-                    return newEvent
-                }
-                return event
-            }
-        )
-        const newData: Bot.Data = update(guildData, {
-            events: newEvents,
-        }) as Bot.Data
+        const newData: Bot.Data = updateEvent(data, newEvent)
         save(guild.id, newData)
 
-        if (clanEvent.type === EVENT_TYPE.COMPETITIVE) {
+        if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
             // pull new hiscores
-            clanEvent.participants.forEach(
-                (participant: Runescape.Participant): void => {
-                    const account$ = participant.runescapeAccounts.map(
-                        (account: Runescape.CompetitiveEventAccountInfo):
-                        Observable<[
-                            hiscores.LookupResponse,
-                            Runescape.CompetitiveEventAccountInfo,
-                        ]> => forkJoin([
-                            hiscores$(account.rsn),
-                            of(account),
-                        ]).pipe(
-                            catchError((error: Error):
-                            Observable<[
-                                hiscores.LookupResponse,
-                                Runescape.CompetitiveEventAccountInfo,
-                            ]> => {
-                                logError(error)
-                                return forkJoin([
-                                    of(null),
-                                    of(account),
-                                ])
-                            })
-                        )
-                    )
-                    forkJoin(account$).subscribe(
-                        (responses: [hiscores.LookupResponse, Runescape.CompetitiveEventAccountInfo][]):
-                        void => {
-                            const accounts: Runescape.CompetitiveEventAccountInfo[] = responses.map(
-                                (response: [
-                                    hiscores.LookupResponse,
-                                    Runescape.CompetitiveEventAccountInfo
-                                ]): Runescape.CompetitiveEventAccountInfo => {
-                                    const account: Runescape.CompetitiveEventAccountInfo = response[1]
-                                    const hiscore: hiscores.LookupResponse = response[0]
-                                    if (hiscore === null) return account
-                                    const newAccount: Runescape.CompetitiveEventAccountInfo = update(account, {
-                                        starting: hiscore,
-                                    }) as Runescape.CompetitiveEventAccountInfo
-                                    return newAccount
-                                }
-                            )
-
-                            // this code is a mess
-                            // rewrite this
-                            const newerData: Bot.Data = load(guild.id, false)
-                            const newClanEvents: Runescape.Event[] = guildData.events
-                            const findEvent: Runescape.Event = newClanEvents.find(
-                                (a: Runescape.Event): boolean => a.id === clanEvent.id
-                            )
-                            if (findEvent === undefined) return
-                            const newParticipant: Runescape.Participant = update(participant, {
-                                runescapeAccounts: accounts,
-                            }) as Runescape.Participant
-                            const newParticipants:
-                            Runescape.Participant[] = findEvent.participants.map(
-                                (p: Runescape.Participant): Runescape.Participant => {
-                                    if (newParticipant.discordId === p.discordId) return newParticipant
-                                    return p
-                                }
-                            )
-                            const newerEvent: Runescape.Event = update(findEvent, {
-                                participants: newParticipants,
-                            }) as Runescape.Event
-                            const newerEvents: Runescape.Event[] = newerData.events.map(
-                                (event: Runescape.Event): Runescape.Event => {
-                                    if (newerEvent.id === event.id) {
-                                        return newerEvent
-                                    }
-                                    return event
-                                }
-                            )
-                            const newestData: Bot.Data = update(newerData, {
-                                events: newerEvents,
-                            }) as Bot.Data
-                            save(guild.id, newestData)
-                        }
-                    )
-                }
-            )
+            updateStartingHiscores(foundEvent, guild)
         }
     }, oldEvent.startingDate.getTime() - now.getTime())
+}
+
+const getTotalEventGain = (participant: Runescape.Participant, newFoundEvent: Runescape.Event): number => {
+    const aMap = participant.runescapeAccounts.map((account: Runescape.CompetitiveRunescapeAccountInfo): number => {
+        if (newFoundEvent.tracking.skills !== undefined) {
+            const skillsComponents: hiscores.SkillComponent[][] = newFoundEvent.tracking.skills.map(
+                (key: string):
+                hiscores.SkillComponent[] => [account.starting.skills[key], account.ending.skills[key]]
+            )
+            const xpDiff = skillsComponents.map((startEnd: hiscores.SkillComponent[]): number => startEnd[1].xp - startEnd[0].xp)
+            const xpGain = xpDiff.reduce((acc, x): number => acc + x)
+            return xpGain
+        }
+        // TODO: implement me
+        return 0
+    })
+    const aTotal = aMap.reduce((acc, x): number => acc + x)
+    return aTotal
+}
+
+const updateEndingHiscores = (foundEvent: Runescape.Event, guild: discord.Guild): void => {
+    foundEvent.participants.forEach((participant: Runescape.Participant): void => {
+        const account$ = participant.runescapeAccounts.map((account: Runescape.CompetitiveRunescapeAccountInfo): Observable<[hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo]> => forkJoin([
+            hiscores$(account.rsn),
+            of(account),
+        ]).pipe(catchError((error: Error): Observable<[hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo]> => {
+            logError(error)
+            return forkJoin([
+                of(null),
+                of(account),
+            ])
+        })))
+        forkJoin(account$).subscribe((responses: [hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo][]): void => {
+            const accounts: Runescape.CompetitiveRunescapeAccountInfo[] = responses.map((response: [hiscores.LookupResponse, Runescape.CompetitiveRunescapeAccountInfo]): Runescape.CompetitiveRunescapeAccountInfo => {
+                const account: Runescape.CompetitiveRunescapeAccountInfo = response[1]
+                const hiscore: hiscores.LookupResponse = response[0]
+                if (hiscore === null) { return account }
+                const newAccount: Runescape.CompetitiveRunescapeAccountInfo = update(account, {
+                    ending: hiscore,
+                }) as Runescape.CompetitiveRunescapeAccountInfo
+                return newAccount
+            })
+            const newerData: Bot.Data = load(guild.id, false)
+            const newerEvents: Runescape.Event[] = newerData.events
+            const newFoundEvent: Runescape.Event = newerEvents.find((event: Runescape.Event): boolean => event.id === foundEvent.id)
+            if (newFoundEvent === undefined) { return }
+
+            const foundParticipant: Runescape.Participant = newFoundEvent.participants.find((p: Runescape.Participant): boolean => p.discordId === participant.discordId)
+            if (foundParticipant === undefined) { return }
+            const newerParticipant: Runescape.Participant = update(foundParticipant, {
+                runescapeAccounts: accounts,
+            }) as Runescape.Participant
+            const newestData: Bot.Data = updateParticipant(newerData, newFoundEvent, newerParticipant)
+            save(guild.id, newestData)
+
+            // print out data
+            const channel: discord.TextChannel = guild.channels.get(newestData.settings.notificationChannelId) as discord.TextChannel
+            if (channel === undefined || channel.type !== 'text') return
+            const newestFoundEvent: Runescape.Event = newestData.events.find(
+                (e: Runescape.Event): boolean => e.id === newFoundEvent.id
+            )
+            if (newestFoundEvent === undefined) return
+            const sortedWinners: Runescape.Participant[] = newestFoundEvent.participants.sort(
+                (a: Runescape.Participant, b: Runescape.Participant): number => {
+                    const aTotal = getTotalEventGain(a, newFoundEvent)
+                    const bTotal = getTotalEventGain(b, newFoundEvent)
+                    return aTotal - bTotal
+                }
+            )
+            const msg: string = sortedWinners.map(
+                (p: Runescape.Participant): string => `${userIdToDisplayName(guild, p.discordId)} -> ${getTotalEventGain(p, newFoundEvent)} xp`
+            ).join('\n')
+            channel.sendMessage(msg)
+        })
+    })
 }
 
 /**
@@ -797,29 +955,24 @@ function setTimerEnd(oldEvent: Runescape.Event, guild: discord.Guild):
 NodeJS.Timeout {
     const now: Date = new Date()
     return setTimeout((): void => {
-        const guildData: Bot.Data = load(guild.id, false)
-        const clanEvents: Runescape.Event[] = guildData.events.filter(
+        const data: Bot.Data = load(guild.id, false)
+        const foundEvent: Runescape.Event = data.events.find(
             (event: Runescape.Event): boolean => event.id === oldEvent.id
         )
-        if (clanEvents.length === 0) return
-        const clanEvent: Runescape.Event = clanEvents[0]
-        notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
+        if (foundEvent === undefined) return
+
+        notifyClanEvent(foundEvent, guild, data.settings.notificationChannelId, 'has ended')
         // mark end date as completed
-        const newEvent: Runescape.Event = update(clanEvent, {
+        const newEvent: Runescape.Event = update(foundEvent, {
             hasNotifiedEnded: true,
         }) as Runescape.Event
-        const newEvents: Runescape.Event[] = guildData.events.map(
-            (event: Runescape.Event): Runescape.Event => {
-                if (newEvent.id === event.id) {
-                    return newEvent
-                }
-                return event
-            }
-        )
-        const newData: Bot.Data = update(guildData, {
-            events: newEvents,
-        }) as Bot.Data
+        const newData: Bot.Data = updateEvent(data, newEvent)
         save(guild.id, newData)
+
+        if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
+            // pull new hiscores
+            updateEndingHiscores(foundEvent, guild)
+        }
     }, oldEvent.endingDate.getTime() - now.getTime())
 }
 
@@ -1330,46 +1483,27 @@ Observable<[Bot.Data, discord.Message, Runescape.Event]> = filteredMessage$(
     .pipe(
         map((command: Bot.Input):
         [Bot.Data, discord.Message, Runescape.Event] => {
-            const upcomingEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
-            const idxToRemove: number = parseInt(command.input, 10)
-            const removedEvent: Runescape.Event = upcomingEvents[idxToRemove]
-            const filteredEvents: Runescape.Event[] = upcomingEvents.filter(
-                (event: Runescape.Event, idx: number): boolean => idx !== idxToRemove
+            const upcomingAndInFlightEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(
+                command.guildData.events
             )
-            if (Number.isNaN(idxToRemove) || filteredEvents.length === upcomingEvents.length) {
+            const idxToRemove: number = parseInt(command.input, 10)
+            if (Number.isNaN(idxToRemove) || idxToRemove >= upcomingAndInFlightEvents.length) {
                 logger.debug(`Admin did not specify index (${idxToRemove})`)
                 command.message.reply(`invalid index ${idxToRemove}\n${Bot.COMMANDS.DELETE_UPCOMING.parameters}`)
                 return null
             }
-            const newGuildData: Bot.Data = update(command.guildData, {
-                events: filteredEvents,
-            }) as Bot.Data
+
+            const eventToDelete: Runescape.Event = upcomingAndInFlightEvents[idxToRemove]
+            const newData: Bot.Data = deleteEvent(command.guildData, eventToDelete)
             return [
-                save(command.guild.id, newGuildData),
+                save(command.guild.id, newData),
                 command.message,
-                removedEvent,
+                eventToDelete,
             ]
         }),
         filter((saveMsgArr: [Bot.Data, discord.Message, Runescape.Event]):
         boolean => saveMsgArr !== null)
     )
-
-
-/**
- * @function
- * @description Converts a users Discord Id to Guild nickname
- * @param {discord.Guild} guild  The guild to use for user's nickname
- * @param {string} userId The Discord Id to lookup
- * @returns {string} The user's Guild nickname
- */
-const userIdToDisplayName = (guild: discord.Guild, userId: string): string => {
-    if (!guild.available) return 'unknown (guild unavailable)'
-    const members: discord.Collection<string, discord.GuildMember> = guild.members.filter(
-        (member: discord.GuildMember): boolean => member.id === userId
-    )
-    const name: string = members.size > 0 ? members.first().displayName : null
-    return name
-}
 
 /**
  * @description Ending regex terminator for command SIGNUP_UPCOMING
@@ -1407,99 +1541,32 @@ const signupEvent$: Observable<[Bot.Data, discord.Message]> = filteredMessage$(
                 command.guildData.events
             )
             const idxToModify: number = Number.parseInt(parsedRegex[0], 10)
-            const userIdToAdd: string = command.author.id
-            const rsnToAdd: string = parsedRegex[1]
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingAndInFlightEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
                 command.message.reply(`invalid index ${idxToModify}\n${Bot.COMMANDS.SIGNUP_UPCOMING.parameters}`)
                 return of<[Bot.Data, discord.Message, hiscores.LookupResponse]>(null)
             }
 
+            const discordIdToAdd: string = command.author.id
+            const rsnToAdd: string = parsedRegex[1]
+
             // get event to modify and its type
             const eventToModify: Runescape.Event = upcomingAndInFlightEvents[idxToModify]
 
-            // is the player already added?
-            const foundDiscordArr:
-            Runescape.Participant[] = eventToModify.participants.filter(
-                (participant: Runescape.Participant):
-                boolean => participant.discordId === userIdToAdd
-            )
-            const firstFoundDiscord: Runescape.Participant = foundDiscordArr.length > 0
-                ? foundDiscordArr[0] : null
-
-            const foundRsnArr: Runescape.RegularEventAccountInfo[] = eventToModify.participants.map(
-                (participant: Runescape.Participant):
-                Runescape.RegularEventAccountInfo[] => participant.runescapeAccounts
-            ).reduce(
-                (acc: Runescape.RegularEventAccountInfo[], x: Runescape.RegularEventAccountInfo[]):
-                Runescape.RegularEventAccountInfo[] => acc.concat(x, []),
-                []
-            ).filter(
-                (account: Runescape.RegularEventAccountInfo): boolean => account.rsn === rsnToAdd
-            )
-            const firstFoundRsn: Runescape.RegularEventAccountInfo = foundRsnArr.length > 0
-                ? foundRsnArr[0] : null
-
-            if (firstFoundDiscord !== null) {
-                // discord id is already signed up
-                // in the future we may use this index
-                // to add rsn but for now just return
-                logger.debug(`<@${firstFoundDiscord.discordId}> already signed up`)
-                const accounts: string = firstFoundDiscord.runescapeAccounts.map(
-                    (account: Runescape.RegularEventAccountInfo): string => account.rsn
-                ).join(', ')
-                command.message.reply(`<@${firstFoundDiscord.discordId}> already signed up ${accounts} re-signup to change this`)
-                return of(null)
-            }
-            if (firstFoundRsn !== null) {
-                // someone already signed up rsn
-                // find that discord user
-                const foundDiscordRsn:
-                Runescape.Participant[] = eventToModify.participants.filter(
-                    (participant: Runescape.Participant):
-                    boolean => participant.runescapeAccounts.includes(firstFoundRsn)
-                )
-                const accounts: string = firstFoundDiscord.runescapeAccounts.map(
-                    (account: Runescape.RegularEventAccountInfo): string => account.rsn
-                ).join(', ')
-                logger.debug(`<@${firstFoundDiscord.discordId}> already signed up`)
-                command.message.reply(`<@${foundDiscordRsn[0].discordId}> already signed up ${accounts} re-signup or ask an admin to delete this`)
-                return of(null)
-            }
-
-            const newRsAccount: Runescape.RegularEventAccountInfo = {
+            const newRsAccount: Runescape.RegularRunescapeAccountInfo = {
                 rsn: rsnToAdd,
             }
 
             const participantToAdd: Runescape.Participant = {
-                discordId: command.author.id,
+                discordId: discordIdToAdd,
                 runescapeAccounts: [newRsAccount],
             }
 
-            // add participant to event array
-            const newEventParticipants: Runescape.Participant[] = eventToModify
-                .participants.concat(
-                    [participantToAdd]
-                )
-
-            // create a new event
-            // create new event list
-            // create new Guild data
-            const newEvent: Runescape.Event = update(eventToModify, {
-                participants: newEventParticipants,
-            }) as Runescape.Event
-            const idxToModifyAllEvents: number = command.guildData.events.indexOf(eventToModify)
-            const newEvents: Runescape.Event[] = command.guildData.events.map(
-                (event: Runescape.Event, idx: number): Runescape.Event => {
-                    if (idx === idxToModifyAllEvents) {
-                        return newEvent
-                    }
-                    return event
-                }
+            const newData: Bot.Data = signupParticipant(
+                command.guildData,
+                eventToModify,
+                participantToAdd,
             )
-            const newData: Bot.Data = update(command.guildData, {
-                events: newEvents,
-            }) as Bot.Data
 
             return forkJoin(
                 of<Bot.Data>(newData),
@@ -1536,48 +1603,28 @@ const unsignupUpcomingEvent$: Observable<[Bot.Data, discord.Message]> = filtered
         map((command: Bot.Input): [Bot.Data, discord.Message] => {
             // get upcoming events
             // if index is out of range return
-            const upcomingEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
+            const upcomingAndInFlightEvents:
+            Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
             const idxToModify: number = Number.parseInt(command.input, 10)
-            if (Number.isNaN(idxToModify) || idxToModify >= upcomingEvents.length) {
+            if (Number.isNaN(idxToModify) || idxToModify >= upcomingAndInFlightEvents.length) {
                 logger.debug(`User did not specify index (${idxToModify})`)
                 command.message.reply(`invalid index ${idxToModify}\n${Bot.COMMANDS.UNSIGNUP_UPCOMING.parameters}`)
                 return null
             }
 
             // does the event to modify contain our user?
-            const eventToModify: Runescape.Event = upcomingEvents[idxToModify]
-            const participantCount: number = eventToModify.participants.length
-            const newEventParticipants:
-            Runescape.Participant[] = eventToModify.participants.filter(
+            const eventToModify: Runescape.Event = upcomingAndInFlightEvents[idxToModify]
+            const participantToRemove:
+            Runescape.Participant = eventToModify.participants.find(
                 (participant: Runescape.Participant):
-                boolean => participant.discordId !== command.author.id
+                boolean => participant.discordId === command.author.id
             )
-
-            // user was not signed up
-            if (participantCount === newEventParticipants.length) {
-                logger.debug('User was not signed up')
-                command.message.reply('you were not signed up for this event')
-                return null
-            }
-
-            // create a new event
-            // create new event list
-            // create new Guild data
-            const newEvent: Runescape.Event = update(eventToModify, {
-                participants: newEventParticipants,
-            }) as Runescape.Event
-            const newEvents: Runescape.Event[] = command.guildData.events.map(
-                (event: Runescape.Event, idx: number): Runescape.Event => {
-                    if (idx === idxToModify) {
-                        return newEvent
-                    }
-                    return event
-                }
+            if (participantToRemove === undefined) return null
+            const newData: Bot.Data = unsignupParticipant(
+                command.guildData,
+                eventToModify,
+                participantToRemove,
             )
-            const newData: Bot.Data = update(command.guildData, {
-                events: newEvents,
-            }) as Bot.Data
-
             return [
                 save(command.guild.id, newData),
                 command.message,
@@ -1594,31 +1641,33 @@ const unsignupUpcomingEvent$: Observable<[Bot.Data, discord.Message]> = filtered
 const amISignedUp$: Observable<void> = filteredMessage$(Bot.COMMANDS.AMISIGNEDUP_UPCOMING)
     .pipe(
         map((command: Bot.Input): void => {
-            const upcomingEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
+            const upcomingAndInFlightEvents:
+            Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
-            if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
+            if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingAndInFlightEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
                 command.message.reply(`invalid index ${idxToCheck}\n${Bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`)
                 return
             }
 
-            // does the event to modify contain our user?
-            const eventToCheck: Runescape.Event = upcomingEvents[idxToCheck]
-            const filteredEventParticipants: Runescape.Participant[] = eventToCheck
-                .participants.filter(
-                    (participant: Runescape.Participant):
-                    boolean => participant.discordId === command.author.id
-                )
+            const discordIdToCheck: string = command.author.id
 
-            const filteredParticipant:
-            Runescape.Participant = filteredEventParticipants.length > 0
-                ? filteredEventParticipants[0] : null
-            const reply: string = filteredParticipant !== null
-                ? `you are signed up with RSN: ${filteredParticipant.runescapeAccounts.map(
-                    (account: Runescape.RegularEventAccountInfo): string => account.rsn
-                ).join(', ')}`
-                : 'you are not signed up'
-            command.message.reply(reply)
+            // does the event to modify contain our user?
+            const eventToCheck: Runescape.Event = upcomingAndInFlightEvents[idxToCheck]
+            const foundEventParticipant: Runescape.Participant = eventToCheck
+                .participants.find(
+                    (participant: Runescape.Participant):
+                    boolean => participant.discordId === discordIdToCheck
+                )
+            if (foundEventParticipant === undefined) {
+                command.message.reply('you are not signed up')
+                return
+            }
+
+            const accounts = foundEventParticipant.runescapeAccounts.map(
+                (account: Runescape.RegularRunescapeAccountInfo): string => account.rsn
+            ).join(', ')
+            command.message.reply(`you are signed up with RSN: ${accounts}`)
         })
     )
 
@@ -1632,15 +1681,16 @@ const listParticipant$: Observable<void> = filteredMessage$(
 )
     .pipe(
         map((command: Bot.Input): void => {
-            const upcomingEvents: Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
+            const upcomingAndInFlightEvents:
+            Runescape.Event[] = getUpcomingAndInFlightEvents(command.guildData.events)
             const idxToCheck: number = Number.parseInt(command.input, 10)
-            if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingEvents.length) {
+            if (Number.isNaN(idxToCheck) || idxToCheck >= upcomingAndInFlightEvents.length) {
                 logger.debug(`User did not specify index (${idxToCheck})`)
                 command.message.reply(`invalid index ${idxToCheck}\n${Bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`)
                 return
             }
 
-            const eventToList: Runescape.Event = upcomingEvents[idxToCheck]
+            const eventToList: Runescape.Event = upcomingAndInFlightEvents[idxToCheck]
             const formattedStr: string = eventToList.participants.map(
                 (participant: Runescape.Participant, idx: number): string => {
                     const displayName: string = userIdToDisplayName(
@@ -1648,7 +1698,7 @@ const listParticipant$: Observable<void> = filteredMessage$(
                         participant.discordId
                     )
                     const accounts: string = participant.runescapeAccounts.map(
-                        (account: Runescape.RegularEventAccountInfo): string => account.rsn
+                        (account: Runescape.RegularRunescapeAccountInfo): string => account.rsn
                     ).join(', ')
                     return `\n${idx}: ${displayName} signed up ${accounts}`
                 }
@@ -1915,7 +1965,7 @@ connect$.subscribe((): void => {
                     // mark 2 hour warning as complete (unnecessary)
                     // mark start notification as complete (unnecessary)
                     // mark end notification as complete
-                    notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended more than 2 hours ago, yell at n0trout')
+                    notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'had ended more than 2 hours ago, yell at n0trout')
                     const newEvent: Runescape.Event = update(clanEvent, {
                         hasNotifiedTwoHourWarning: true,
                         hasNotifiedStarted: true,
