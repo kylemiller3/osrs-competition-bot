@@ -514,6 +514,44 @@ const gClient: discord.Client = new discord.Client()
 //----------------------
 
 /**
+ * @description Observable of discord message events
+ * @type {Observable<discord.Message>}
+ * @constant
+ */
+const message$: Observable<discord.Message> = fromEvent(gClient as unknown as EventEmitter, 'message')
+
+/**
+ * @function
+ * @description Fetches the supplied RSN from hiscores or cache
+ * @param {string} rsn RSN to lookup
+ * @returns {Observable<JSON>} Observable of the JSON response or Observable of null
+ * @todo handle the error properly
+ */
+const hiscores$ = (rsn: string): Observable<hiscores.LookupResponse> => {
+    if (hiscoreCache[rsn] === undefined) {
+        hiscoreCache[rsn] = from(hiscores.getPlayer(rsn))
+            .pipe(
+                retry(5),
+                publishReplay(1, 10 * 60 * 1000),
+                refCount(), catchError((error: Error): Observable<JSON> => {
+                    logError(error)
+                    return of(null)
+                })
+            ) as unknown as Observable<hiscores.LookupResponse>
+    }
+
+    const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn]
+    const keys = Object.keys(hiscoreCache)
+    if (keys.length >= 10000) {
+        const idxToRemove: number = Math.floor((Math.random() * 10000))
+        const keyToRemove: string = keys[idxToRemove]
+        hiscoreCache[keyToRemove] = undefined
+        return cached
+    }
+    return cached
+}
+
+/**
  * @function
  * @description Returns a new Record with an updated entry
  * @param {Record<string, T>} record The Record to edit
@@ -625,6 +663,7 @@ NodeJS.Timeout => {
         const clanEvents: Runescape.Event[] = guildData.events.filter(
             (event: Runescape.Event): boolean => event.id === oldEvent.id
         )
+        if (clanEvents.length === 0) return
         const clanEvent: Runescape.Event = clanEvents[0]
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'will begin within 2 hours')
         // mark 2 hour warning as completed
@@ -657,10 +696,10 @@ NodeJS.Timeout => {
     const now: Date = new Date()
     return setTimeout((): void => {
         const guildData: Bot.Database = load(guild.id, false)
-        const clanEvents: Runescape.Event[] = guildData.events.filter(
+        const clanEvent: Runescape.Event = guildData.events.find(
             (event: Runescape.Event): boolean => event.id === oldEvent.id
         )
-        const clanEvent: Runescape.Event = clanEvents[0]
+        if (clanEvent === undefined) return
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has started')
         // mark start date as completed
         const newEvent: Runescape.Event = update(clanEvent, {
@@ -678,6 +717,91 @@ NodeJS.Timeout => {
             events: newEvents,
         }) as Bot.Database
         save(guild.id, newData)
+
+        if (clanEvent.type === EVENT_TYPE.COMPETITIVE) {
+            // pull new hiscores
+            clanEvent.participants.forEach(
+                (participant: Runescape.DiscordParticipant): void => {
+                    const account$ = participant.runescapeAccounts.map(
+                        (account: Runescape.CompetitiveEventAccountInfo):
+                        Observable<[
+                            hiscores.LookupResponse,
+                            Runescape.CompetitiveEventAccountInfo,
+                        ]> => forkJoin([
+                            hiscores$(account.rsn),
+                            of(account),
+                        ]).pipe(
+                            catchError((error: Error):
+                            Observable<[
+                                hiscores.LookupResponse,
+                                Runescape.CompetitiveEventAccountInfo,
+                            ]> => {
+                                logError(error)
+                                return forkJoin([
+                                    of(null),
+                                    of(account),
+                                ])
+                            })
+                        )
+                    )
+                    forkJoin(account$).subscribe(
+                        (responses: [hiscores.LookupResponse, Runescape.CompetitiveEventAccountInfo][]):
+                        void => {
+                            const accounts: Runescape.CompetitiveEventAccountInfo[] = responses.map(
+                                (response: [
+                                    hiscores.LookupResponse,
+                                    Runescape.CompetitiveEventAccountInfo
+                                ]): Runescape.CompetitiveEventAccountInfo => {
+                                    const account: Runescape.CompetitiveEventAccountInfo = response[1]
+                                    const hiscore: hiscores.LookupResponse = response[0]
+                                    if (hiscore === null) return account
+                                    const newAccount: Runescape.CompetitiveEventAccountInfo = update(account, {
+                                        skills: hiscore.skills,
+                                        bh: hiscore.bh,
+                                        clues: hiscore.clues,
+                                    }) as Runescape.CompetitiveEventAccountInfo
+                                    return newAccount
+                                }
+                            )
+
+                            // this code is a mess
+                            // rewrite this
+                            const newerData: Bot.Database = load(guild.id, false)
+                            const newClanEvents: Runescape.Event[] = guildData.events
+                            const findEvent: Runescape.Event = newClanEvents.find(
+                                (a: Runescape.Event): boolean => a.id === clanEvent.id
+                            )
+                            if (findEvent === undefined) return
+                            const newParticipant: Runescape.DiscordParticipant = update(participant, {
+                                runescapeAccounts: accounts,
+                            }) as Runescape.DiscordParticipant
+                            const newParticipants:
+                            Runescape.DiscordParticipant[] = findEvent.participants.map(
+                                (p: Runescape.DiscordParticipant): Runescape.DiscordParticipant => {
+                                    if (newParticipant.discordId === p.discordId) return newParticipant
+                                    return p
+                                }
+                            )
+                            const newerEvent: Runescape.Event = update(findEvent, {
+                                participants: newParticipants,
+                            }) as Runescape.Event
+                            const newerEvents: Runescape.Event[] = newerData.events.map(
+                                (event: Runescape.Event): Runescape.Event => {
+                                    if (newerEvent.id === event.id) {
+                                        return newerEvent
+                                    }
+                                    return event
+                                }
+                            )
+                            const newestData: Bot.Database = update(newerData, {
+                                events: newerEvents,
+                            }) as Bot.Database
+                            save(guild.id, newestData)
+                        }
+                    )
+                }
+            )
+        }
     }, oldEvent.startingDate.getTime() - now.getTime())
 }
 
@@ -697,6 +821,7 @@ NodeJS.Timeout {
         const clanEvents: Runescape.Event[] = guildData.events.filter(
             (event: Runescape.Event): boolean => event.id === oldEvent.id
         )
+        if (clanEvents.length === 0) return
         const clanEvent: Runescape.Event = clanEvents[0]
         notifyClanEvent(clanEvent, guild, guildData.settings.notificationChannelId, 'has ended')
         // mark end date as completed
@@ -752,45 +877,6 @@ const connect$: Observable<void> = ready$
  * @constant
  */
 const error$: Observable<Error> = fromEvent(gClient as unknown as EventEmitter, 'error')
-
-
-/**
- * @description Observable of discord message events
- * @type {Observable<discord.Message>}
- * @constant
- */
-const message$: Observable<discord.Message> = fromEvent(gClient as unknown as EventEmitter, 'message')
-
-/**
- * @function
- * @description Fetches the supplied RSN from hiscores or cache
- * @param {string} rsn RSN to lookup
- * @returns {Observable<JSON>} Observable of the JSON response or Observable of null
- * @todo handle the error properly
- */
-const hiscores$ = (rsn: string): Observable<hiscores.LookupResponse> => {
-    if (hiscoreCache[rsn] === undefined) {
-        hiscoreCache[rsn] = from(hiscores.getPlayer(rsn))
-            .pipe(
-                retry(5),
-                publishReplay(1, 10 * 60 * 1000),
-                refCount(), catchError((error: Error): Observable<JSON> => {
-                    logError(error)
-                    return of(null)
-                })
-            ) as unknown as Observable<hiscores.LookupResponse>
-    }
-
-    const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn]
-    const keys = Object.keys(hiscoreCache)
-    if (keys.length >= 10000) {
-        const idxToRemove: number = Math.floor((Math.random() * 10000))
-        const keyToRemove: string = keys[idxToRemove]
-        hiscoreCache[keyToRemove] = undefined
-        return cached
-    }
-    return cached
-}
 
 /**
  * @function
