@@ -23,10 +23,12 @@
     "rxjs": "^6.5.2",
     "typescript": "^3.5.3",
     "uuid": "^3.3.2",
+    "uuidv4": "^4.0.0",
     "winston": "^3.2.1"
   },
   "devDependencies": {
     "@types/jsonfile": "^5.0.0",
+    "@types/uuidv4": "^2.0.0",
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.2.0",
     "eslint-plugin-import": "^2.18.2"
