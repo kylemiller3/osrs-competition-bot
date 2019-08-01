@@ -49,6 +49,30 @@ const EVENT_TYPE: Record<string, string> = {
 
 /**
  * @function
+ * @description Get all completed events
+ * @param {ClanEvent[]} events ClanEvents source
+ * @returns {ClanEvent[]} The array of ended ClanEvents for Guild id
+ */
+const getEndedEvents = (events: runescape.Event[]):
+runescape.Event[] => events.filter(
+    (event: runescape.Event):
+    boolean => utils.isInPast(event.endingDate)
+)
+
+/**
+ * @function
+ * @description Gets currently running events
+ * @param {GuildData} guildData The GuildData to check
+ * @returns {ClanEvent[]} The array of ongoing ClanEvents for Guild id
+ */
+const getInFlightEvents = (events: runescape.Event[]):
+runescape.Event[] => events.filter(
+    (event: runescape.Event):
+    boolean => utils.isNowBetween(event.startingDate, event.endingDate)
+)
+
+/**
+ * @function
  * @description Gets all upcoming events and in flight events
  * @param {runescape.Event[]} events ClanEvents source
  * @returns {runescape.Event[]} The array of upcoming ClanEvents
@@ -56,7 +80,7 @@ const EVENT_TYPE: Record<string, string> = {
 const getUpcomingAndInFlightEvents = (events: runescape.Event[]):
 runescape.Event[] => events.filter(
     (event: runescape.Event):
-    boolean => utils.isInPast(event.endingDate)
+    boolean => utils.isInFuture(event.endingDate)
 )
 
 /**
@@ -68,7 +92,7 @@ runescape.Event[] => events.filter(
 const getUpcomingEvents = (events: runescape.Event[]):
 runescape.Event[] => events.filter(
     (event: runescape.Event):
-    boolean => utils.isInPast(event.startingDate)
+    boolean => utils.isInFuture(event.startingDate)
 )
 
 const updateSettings = (
@@ -1049,6 +1073,7 @@ const setChannel$: Observable<Input> = filteredMessage$(
         filter((command: Input): boolean => {
             const channel = command.message.mentions.channels.first()
             if (channel === undefined) return false
+            if (!command.guild.available) return false
             return command.guild.channels.get(channel.id) !== undefined
         })
     )
