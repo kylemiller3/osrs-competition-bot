@@ -108,6 +108,7 @@ export namespace runescape {
     export interface Tracking extends Record<string, unknown> {
         skills: SkillsEnum[]
         bh: BountyHunterEnum[]
+        lms: null
         clues: CluesEnum[]
     }
 

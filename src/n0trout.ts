@@ -6,18 +6,16 @@
 import * as discord from 'discord.js'
 
 import {
-    fromEvent, Observable, of, forkJoin, merge, Subscribable, Subscriber, TeardownLogic, from,
+    fromEvent, Observable, of, forkJoin, merge, from,
 } from 'rxjs'
 import {
-    take, skip, filter, switchMap, catchError, tap, map, share, scan, reduce,
+    take, skip, filter, switchMap, tap, map, share, reduce,
 } from 'rxjs/operators'
 import {
     hiscores,
 } from 'osrs-json-api'
 import { EventEmitter } from 'events'
 import uuid from 'uuidv4'
-import { start } from 'repl'
-import { Stats } from 'fs'
 import { runescape } from './runescape'
 import { bot } from './bot'
 import { utils } from './utils'
@@ -59,30 +57,6 @@ string => {
     const averageParticipants: number = Math.floor(stats.totalParticipants / stats.totalEvents)
     return `${firstPlaceEmoji}: ${stats.firstPlaceFinishes}\n${secondPlaceEmoji}: ${stats.secondPlaceFinishes}\n${thirdPlaceEmoji}: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
 }
-
-/**
- * @function
- * @description Get all completed events
- * @param {ClanEvent[]} events ClanEvents source
- * @returns {ClanEvent[]} The array of ended ClanEvents for Guild id
- */
-const getEndedEvents = (events: runescape.Event[]):
-runescape.Event[] => events.filter(
-    (event: runescape.Event):
-    boolean => utils.isInPast(event.endingDate)
-)
-
-/**
- * @function
- * @description Gets currently running events
- * @param {GuildData} guildData The GuildData to check
- * @returns {ClanEvent[]} The array of ongoing ClanEvents for Guild id
- */
-const getInFlightEvents = (events: runescape.Event[]):
-runescape.Event[] => events.filter(
-    (event: runescape.Event):
-    boolean => utils.isNowBetween(event.startingDate, event.endingDate)
-)
 
 /**
  * @function
@@ -195,34 +169,6 @@ const unsignupParticipant = (
     return updateEvent(oldData, newEvent)
 }
 
-const setRunescapeAccountCompetitionInfo = (
-    oldData: bot.Data,
-    oldEvent: runescape.Event,
-    oldParticipant: runescape.Participant,
-    oldAccountInfo: runescape.CompetitiveAccountInfo,
-    hiscore: hiscores.LookupResponse,
-    starting: boolean
-): bot.Data => {
-    const newAccountInfo: runescape.CompetitiveAccountInfo = starting
-        ? utils.update(oldAccountInfo, {
-            starting: hiscore,
-        }) as runescape.CompetitiveAccountInfo
-        : utils.update(oldAccountInfo, {
-            ending: hiscore,
-        }) as runescape.CompetitiveAccountInfo
-    const newAccountInfos:
-    runescape.CompetitiveAccountInfo[] = oldParticipant.runescapeAccounts.map(
-        (accountInfo: runescape.CompetitiveAccountInfo):
-        runescape.CompetitiveAccountInfo => {
-            if (accountInfo.rsn === oldAccountInfo.rsn) return newAccountInfo
-            return accountInfo
-        }
-    )
-    const newParticipant = utils.update(oldParticipant, {
-        runescapeAccounts: newAccountInfos,
-    }) as runescape.Participant
-    return updateParticipant(oldData, oldEvent, newParticipant)
-}
 
 /**
 * @function
@@ -480,10 +426,10 @@ const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: 
                     : foundStats
                 // TODO: refactor me later??
                 // update stats
-                const firstPlaceFinish = placing === 1 ? 1 : 0
-                const secondPlaceFinish = placing === 2 ? 1 : 0
-                const thirdPlaceFinish = placing === 3 ? 1 : 0
-                const topTenPlaceFinishes = (placing > 3 && placing <= 10) ? 1 : 0
+                const firstPlaceFinish = placing === 0 ? 1 : 0
+                const secondPlaceFinish = placing === 1 ? 1 : 0
+                const thirdPlaceFinish = placing === 2 ? 1 : 0
+                const topTenPlaceFinishes = (placing > 2 && placing < 10) ? 1 : 0
                 const participantCount = sortedParticipants.length
                 const skillGain = getTotalEventGain(
                     participant,
@@ -573,7 +519,7 @@ NodeJS.Timeout => {
 
         if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
             // pull new hiscores
-            updateHiscores(foundEvent, guild, true)
+            updateHiscores(newEvent, guild, true)
         }
     }, oldEvent.startingDate.getTime() - now.getTime())
 }
@@ -606,7 +552,7 @@ NodeJS.Timeout {
 
         if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
             // pull new hiscores
-            updateHiscores(foundEvent, guild, false)
+            updateHiscores(newEvent, guild, false)
         }
     }, oldEvent.endingDate.getTime() - now.getTime())
 }
@@ -874,6 +820,7 @@ const prepareUpcomingGenericEvent$: Observable<[Input, runescape.Event]> = filte
                 skills: null,
                 bh: null,
                 clues: null,
+                lms: null,
             }
             const type = EVENT_TYPE[inputType]
             const clanEvent: runescape.Event = {
