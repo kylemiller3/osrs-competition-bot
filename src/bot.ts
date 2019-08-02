@@ -110,7 +110,8 @@ export namespace bot {
         topTenPlaceFinishes: number
         totalParticipants: number
         totalPlaces: number
-        totalEvents: number
+        totalCompetitiveEvents: number
+        totalRegularEvents: number
         totalSkillsGain: number
         totalCluesGain: number
         totalLmsGain: number

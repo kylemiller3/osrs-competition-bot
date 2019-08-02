@@ -53,9 +53,13 @@ const thirdPlaceEmoji: string = String.fromCodePoint(0x1F949)
 
 const getStatsStr = (stats: bot.Stats):
 string => {
-    const averagePlace: number = Math.floor(stats.totalPlaces / stats.totalEvents)
-    const averageParticipants: number = Math.floor(stats.totalParticipants / stats.totalEvents)
-    return `${firstPlaceEmoji}: ${stats.firstPlaceFinishes}\n${secondPlaceEmoji}: ${stats.secondPlaceFinishes}\n${thirdPlaceEmoji}: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
+    const averagePlace: number = Math.floor(
+        stats.totalPlaces / stats.totalCompetitiveEvents
+    )
+    const averageParticipants: number = Math.floor(
+        stats.totalParticipants / stats.totalCompetitiveEvents
+    )
+    return `${firstPlaceEmoji}: ${stats.firstPlaceFinishes}\n${secondPlaceEmoji}: ${stats.secondPlaceFinishes}\n${thirdPlaceEmoji}: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
 }
 
 /**
@@ -335,7 +339,104 @@ const getTotalEventGain = (
     }
 }
 
+const updateStats = (
+    sortedParticipants: runescape.Participant[],
+    oldData: bot.Data,
+    event: runescape.Event,
+    competitive: boolean
+): bot.Data => {
+    const updatedStats: bot.Stats[] = sortedParticipants.map(
+        (participant: runescape.Participant, placing: number):
+        bot.Stats => {
+            const foundStats: bot.Stats = oldData.stats.find(
+                (stats: bot.Stats):
+                boolean => stats.discordId === participant.discordId
+            )
+            const StatsToUse: bot.Stats = foundStats === undefined
+                ? {
+                    discordId: participant.discordId,
+                    firstPlaceFinishes: 0,
+                    secondPlaceFinishes: 0,
+                    thirdPlaceFinishes: 0,
+                    topTenPlaceFinishes: 0,
+                    totalParticipants: 0,
+                    totalPlaces: 0,
+                    totalCompetitiveEvents: 0,
+                    totalRegularEvents: 0,
+                    totalSkillsGain: 0,
+                    totalCluesGain: 0,
+                    totalLmsGain: 0,
+                    totalBhGain: 0,
+                }
+                : foundStats
+
+            if (!competitive) {
+                const regularEvents: number = StatsToUse.totalRegularEvents
+                const newStats: bot.Stats = utils.update(StatsToUse, {
+                    totalRegularEvents: regularEvents + 1,
+                }) as bot.Stats
+                return newStats
+            }
+
+            const firstPlaceFinish = placing === 0 ? 1 : 0
+            const secondPlaceFinish = placing === 1 ? 1 : 0
+            const thirdPlaceFinish = placing === 2 ? 1 : 0
+            const topTenPlaceFinishes = (placing > 2 && placing < 10) ? 1 : 0
+            const participantCount = sortedParticipants.length
+            const skillGain = getTotalEventGain(participant, event, runescape.TrackingEnum.SKILLS)
+            const bhGain = getTotalEventGain(participant, event, runescape.TrackingEnum.BH)
+            const lmsGain = getTotalEventGain(participant, event, runescape.TrackingEnum.LMS)
+            const cluesGain = getTotalEventGain(participant, event, runescape.TrackingEnum.CLUES)
+            const newFirstPlaceFinishes = StatsToUse.firstPlaceFinishes + firstPlaceFinish
+            const newSecondPlaceFinishes = StatsToUse.secondPlaceFinishes + secondPlaceFinish
+            const newThirdPlaceFinishes = StatsToUse.thirdPlaceFinishes + thirdPlaceFinish
+            const newTopTenPlaceFinishes = StatsToUse.topTenPlaceFinishes + topTenPlaceFinishes
+            const newTotalParticipants = StatsToUse.totalParticipants + participantCount
+            const newTotalPlaces = StatsToUse.totalPlaces + placing
+            const newTotalEvents = StatsToUse.totalCompetitiveEvents + 1
+            const newTotalSkillsGain = StatsToUse.totalSkillsGain + skillGain
+            const newTotalBhGain = StatsToUse.totalBhGain + bhGain
+            const newLmsGain = StatsToUse.totalLmsGain + lmsGain
+            const newCluesGain = StatsToUse.totalCluesGain + cluesGain
+            return {
+                discordId: StatsToUse.discordId,
+                firstPlaceFinishes: newFirstPlaceFinishes,
+                secondPlaceFinishes: newSecondPlaceFinishes,
+                thirdPlaceFinishes: newThirdPlaceFinishes,
+                topTenPlaceFinishes: newTopTenPlaceFinishes,
+                totalParticipants: newTotalParticipants,
+                totalPlaces: newTotalPlaces,
+                totalCompetitiveEvents: newTotalEvents,
+                totalRegularEvents: StatsToUse.totalRegularEvents,
+                totalSkillsGain: newTotalSkillsGain,
+                totalBhGain: newTotalBhGain,
+                totalLmsGain: newLmsGain,
+                totalCluesGain: newCluesGain,
+            }
+        }
+    )
+    const filteredStats: bot.Stats[] = oldData.stats.filter(
+        (statsOuter: bot.Stats):
+        boolean => updatedStats.every(
+            (statsInner: bot.Stats):
+            boolean => statsInner.discordId !== statsOuter.discordId
+        )
+    )
+    const newStats: bot.Stats[] = filteredStats.concat(updatedStats)
+    const newData: bot.Data = utils.update(oldData, {
+        stats: newStats,
+    }) as bot.Data
+    return newData
+}
+
 const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: boolean): void => {
+    if (event.type === EVENT_TYPE.REGULAR) {
+        const oldData: bot.Data = bot.load(guild.id, false)
+        const newData: bot.Data = updateStats(event.participants, oldData, event, false)
+        bot.save(guild.id, newData)
+        return
+    }
+
     const participant$: Observable<runescape.Participant[]> = from(event.participants)
         .pipe(
             switchMap(
@@ -400,95 +501,10 @@ const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: 
         const tracking: runescape.TrackingEnum = getEventTracking(event)
         const sortedParticipants: runescape.Participant[] = participantsArr.sort(
             (a: runescape.Participant, b: runescape.Participant):
-            number => getTotalEventGain(a, event, tracking) - getTotalEventGain(b, event, tracking)
+            number => getTotalEventGain(b, event, tracking) - getTotalEventGain(a, event, tracking)
         )
         const oldData = bot.load(guild.id, false)
-        const updatedStats: bot.Stats[] = sortedParticipants.map(
-            (participant: runescape.Participant, placing: number): bot.Stats => {
-                const foundStats: bot.Stats = oldData.stats.find(
-                    (stats: bot.Stats): boolean => stats.discordId === participant.discordId
-                )
-                const foundOrCreatedStats: bot.Stats = foundStats === undefined
-                    ? {
-                        discordId: participant.discordId,
-                        firstPlaceFinishes: 0,
-                        secondPlaceFinishes: 0,
-                        thirdPlaceFinishes: 0,
-                        topTenPlaceFinishes: 0,
-                        totalParticipants: 0,
-                        totalPlaces: 0,
-                        totalEvents: 0,
-                        totalSkillsGain: 0,
-                        totalCluesGain: 0,
-                        totalLmsGain: 0,
-                        totalBhGain: 0,
-                    }
-                    : foundStats
-                // TODO: refactor me later??
-                // update stats
-                const firstPlaceFinish = placing === 0 ? 1 : 0
-                const secondPlaceFinish = placing === 1 ? 1 : 0
-                const thirdPlaceFinish = placing === 2 ? 1 : 0
-                const topTenPlaceFinishes = (placing > 2 && placing < 10) ? 1 : 0
-                const participantCount = sortedParticipants.length
-                const skillGain = getTotalEventGain(
-                    participant,
-                    event,
-                    runescape.TrackingEnum.SKILLS
-                )
-                const bhGain = getTotalEventGain(
-                    participant,
-                    event,
-                    runescape.TrackingEnum.BH
-                )
-                const lmsGain = getTotalEventGain(
-                    participant,
-                    event,
-                    runescape.TrackingEnum.LMS
-                )
-                const cluesGain = getTotalEventGain(
-                    participant,
-                    event,
-                    runescape.TrackingEnum.CLUES
-                )
-
-                const newFirstPlaceFinishes = foundOrCreatedStats.firstPlaceFinishes + firstPlaceFinish
-                const newSecondPlaceFinishes = foundOrCreatedStats.secondPlaceFinishes + secondPlaceFinish
-                const newThirdPlaceFinishes = foundOrCreatedStats.thirdPlaceFinishes + thirdPlaceFinish
-                const newTopTenPlaceFinishes = foundOrCreatedStats.topTenPlaceFinishes + topTenPlaceFinishes
-                const newTotalParticipants = foundOrCreatedStats.totalParticipants + participantCount
-                const newTotalPlaces = foundOrCreatedStats.totalPlaces + placing
-                const newTotalEvents = foundOrCreatedStats.totalEvents + 1
-                const newTotalSkillsGain = foundOrCreatedStats.totalSkillsGain + skillGain
-                const newTotalBhGain = foundOrCreatedStats.totalBhGain + bhGain
-                const newLmsGain = foundOrCreatedStats.totalLmsGain + lmsGain
-                const newCluesGain = foundOrCreatedStats.totalCluesGain + cluesGain
-
-                return {
-                    discordId: foundOrCreatedStats.discordId,
-                    firstPlaceFinishes: newFirstPlaceFinishes,
-                    secondPlaceFinishes: newSecondPlaceFinishes,
-                    thirdPlaceFinishes: newThirdPlaceFinishes,
-                    topTenPlaceFinishes: newTopTenPlaceFinishes,
-                    totalParticipants: newTotalParticipants,
-                    totalPlaces: newTotalPlaces,
-                    totalEvents: newTotalEvents,
-                    totalSkillsGain: newTotalSkillsGain,
-                    totalBhGain: newTotalBhGain,
-                    totalLmsGain: newLmsGain,
-                    totalCluesGain: newCluesGain,
-                }
-            }
-        )
-        const filteredStats: bot.Stats[] = oldData.stats.filter(
-            (statsOuter: bot.Stats): boolean => updatedStats.every(
-                (statsInner: bot.Stats): boolean => statsInner.discordId !== statsOuter.discordId
-            )
-        )
-        const newStats: bot.Stats[] = filteredStats.concat(updatedStats)
-        const newData: bot.Data = utils.update(oldData, {
-            stats: newStats,
-        }) as bot.Data
+        const newData: bot.Data = updateStats(sortedParticipants, oldData, event, true)
         bot.save(guild.id, newData)
     })
 }
@@ -1052,7 +1068,11 @@ Observable<Input> = filteredMessage$(
  * @type {Observable<any>}
  * @constant
  */
-const signupEvent$: Observable<[bot.Data, discord.Message, hiscores.LookupResponse]> = filteredMessage$(
+const signupEvent$: Observable<[
+    bot.Data,
+    discord.Message,
+    hiscores.LookupResponse
+]> = filteredMessage$(
     bot.COMMANDS.SIGNUP_UPCOMING
 )
     .pipe(
