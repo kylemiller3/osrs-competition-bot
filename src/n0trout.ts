@@ -6,16 +6,18 @@
 import * as discord from 'discord.js'
 
 import {
-    fromEvent, Observable, of, forkJoin, merge,
+    fromEvent, Observable, of, forkJoin, merge, Subscribable, Subscriber, TeardownLogic, from,
 } from 'rxjs'
 import {
-    take, skip, filter, switchMap, catchError, tap, map, share,
+    take, skip, filter, switchMap, catchError, tap, map, share, scan, reduce,
 } from 'rxjs/operators'
 import {
     hiscores,
 } from 'osrs-json-api'
 import { EventEmitter } from 'events'
 import uuid from 'uuidv4'
+import { start } from 'repl'
+import { Stats } from 'fs'
 import { runescape } from './runescape'
 import { bot } from './bot'
 import { utils } from './utils'
@@ -46,6 +48,17 @@ const EVENT_TYPE: Record<string, string> = {
 //--------
 // Helpers
 //--------
+
+const firstPlaceEmoji: string = String.fromCodePoint(0x1F947)
+const secondPlaceEmoji: string = String.fromCodePoint(0x1F948)
+const thirdPlaceEmoji: string = String.fromCodePoint(0x1F949)
+
+const getStatsStr = (stats: bot.Stats):
+string => {
+    const averagePlace: number = Math.floor(stats.totalPlaces / stats.totalEvents)
+    const averageParticipants: number = Math.floor(stats.totalParticipants / stats.totalEvents)
+    return `${firstPlaceEmoji}: ${stats.firstPlaceFinishes}\n${secondPlaceEmoji}: ${stats.secondPlaceFinishes}\n${thirdPlaceEmoji}: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
+}
 
 /**
  * @function
@@ -218,7 +231,7 @@ const setRunescapeAccountCompetitionInfo = (
 * @param {string} userId The Discord Id to lookup
 * @returns {string} The user's Guild nickname
 */
-const userIdToDisplayName = (guild: discord.Guild, userId: string):
+const discordIdToDisplayName = (guild: discord.Guild, userId: string):
 string => {
     if (!guild.available) return '(guild unavailable)'
     const member: discord.GuildMember = guild.members.find(
@@ -295,62 +308,242 @@ NodeJS.Timeout => {
     }, twoHoursBeforeStart.getTime() - now.getTime())
 }
 
-const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: boolean): void => {
-    event.participants.forEach((participant: runescape.Participant): void => {
-        const account$ = participant.runescapeAccounts.map(
-            (account: runescape.CompetitiveAccountInfo):
-            Observable<[
-                hiscores.LookupResponse,
-                runescape.CompetitiveAccountInfo
-            ]> => forkJoin([
-                runescape.hiscores$(account.rsn),
-                of(account),
-            ]).pipe(
-                catchError(
-                    (error: Error):
-                    Observable<[
-                        hiscores.LookupResponse,
-                        runescape.CompetitiveAccountInfo
-                    ]> => {
-                        utils.logError(error)
-                        return forkJoin([
-                            of(null),
-                            of(account),
-                        ])
-                    }
-                )
+const getEventTracking = (event: runescape.Event): runescape.TrackingEnum => {
+    if (event.tracking.bh !== null) {
+        return runescape.TrackingEnum.BH
+    }
+    if (event.tracking.clues !== null) {
+        return runescape.TrackingEnum.CLUES
+    }
+    if (event.tracking.skills !== null) {
+        return runescape.TrackingEnum.SKILLS
+    }
+    if (event.tracking.lms !== null) {
+        return runescape.TrackingEnum.LMS
+    }
+    return null
+}
+
+const getTotalEventGain = (
+    participant: runescape.Participant,
+    event: runescape.Event,
+    tracking: runescape.TrackingEnum,
+): number => {
+    switch (tracking) {
+        case 'skills': {
+            if (event.tracking.skills === null) return 0
+            const xps: number[] = participant.runescapeAccounts.map(
+                (account: runescape.CompetitiveAccountInfo):
+                number => {
+                    const skillsComponents:
+                    hiscores.SkillComponent[][] = event.tracking[tracking].map(
+                        (key: string):
+                        hiscores.SkillComponent[] => [
+                            account.starting[tracking][key],
+                            account.ending[tracking][key],
+                        ]
+                    )
+                    const xpDiff = skillsComponents.map(
+                        (startEnd: hiscores.SkillComponent[]):
+                        number => startEnd[1].xp - startEnd[0].xp
+                    )
+                    const xpGain = xpDiff.reduce((acc, x): number => acc + x)
+                    return xpGain
+                }
             )
-        )
-        forkJoin(account$).subscribe(
-            (responses: [
-                hiscores.LookupResponse,
-                runescape.CompetitiveAccountInfo
-            ][]): void => {
-                responses.forEach(
-                    (response: [
-                        hiscores.LookupResponse,
-                        runescape.CompetitiveAccountInfo
-                    ]): void => {
-                        const hiscore: hiscores.LookupResponse = response[0]
-                        const account: runescape.CompetitiveAccountInfo = response[1]
-                        const data: bot.Data = bot.load(guild.id, false)
-                        const events: runescape.Event[] = data.events
-                        const foundEvent: runescape.Event = events.find(
-                            (e: runescape.Event): boolean => e.id === event.id
-                        )
-                        const newData = setRunescapeAccountCompetitionInfo(
-                            data,
-                            foundEvent,
-                            participant,
-                            account,
-                            hiscore,
-                            starting
-                        )
-                        bot.save(guild.id, newData)
-                    }
+            const xp = xps.reduce((acc: number, x: number): number => acc + x)
+            return xp
+        }
+
+        case 'bh':
+        case 'clues':
+        case 'lms': {
+            if (event.tracking.bh === null
+                && event.tracking.clues === null
+                && event.tracking.lms === null) return 0
+            const gains: number[] = participant.runescapeAccounts.map(
+                (account: runescape.CompetitiveAccountInfo): number => {
+                    const rankAndScoreComponents:
+                    hiscores.RankAndScoreComponent[][] = (
+                        event.tracking[tracking] as unknown[]
+                    ).map(
+                        (key: string):
+                        hiscores.RankAndScoreComponent[] => [
+                            account.starting[tracking][key],
+                            account.ending[tracking][key],
+                        ]
+                    )
+                    const clueDiff = rankAndScoreComponents.map(
+                        (startEnd: hiscores.RankAndScoreComponent[]):
+                        number => startEnd[1].score - startEnd[0].score
+                    )
+                    const clueGain = clueDiff.reduce((acc, x): number => acc + x)
+                    return clueGain
+                }
+            )
+            const gain = gains.reduce((acc: number, x: number): number => acc + x)
+            return gain
+        }
+        default:
+            return 0
+    }
+}
+
+const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: boolean): void => {
+    const participant$: Observable<runescape.Participant[]> = from(event.participants)
+        .pipe(
+            switchMap(
+                (participant: runescape.Participant):
+                Observable<[
+                    hiscores.LookupResponse[],
+                    runescape.Participant
+                ]> => {
+                    const responseObs:
+                    Observable<hiscores.LookupResponse>[] = participant.runescapeAccounts.map(
+                        (account: runescape.CompetitiveAccountInfo):
+                        Observable<hiscores.LookupResponse> => runescape.hiscores$(account.rsn)
+                    )
+                    const responseArr = forkJoin(
+                        responseObs
+                    )
+                    return forkJoin(
+                        responseArr,
+                        of(participant)
+                    )
+                }
+            ),
+            // TODO: add error catch here
+            map((respArr: [
+                hiscores.LookupResponse[],
+                runescape.Participant]):
+            runescape.Participant => {
+                const hiscoreArr: hiscores.LookupResponse[] = respArr[0]
+                const participant: runescape.Participant = respArr[1]
+                const newAccountInfos:
+                runescape.CompetitiveAccountInfo[] = participant.runescapeAccounts.map(
+                    (account: runescape.CompetitiveAccountInfo, idx: number):
+                    runescape.CompetitiveAccountInfo => (starting
+                        ? utils.update(account, {
+                            starting: hiscoreArr[idx],
+                        }) as runescape.CompetitiveAccountInfo
+                        : utils.update(account, {
+                            ending: hiscoreArr[idx],
+                        }) as runescape.CompetitiveAccountInfo)
                 )
+                const newParticipant: runescape.Participant = utils.update(participant, {
+                    runescapeAccounts: newAccountInfos,
+                }) as runescape.Participant
+                return newParticipant
+            }),
+            reduce((
+                all: runescape.Participant[],
+                current: runescape.Participant
+            ): runescape.Participant[] => [...all, current], []),
+            tap((newParticipants: runescape.Participant[]): void => {
+                const oldData: bot.Data = bot.load(guild.id, false)
+                const newEvent: runescape.Event = utils.update(event, {
+                    participants: newParticipants,
+                }) as runescape.Event
+                const newData = updateEvent(oldData, newEvent)
+                bot.save(guild.id, newData)
+            })
+        )
+    participant$.subscribe((participantsArr: runescape.Participant[]): void => {
+        if (starting) return
+        // we should do stats here if it's an ending event
+        const tracking: runescape.TrackingEnum = getEventTracking(event)
+        const sortedParticipants: runescape.Participant[] = participantsArr.sort(
+            (a: runescape.Participant, b: runescape.Participant):
+            number => getTotalEventGain(a, event, tracking) - getTotalEventGain(b, event, tracking)
+        )
+        const oldData = bot.load(guild.id, false)
+        const updatedStats: bot.Stats[] = sortedParticipants.map(
+            (participant: runescape.Participant, placing: number): bot.Stats => {
+                const foundStats: bot.Stats = oldData.stats.find(
+                    (stats: bot.Stats): boolean => stats.discordId === participant.discordId
+                )
+                const foundOrCreatedStats: bot.Stats = foundStats === undefined
+                    ? {
+                        discordId: participant.discordId,
+                        firstPlaceFinishes: 0,
+                        secondPlaceFinishes: 0,
+                        thirdPlaceFinishes: 0,
+                        topTenPlaceFinishes: 0,
+                        totalParticipants: 0,
+                        totalPlaces: 0,
+                        totalEvents: 0,
+                        totalSkillsGain: 0,
+                        totalCluesGain: 0,
+                        totalLmsGain: 0,
+                        totalBhGain: 0,
+                    }
+                    : foundStats
+                // TODO: refactor me later??
+                // update stats
+                const firstPlaceFinish = placing === 1 ? 1 : 0
+                const secondPlaceFinish = placing === 2 ? 1 : 0
+                const thirdPlaceFinish = placing === 3 ? 1 : 0
+                const topTenPlaceFinishes = (placing > 3 && placing <= 10) ? 1 : 0
+                const participantCount = sortedParticipants.length
+                const skillGain = getTotalEventGain(
+                    participant,
+                    event,
+                    runescape.TrackingEnum.SKILLS
+                )
+                const bhGain = getTotalEventGain(
+                    participant,
+                    event,
+                    runescape.TrackingEnum.BH
+                )
+                const lmsGain = getTotalEventGain(
+                    participant,
+                    event,
+                    runescape.TrackingEnum.LMS
+                )
+                const cluesGain = getTotalEventGain(
+                    participant,
+                    event,
+                    runescape.TrackingEnum.CLUES
+                )
+
+                const newFirstPlaceFinishes = foundOrCreatedStats.firstPlaceFinishes + firstPlaceFinish
+                const newSecondPlaceFinishes = foundOrCreatedStats.secondPlaceFinishes + secondPlaceFinish
+                const newThirdPlaceFinishes = foundOrCreatedStats.thirdPlaceFinishes + thirdPlaceFinish
+                const newTopTenPlaceFinishes = foundOrCreatedStats.topTenPlaceFinishes + topTenPlaceFinishes
+                const newTotalParticipants = foundOrCreatedStats.totalParticipants + participantCount
+                const newTotalPlaces = foundOrCreatedStats.totalPlaces + placing
+                const newTotalEvents = foundOrCreatedStats.totalEvents + 1
+                const newTotalSkillsGain = foundOrCreatedStats.totalSkillsGain + skillGain
+                const newTotalBhGain = foundOrCreatedStats.totalBhGain + bhGain
+                const newLmsGain = foundOrCreatedStats.totalLmsGain + lmsGain
+                const newCluesGain = foundOrCreatedStats.totalCluesGain + cluesGain
+
+                return {
+                    discordId: foundOrCreatedStats.discordId,
+                    firstPlaceFinishes: newFirstPlaceFinishes,
+                    secondPlaceFinishes: newSecondPlaceFinishes,
+                    thirdPlaceFinishes: newThirdPlaceFinishes,
+                    topTenPlaceFinishes: newTopTenPlaceFinishes,
+                    totalParticipants: newTotalParticipants,
+                    totalPlaces: newTotalPlaces,
+                    totalEvents: newTotalEvents,
+                    totalSkillsGain: newTotalSkillsGain,
+                    totalBhGain: newTotalBhGain,
+                    totalLmsGain: newLmsGain,
+                    totalCluesGain: newCluesGain,
+                }
             }
         )
+        const filteredStats: bot.Stats[] = oldData.stats.filter(
+            (statsOuter: bot.Stats): boolean => updatedStats.every(
+                (statsInner: bot.Stats): boolean => statsInner.discordId !== statsOuter.discordId
+            )
+        )
+        const newStats: bot.Stats[] = filteredStats.concat(updatedStats)
+        const newData: bot.Data = utils.update(oldData, {
+            stats: newStats,
+        }) as bot.Data
+        bot.save(guild.id, newData)
     })
 }
 
@@ -450,71 +643,6 @@ const findFirstRegexesMatch = (regexes: RegExp[], search: string): string[] => {
         (str: string): string => (str !== null && str.length > 0 ? str : null)
     )
     return nonEmpty
-}
-
-const getTotalEventGain = (
-    participant: runescape.Participant,
-    event: runescape.Event,
-    tracking: runescape.TrackingEnum,
-): number => {
-    switch (tracking) {
-        case 'skills': {
-            if (event.tracking.skills === null) return 0
-            const xps: number[] = participant.runescapeAccounts.map(
-                (account: runescape.CompetitiveAccountInfo):
-                number => {
-                    const skillsComponents:
-                    hiscores.SkillComponent[][] = event.tracking[tracking].map(
-                        (key: string):
-                        hiscores.SkillComponent[] => [
-                            account.starting[tracking][key],
-                            account.ending[tracking][key],
-                        ]
-                    )
-                    const xpDiff = skillsComponents.map(
-                        (startEnd: hiscores.SkillComponent[]):
-                        number => startEnd[1].xp - startEnd[0].xp
-                    )
-                    const xpGain = xpDiff.reduce((acc, x): number => acc + x)
-                    return xpGain
-                }
-            )
-            const xp = xps.reduce((acc: number, x: number): number => acc + x)
-            return xp
-        }
-
-        case 'bh':
-        case 'clues':
-        case 'lms': {
-            if (event.tracking.bh === null
-                && event.tracking.clues === null
-                && event.tracking.lms === null) return 0
-            const gains: number[] = participant.runescapeAccounts.map(
-                (account: runescape.CompetitiveAccountInfo): number => {
-                    const rankAndScoreComponents:
-                    hiscores.RankAndScoreComponent[][] = (
-                        event.tracking[tracking] as unknown[]
-                    ).map(
-                        (key: string):
-                        hiscores.RankAndScoreComponent[] => [
-                            account.starting[tracking][key],
-                            account.ending[tracking][key],
-                        ]
-                    )
-                    const clueDiff = rankAndScoreComponents.map(
-                        (startEnd: hiscores.RankAndScoreComponent[]):
-                        number => startEnd[1].score - startEnd[0].score
-                    )
-                    const clueGain = clueDiff.reduce((acc, x): number => acc + x)
-                    return clueGain
-                }
-            )
-            const gain = gains.reduce((acc: number, x: number): number => acc + x)
-            return gain
-        }
-        default:
-            return 0
-    }
 }
 
 //-------------
@@ -1535,7 +1663,7 @@ listParticipant$.subscribe((command: Input): void => {
     const eventToList: runescape.Event = upcomingAndInFlightEvents[idxToCheck]
     const formattedStr: string = eventToList.participants.map(
         (participant: runescape.Participant, idx: number): string => {
-            const displayName: string = userIdToDisplayName(
+            const displayName: string = discordIdToDisplayName(
                 command.guild,
                 participant.discordId
             )
