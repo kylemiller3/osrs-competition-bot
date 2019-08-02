@@ -566,10 +566,7 @@ NodeJS.Timeout {
         const newData: bot.Data = updateEvent(data, newEvent)
         bot.save(guild.id, newData)
 
-        if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
-            // pull new hiscores
-            updateHiscores(newEvent, guild, false)
-        }
+        updateHiscores(newEvent, guild, false)
     }, oldEvent.endingDate.getTime() - now.getTime())
 }
 
