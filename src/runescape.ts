@@ -138,11 +138,11 @@ export namespace runescape {
     * @returns {Observable<JSON>} Observable of the JSON response or Observable of null
     * @todo handle the error properly
     */
-    export const hiscores$ = (rsn: string): Observable<hiscores.LookupResponse> => {
+    export const hiscores$ = (rsn: string, pullNew: boolean): Observable<hiscores.LookupResponse> => {
         if (hiscoreCache[rsn] !== undefined) {
             const date: Date = new Date(hiscoreCache[rsn].date)
             date.setMinutes(date.getMinutes() + 20)
-            if (utils.isInPast(date)) {
+            if (utils.isInPast(date) || pullNew) {
                 hiscoreCache[rsn] = undefined
             }
         }

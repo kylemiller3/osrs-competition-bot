@@ -445,7 +445,7 @@ const updateStats = (
     return newData
 }
 
-const updateParticipantsStat$ = (event: runescape.Event, starting: boolean):
+const updateParticipantsStat$ = (event: runescape.Event, starting: boolean, pullNew: boolean):
 Observable<runescape.Participant[]> => {
     const update$: Observable<runescape.Participant>[] = event.participants.map(
         (participant: runescape.Participant): Observable<runescape.Participant> => of(participant)
@@ -455,7 +455,7 @@ Observable<runescape.Participant[]> => {
                     Observable<[hiscores.LookupResponse[], runescape.Participant]> => {
                         const responseObs: Observable<hiscores.LookupResponse>[] = p.runescapeAccounts.map(
                             (account: runescape.CompetitiveAccountInfo):
-                            Observable<hiscores.LookupResponse> => runescape.hiscores$(account.rsn)
+                            Observable<hiscores.LookupResponse> => runescape.hiscores$(account.rsn, pullNew)
                         )
                         const responseArr = forkJoin(responseObs)
                         return forkJoin(responseArr, of(p))
@@ -510,7 +510,7 @@ const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: 
         return
     }
 
-    const participant$: Observable<runescape.Participant[]> = updateParticipantsStat$(event, starting)
+    const participant$: Observable<runescape.Participant[]> = updateParticipantsStat$(event, starting, true)
     participant$.subscribe((participantsArr: runescape.Participant[]): void => {
         if (starting) {
             const oldData: bot.Data = bot.load(guild.id, false)
@@ -1169,7 +1169,7 @@ const signupEvent$: Observable<[
             return forkJoin(
                 of<bot.Data>(newData),
                 of<discord.Message>(command.message),
-                runescape.hiscores$(rsnToAdd)
+                runescape.hiscores$(rsnToAdd, false)
             )
         }),
         filter((dataMsgHiArr: [bot.Data, discord.Message, hiscores.LookupResponse]):
@@ -1810,7 +1810,7 @@ updateLeaderboard$.subscribe((command: Input): void => {
         return
     }
 
-    const participant$ = updateParticipantsStat$(eventToUpdate, false)
+    const participant$ = updateParticipantsStat$(eventToUpdate, false, false)
     participant$.subscribe(
         (participantsArr: runescape.Participant[]): void => {
             const oldData: bot.Data = bot.load(command.guild.id, false)
