@@ -6,7 +6,7 @@
 import * as discord from 'discord.js'
 
 import {
-    fromEvent, Observable, of, forkJoin, merge, Subject, Subscription,
+    fromEvent, Observable, of, forkJoin, merge, Subject,
 } from 'rxjs'
 import {
     take, skip, filter, switchMap, tap, map, share,
@@ -511,8 +511,7 @@ const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: 
     }
 
     const participant$: Observable<runescape.Participant[]> = updateParticipantsStat$(event, starting)
-    const subscription: Subscription = participant$.subscribe((participantsArr: runescape.Participant[]): void => {
-        subscription.unsubscribe()
+    participant$.subscribe((participantsArr: runescape.Participant[]): void => {
         if (starting) {
             const oldData: bot.Data = bot.load(guild.id, false)
             const newEvent: runescape.Event = utils.update(event, {
@@ -1812,10 +1811,8 @@ updateLeaderboard$.subscribe((command: Input): void => {
     }
 
     const participant$ = updateParticipantsStat$(eventToUpdate, false)
-    const subscription: Subscription = participant$.subscribe(
+    participant$.subscribe(
         (participantsArr: runescape.Participant[]): void => {
-            subscription.unsubscribe()
-
             const oldData: bot.Data = bot.load(command.guild.id, false)
             const newEvent: runescape.Event = utils.update(eventToUpdate, {
                 participants: participantsArr,

@@ -140,8 +140,8 @@ export namespace runescape {
         if (hiscoreCache[rsn] === undefined) {
             hiscoreCache[rsn] = from(hiscores.getPlayer(rsn))
                 .pipe(
-                    retry(5),
-                    publishReplay(1, 10 * 60 * 1000),
+                    retry(10),
+                    publishReplay(1, 20 * 60 * 1000),
                     refCount(), catchError((error: Error): Observable<JSON> => {
                         utils.logError(error)
                         return of(null)
