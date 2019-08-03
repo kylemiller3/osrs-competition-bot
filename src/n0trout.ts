@@ -47,7 +47,7 @@ const EVENT_TYPE: Record<string, string> = {
 // Helpers
 //--------
 
-const getStatsStr = (stats: bot.Stats):
+const getStatsStr = (displayName: string, stats: bot.Stats):
 string => {
     const averagePlace: number = Math.floor(
         stats.totalPlaces / stats.totalCompetitiveEvents
@@ -55,7 +55,7 @@ string => {
     const averageParticipants: number = Math.floor(
         stats.totalParticipants / stats.totalCompetitiveEvents
     )
-    return `🥇: ${stats.firstPlaceFinishes}\n🥈: ${stats.secondPlaceFinishes}\n🥉: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
+    return `\n${displayName}\n🥇: ${stats.firstPlaceFinishes}\n🥈: ${stats.secondPlaceFinishes}\n🥉: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage placement: ${averagePlace}/${averageParticipants}`
 }
 
 /**
@@ -408,7 +408,7 @@ const updateStats = (
             const newThirdPlaceFinishes = StatsToUse.thirdPlaceFinishes + thirdPlaceFinish
             const newTopTenPlaceFinishes = StatsToUse.topTenPlaceFinishes + topTenPlaceFinishes
             const newTotalParticipants = StatsToUse.totalParticipants + participantCount
-            const newTotalPlaces = StatsToUse.totalPlaces + placing
+            const newTotalPlaces = StatsToUse.totalPlaces + placing + 1
             const newTotalEvents = StatsToUse.totalCompetitiveEvents + 1
             const newTotalSkillsGain = StatsToUse.totalSkillsGain + skillGain
             const newTotalBhGain = StatsToUse.totalBhGain + bhGain
@@ -1246,6 +1246,10 @@ const showLeaderboard$: Observable<Input> = filteredMessage$(
     bot.COMMANDS.SHOWLEADERBOARD
 )
 
+const showStat$: Observable<Input> = filteredMessage$(
+    bot.COMMANDS.SHOWSTATS
+)
+
 //------------------------
 // Subscriptions & helpers
 //
@@ -1847,6 +1851,25 @@ showLeaderboard$.subscribe(
 
         const strToPrint: string = getScoreboardString(eventToPrint, command.guild)
         command.message.reply(`\n${strToPrint}`)
+    }
+)
+
+showStat$.subscribe(
+    (command: Input): void => {
+        const data: bot.Data = bot.load(command.guild.id, false)
+        const user: discord.User = command.message.mentions.members.array().length > 0
+            ? command.message.mentions.users.array()[0]
+            : command.author
+        const foundStats: bot.Stats = data.stats.find(
+            (stats: bot.Stats): boolean => stats.discordId === user.id
+        )
+        const displayName: string = discordIdToDisplayName(command.guild, user.id)
+        if (foundStats === undefined) {
+            command.message.reply(`${displayName} has not completed any events yet`)
+            return
+        }
+        const stats: string = getStatsStr(displayName, foundStats)
+        command.message.reply(stats)
     }
 )
 

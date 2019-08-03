@@ -252,17 +252,24 @@ export namespace bot {
         },
 
         UPDATELEADERBOARD: {
-            command: '!f updateleaderboard',
+            command: '!f updateleaderboard ',
             description: 'updates and prints an event\'s leaderboard (use with \'!f events\')',
             accessControl: ANY_USER,
             parameters: '(index)',
         },
 
         SHOWLEADERBOARD: {
-            command: '!f showleaderboard',
+            command: '!f showleaderboard ',
             description: 'prints an event\'s leaderboard (use with \'!f events\')',
             accessControl: ANY_USER,
             parameters: '(index)',
+        },
+
+        SHOWSTATS: {
+            command: '!f showstats',
+            description: 'prints stats for a user',
+            accessControl: ANY_USER,
+            parameters: '(mention)',
         },
     }
 
