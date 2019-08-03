@@ -236,6 +236,20 @@ export namespace bot {
             accessControl: ONLY_ADMIN,
             parameters: '(channel mention)',
         },
+
+        FORCESIGNUP_UPCOMING: {
+            command: '!f forcesignup ',
+            description: 'forces signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
+            accessControl: ONLY_ADMIN,
+            parameters: '(index rsn mention)',
+        },
+
+        FORCEUNSIGNUP_UPCOMING: {
+            command: '!f forceunsignup ',
+            description: 'forces un-signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
+            accessControl: ONLY_ADMIN,
+            parameters: '(index mention)',
+        },
     }
 
     /**

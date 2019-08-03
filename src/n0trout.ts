@@ -6,7 +6,7 @@
 import * as discord from 'discord.js'
 
 import {
-    fromEvent, Observable, of, forkJoin, merge, from,
+    fromEvent, Observable, of, forkJoin, merge, from, Subject,
 } from 'rxjs'
 import {
     take, skip, filter, switchMap, tap, map, share, reduce,
@@ -151,6 +151,25 @@ const signupParticipant = (
         boolean => participant.discordId === newParticipant.discordId
     )
     if (foundParticipant !== undefined) return oldData
+    const allRsn: string[] = oldEvent.participants.map(
+        (participant: runescape.Participant): runescape.AccountInfo[] => participant.runescapeAccounts
+    ).reduce(
+        (
+            acc: runescape.AccountInfo[],
+            x: runescape.AccountInfo[]
+        ):
+        runescape.AccountInfo[] => acc.concat(x),
+        []
+    ).map(
+        (account: runescape.AccountInfo): string => account.rsn
+    )
+    const newRsn: string[] = newParticipant.runescapeAccounts.map(
+        (account: runescape.AccountInfo): string => account.rsn
+    )
+    const foundRsn: boolean = allRsn.some(
+        (rsn: string): boolean => newRsn.includes(rsn)
+    )
+    if (foundRsn) return oldData
     const newParticipants: runescape.Participant[] = oldEvent.participants.concat(newParticipant)
     const newEvent: runescape.Event = utils.update(oldEvent, {
         participants: newParticipants,
@@ -625,6 +644,8 @@ const timers: Record<string, NodeJS.Timeout[]> = {}
  */
 const signupTermRegex = 'rsn|$'
 
+const forceSignupTermRegex = '<@!|rsn|$'
+
 /**
  * @description Ending regex terminators for command ADD_EVENT
  * @type {string}
@@ -650,7 +671,9 @@ const commandRegex = (term: string): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term
  * @type {Observable<discord.Message>}
  * @constant
  */
-const message$: Observable<discord.Message> = fromEvent(gClient as unknown as EventEmitter, 'message')
+const eventMessage$: Observable<discord.Message> = fromEvent(gClient as unknown as EventEmitter, 'message')
+const injectedMessages$: Subject<discord.Message> = new Subject()
+const message$: Observable<discord.Message> = merge(eventMessage$, injectedMessages$)
 
 /**
  * @description Observable of discord ready events
@@ -922,7 +945,10 @@ Observable<[Input, runescape.Event]> = prepareUpcomingGenericEvent$
                 new RegExp(`clues${compoundRegex}`, 'gim'),
             ]
             const parsedRegex = findFirstRegexesMatch(competitiveRegex, inputCommand.input)
-            if (parsedRegex.length === 0) {
+            if (parsedRegex[0] === null
+                && parsedRegex[1] === null
+                && parsedRegex[2] === null
+            ) {
                 utils.logger.debug(`Admin ${inputCommand.author.id} did not specify what to track`)
                 inputCommand.message.reply(`no skills specified\n${bot.COMMANDS.ADD_UPCOMING.parameters}`)
                 return null
@@ -1081,10 +1107,15 @@ const signupEvent$: Observable<[
                 new RegExp(`rsn${compoundRegex}`, 'gim'),
             ]
             const parsedRegex = findFirstRegexesMatch(skillsRegex, command.input)
-            if (parsedRegex.length !== skillsRegex.length) {
-                utils.logger.debug(`${command.author.id} entered invalid signup data`)
-                command.message.reply(`invalid input\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`)
-                return of<[bot.Data, discord.Message, hiscores.LookupResponse]>(null)
+            if (parsedRegex[0] === null) {
+                utils.logger.debug(`${command.author.id} entered invalid index`)
+                command.message.reply(`invalid index\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`)
+                return of(null)
+            }
+            if (parsedRegex[1] === null) {
+                utils.logger.debug(`${command.author.id} entered invalid rsn`)
+                command.message.reply(`invalid rsn. Did you forget to add 'rsn'?\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`)
+                return of(null)
             }
 
             // get upcoming events
@@ -1120,6 +1151,12 @@ const signupEvent$: Observable<[
                 eventToModify,
                 participantToAdd,
             )
+
+            if (newData === oldData) {
+                utils.logger.debug('User already signed up')
+                command.message.reply('Your discord id or rsn is already signed up')
+                return of(null)
+            }
 
             return forkJoin(
                 of<bot.Data>(newData),
@@ -1176,6 +1213,22 @@ const setChannel$: Observable<Input> = filteredMessage$(
  * @constant
  */
 const help$: Observable<Input> = filteredMessage$(bot.COMMANDS.HELP)
+
+const forceSignup$: Observable<Input> = filteredMessage$(bot.COMMANDS.FORCESIGNUP_UPCOMING)
+    .pipe(
+        filter(
+            (command: Input):
+            boolean => command.message.mentions.members.array().length > 0
+        ),
+    )
+
+const forceUnsignup$: Observable<Input> = filteredMessage$(bot.COMMANDS.FORCEUNSIGNUP_UPCOMING)
+    .pipe(
+        filter(
+            (command: Input):
+            boolean => command.message.mentions.members.array().length > 0
+        ),
+    )
 
 //------------------------
 // Subscriptions & helpers
@@ -1685,6 +1738,43 @@ help$.subscribe((command: Input): void => {
     })
 
     utils.logger.debug('Help called')
+})
+
+const mockMessage = (newCommand: bot.Command, newInput: string, oldMessage: discord.Message): discord.Message => {
+    const content = `${newCommand.command}${newInput}`
+    const author = oldMessage.mentions.users.array()[0]
+    const message: discord.Message = new discord.Message(oldMessage.channel, {
+        id: oldMessage.id,
+        type: oldMessage.type,
+        content,
+        author,
+        pinned: oldMessage.pinned,
+        tts: oldMessage.tts,
+        nonce: oldMessage.nonce,
+        embeds: oldMessage.embeds,
+        attachments: oldMessage.attachments,
+        timestamp: oldMessage.createdTimestamp,
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        edited_timestamp: oldMessage.editedTimestamp,
+        reactions: oldMessage.reactions,
+        mentions: oldMessage.mentions.users.array(),
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        webhook_id: oldMessage.webhookID,
+        hit: oldMessage.hit,
+    }, gClient)
+    return message
+}
+
+forceSignup$.subscribe((command: Input): void => {
+    const newInput = command.input.replace(/\s*<@[0-9]+>/g, '')
+    const message: discord.Message = mockMessage(bot.COMMANDS.SIGNUP_UPCOMING, newInput, command.message)
+    injectedMessages$.next(message)
+})
+
+forceUnsignup$.subscribe((command: Input): void => {
+    const newInput = command.input.replace(/\s*<@[0-9]+>/g, '')
+    const message: discord.Message = mockMessage(bot.COMMANDS.UNSIGNUP_UPCOMING, newInput, command.message)
+    injectedMessages$.next(message)
 })
 
 //--------------
