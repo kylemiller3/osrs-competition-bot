@@ -6,10 +6,10 @@
 import * as discord from 'discord.js'
 
 import {
-    fromEvent, Observable, of, forkJoin, merge, from, Subject,
+    fromEvent, Observable, of, forkJoin, merge, Subject, Subscription,
 } from 'rxjs'
 import {
-    take, skip, filter, switchMap, tap, map, share, reduce,
+    take, skip, filter, switchMap, tap, map, share,
 } from 'rxjs/operators'
 import {
     hiscores,
@@ -47,10 +47,6 @@ const EVENT_TYPE: Record<string, string> = {
 // Helpers
 //--------
 
-const firstPlaceEmoji: string = String.fromCodePoint(0x1F947)
-const secondPlaceEmoji: string = String.fromCodePoint(0x1F948)
-const thirdPlaceEmoji: string = String.fromCodePoint(0x1F949)
-
 const getStatsStr = (stats: bot.Stats):
 string => {
     const averagePlace: number = Math.floor(
@@ -59,7 +55,7 @@ string => {
     const averageParticipants: number = Math.floor(
         stats.totalParticipants / stats.totalCompetitiveEvents
     )
-    return `${firstPlaceEmoji}: ${stats.firstPlaceFinishes}\n${secondPlaceEmoji}: ${stats.secondPlaceFinishes}\n${thirdPlaceEmoji}: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
+    return `🥇: ${stats.firstPlaceFinishes}\n🥈: ${stats.secondPlaceFinishes}\n🥉: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage place: ${averagePlace}/${averageParticipants}`
 }
 
 /**
@@ -207,7 +203,7 @@ string => {
         (m: discord.GuildMember):
         boolean => m.id === userId
     )
-    if (member === undefined) return '(unknown)'
+    if (member === null) return '(unknown)'
     return member.displayName
 }
 
@@ -304,6 +300,7 @@ const getTotalEventGain = (
             const xps: number[] = participant.runescapeAccounts.map(
                 (account: runescape.CompetitiveAccountInfo):
                 number => {
+                    if (account.starting === undefined || account.ending === undefined) return NaN
                     const skillsComponents:
                     hiscores.SkillComponent[][] = event.tracking[tracking].map(
                         (key: string):
@@ -448,6 +445,63 @@ const updateStats = (
     return newData
 }
 
+const updateParticipantsStat$ = (event: runescape.Event, starting: boolean):
+Observable<runescape.Participant[]> => {
+    const update$: Observable<runescape.Participant>[] = event.participants.map(
+        (participant: runescape.Participant): Observable<runescape.Participant> => of(participant)
+            .pipe(
+                switchMap(
+                    (p: runescape.Participant):
+                    Observable<[hiscores.LookupResponse[], runescape.Participant]> => {
+                        const responseObs: Observable<hiscores.LookupResponse>[] = p.runescapeAccounts.map(
+                            (account: runescape.CompetitiveAccountInfo):
+                            Observable<hiscores.LookupResponse> => runescape.hiscores$(account.rsn)
+                        )
+                        const responseArr = forkJoin(responseObs)
+                        return forkJoin(responseArr, of(p))
+                    }
+                ),
+                // TODO: add error catch here
+                map((respArr: [hiscores.LookupResponse[], runescape.Participant]): runescape.Participant => {
+                    const hiscoreArr: hiscores.LookupResponse[] = respArr[0]
+                    const p: runescape.Participant = respArr[1]
+                    const newAccountInfos: runescape.CompetitiveAccountInfo[] = p.runescapeAccounts.map((account: runescape.CompetitiveAccountInfo, idx: number): runescape.CompetitiveAccountInfo => (starting
+                        ? utils.update(account, {
+                            starting: hiscoreArr[idx],
+                            ending: hiscoreArr[idx],
+                        }) as runescape.CompetitiveAccountInfo
+                        : utils.update(account, {
+                            ending: hiscoreArr[idx],
+                        }) as runescape.CompetitiveAccountInfo))
+                    const newParticipant: runescape.Participant = utils.update(p, {
+                        runescapeAccounts: newAccountInfos,
+                    }) as runescape.Participant
+                    return newParticipant
+                })
+            )
+    )
+    return forkJoin(update$)
+}
+
+const getScoreboardString = (eventToPrint: runescape.Event, guild: discord.Guild): string => {
+    const tracking: runescape.TrackingEnum = getEventTracking(eventToPrint)
+    const sortedParticipants: runescape.Participant[] = eventToPrint.participants.sort((a: runescape.Participant, b: runescape.Participant): number => getTotalEventGain(b, eventToPrint, tracking) - getTotalEventGain(a, eventToPrint, tracking))
+    const strToPrint: string = sortedParticipants.map((participant: runescape.Participant, idx: number): string => {
+        const name: string = discordIdToDisplayName(guild, participant.discordId)
+        switch (idx) {
+            case 0:
+                return `🥇\t${name}\t\t\t${getTotalEventGain(participant, eventToPrint, tracking)}`
+            case 1:
+                return `🥈\t${name}\t\t\t${getTotalEventGain(participant, eventToPrint, tracking)}`
+            case 2:
+                return `🥉\t${name}\t\t\t${getTotalEventGain(participant, eventToPrint, tracking)}`
+            default:
+                return `🤡\t${name}\t\t\t${getTotalEventGain(participant, eventToPrint, tracking)}`
+        }
+    }).join('\n')
+    return strToPrint
+}
+
 const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: boolean): void => {
     if (event.type === EVENT_TYPE.REGULAR) {
         const oldData: bot.Data = bot.load(guild.id, false)
@@ -456,66 +510,18 @@ const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: 
         return
     }
 
-    const participant$: Observable<runescape.Participant[]> = from(event.participants)
-        .pipe(
-            switchMap(
-                (participant: runescape.Participant):
-                Observable<[
-                    hiscores.LookupResponse[],
-                    runescape.Participant
-                ]> => {
-                    const responseObs:
-                    Observable<hiscores.LookupResponse>[] = participant.runescapeAccounts.map(
-                        (account: runescape.CompetitiveAccountInfo):
-                        Observable<hiscores.LookupResponse> => runescape.hiscores$(account.rsn)
-                    )
-                    const responseArr = forkJoin(
-                        responseObs
-                    )
-                    return forkJoin(
-                        responseArr,
-                        of(participant)
-                    )
-                }
-            ),
-            // TODO: add error catch here
-            map((respArr: [
-                hiscores.LookupResponse[],
-                runescape.Participant]):
-            runescape.Participant => {
-                const hiscoreArr: hiscores.LookupResponse[] = respArr[0]
-                const participant: runescape.Participant = respArr[1]
-                const newAccountInfos:
-                runescape.CompetitiveAccountInfo[] = participant.runescapeAccounts.map(
-                    (account: runescape.CompetitiveAccountInfo, idx: number):
-                    runescape.CompetitiveAccountInfo => (starting
-                        ? utils.update(account, {
-                            starting: hiscoreArr[idx],
-                        }) as runescape.CompetitiveAccountInfo
-                        : utils.update(account, {
-                            ending: hiscoreArr[idx],
-                        }) as runescape.CompetitiveAccountInfo)
-                )
-                const newParticipant: runescape.Participant = utils.update(participant, {
-                    runescapeAccounts: newAccountInfos,
-                }) as runescape.Participant
-                return newParticipant
-            }),
-            reduce((
-                all: runescape.Participant[],
-                current: runescape.Participant
-            ): runescape.Participant[] => [...all, current], []),
-            tap((newParticipants: runescape.Participant[]): void => {
-                const oldData: bot.Data = bot.load(guild.id, false)
-                const newEvent: runescape.Event = utils.update(event, {
-                    participants: newParticipants,
-                }) as runescape.Event
-                const newData = updateEvent(oldData, newEvent)
-                bot.save(guild.id, newData)
-            })
-        )
-    participant$.subscribe((participantsArr: runescape.Participant[]): void => {
-        if (starting) return
+    const participant$: Observable<runescape.Participant[]> = updateParticipantsStat$(event, starting)
+    const subscription: Subscription = participant$.subscribe((participantsArr: runescape.Participant[]): void => {
+        subscription.unsubscribe()
+        if (starting) {
+            const oldData: bot.Data = bot.load(guild.id, false)
+            const newEvent: runescape.Event = utils.update(event, {
+                participants: participantsArr,
+            }) as runescape.Event
+            const newData = updateEvent(oldData, newEvent)
+            bot.save(guild.id, newData)
+            return
+        }
         // we should do stats here if it's an ending event
         const tracking: runescape.TrackingEnum = getEventTracking(event)
         const sortedParticipants: runescape.Participant[] = participantsArr.sort(
@@ -525,6 +531,9 @@ const updateHiscores = (event: runescape.Event, guild: discord.Guild, starting: 
         const oldData = bot.load(guild.id, false)
         const newData: bot.Data = updateStats(sortedParticipants, oldData, event, true)
         bot.save(guild.id, newData)
+
+        const strToPrint = getScoreboardString(event, guild)
+        sendChannelMessage(guild, newData.settings.notificationChannelId, strToPrint, null)
     })
 }
 
@@ -1230,6 +1239,14 @@ const forceUnsignup$: Observable<Input> = filteredMessage$(bot.COMMANDS.FORCEUNS
         ),
     )
 
+const updateLeaderboard$: Observable<Input> = filteredMessage$(
+    bot.COMMANDS.UPDATELEADERBOARD
+)
+
+const showLeaderboard$: Observable<Input> = filteredMessage$(
+    bot.COMMANDS.SHOWLEADERBOARD
+)
+
 //------------------------
 // Subscriptions & helpers
 //
@@ -1740,9 +1757,8 @@ help$.subscribe((command: Input): void => {
     utils.logger.debug('Help called')
 })
 
-const mockMessage = (newCommand: bot.Command, newInput: string, oldMessage: discord.Message): discord.Message => {
+const mockMessage = (newCommand: bot.Command, newInput: string, oldMessage: discord.Message, author: discord.User): discord.Message => {
     const content = `${newCommand.command}${newInput}`
-    const author = oldMessage.mentions.users.array()[0]
     const message: discord.Message = new discord.Message(oldMessage.channel, {
         id: oldMessage.id,
         type: oldMessage.type,
@@ -1767,15 +1783,75 @@ const mockMessage = (newCommand: bot.Command, newInput: string, oldMessage: disc
 
 forceSignup$.subscribe((command: Input): void => {
     const newInput = command.input.replace(/\s*<@[0-9]+>/g, '')
-    const message: discord.Message = mockMessage(bot.COMMANDS.SIGNUP_UPCOMING, newInput, command.message)
+    const message: discord.Message = mockMessage(bot.COMMANDS.SIGNUP_UPCOMING, newInput, command.message, command.message.mentions.users.array()[0])
     injectedMessages$.next(message)
 })
 
 forceUnsignup$.subscribe((command: Input): void => {
     const newInput = command.input.replace(/\s*<@[0-9]+>/g, '')
-    const message: discord.Message = mockMessage(bot.COMMANDS.UNSIGNUP_UPCOMING, newInput, command.message)
+    const message: discord.Message = mockMessage(bot.COMMANDS.UNSIGNUP_UPCOMING, newInput, command.message, command.message.mentions.users.array()[0])
     injectedMessages$.next(message)
 })
+
+updateLeaderboard$.subscribe((command: Input): void => {
+    const data: bot.Data = bot.load(command.guild.id, false)
+    const upcomingAndInFlightEvents:
+    runescape.Event[] = getUpcomingAndInFlightEvents(data.events)
+    const idxToUpdate: number = Number.parseInt(command.input, 10)
+    if (Number.isNaN(idxToUpdate) || idxToUpdate >= upcomingAndInFlightEvents.length) {
+        utils.logger.debug(`User did not specify index (${idxToUpdate})`)
+        command.message.reply(`invalid index ${idxToUpdate}\n${bot.COMMANDS.UPDATELEADERBOARD.parameters}`)
+        return
+    }
+
+    const eventToUpdate: runescape.Event = upcomingAndInFlightEvents[idxToUpdate]
+    if (!eventToUpdate.hasNotifiedStarted) {
+        utils.logger.debug('User tried to update event that hasn\'t started yet')
+        command.message.reply('cannot update an event that hasn\'t started yet')
+        return
+    }
+
+    const participant$ = updateParticipantsStat$(eventToUpdate, false)
+    const subscription: Subscription = participant$.subscribe(
+        (participantsArr: runescape.Participant[]): void => {
+            subscription.unsubscribe()
+
+            const oldData: bot.Data = bot.load(command.guild.id, false)
+            const newEvent: runescape.Event = utils.update(eventToUpdate, {
+                participants: participantsArr,
+            }) as runescape.Event
+            const newData = updateEvent(oldData, newEvent)
+            bot.save(command.guild.id, newData)
+
+            const message: discord.Message = mockMessage(bot.COMMANDS.SHOWLEADERBOARD, command.input, command.message, command.message.author)
+            injectedMessages$.next(message)
+        }
+    )
+})
+
+showLeaderboard$.subscribe(
+    (command: Input): void => {
+        const data: bot.Data = bot.load(command.guild.id, false)
+        const upcomingAndInFlightEvents:
+        runescape.Event[] = getUpcomingAndInFlightEvents(data.events)
+        const idxToPrint: number = Number.parseInt(command.input, 10)
+        if (Number.isNaN(idxToPrint) || idxToPrint >= upcomingAndInFlightEvents.length) {
+            utils.logger.debug(`User did not specify index (${idxToPrint})`)
+            command.message.reply(`invalid index ${idxToPrint}\n${bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`)
+            return
+        }
+
+        const eventToPrint: runescape.Event = upcomingAndInFlightEvents[idxToPrint]
+        if (!eventToPrint.hasNotifiedStarted) {
+            utils.logger.debug('User tried to print event that hasn\'t started yet')
+            command.message.reply('cannot print an event that hasn\'t started yet')
+            return
+        }
+
+        const strToPrint: string = getScoreboardString(eventToPrint, command.guild)
+        command.message.reply(`\n${strToPrint}`)
+    }
+)
 
 //--------------
 // Global script

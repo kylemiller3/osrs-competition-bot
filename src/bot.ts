@@ -250,6 +250,20 @@ export namespace bot {
             accessControl: ONLY_ADMIN,
             parameters: '(index mention)',
         },
+
+        UPDATELEADERBOARD: {
+            command: '!f updateleaderboard',
+            description: 'updates and prints an event\'s leaderboard (use with \'!f events\')',
+            accessControl: ANY_USER,
+            parameters: '(index)',
+        },
+
+        SHOWLEADERBOARD: {
+            command: '!f showleaderboard',
+            description: 'prints an event\'s leaderboard (use with \'!f events\')',
+            accessControl: ANY_USER,
+            parameters: '(index)',
+        },
     }
 
     /**
