@@ -1,7 +1,9 @@
 import {
     hiscores,
 } from 'osrs-json-api'
-import { Observable, from, of } from 'rxjs'
+import {
+    Observable, from, of, observable,
+} from 'rxjs'
 import {
     retry, publishReplay, refCount, catchError,
 } from 'rxjs/operators'
@@ -9,7 +11,7 @@ import { utils } from './utils'
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace runescape {
-    const hiscoreCache: Record<string, Observable<hiscores.LookupResponse>> = {}
+    const hiscoreCache: Record<string, { observable: Observable<hiscores.LookupResponse>; date: Date }> = {}
 
     /**
     * @description Enum of all Runescape skills
@@ -137,22 +139,35 @@ export namespace runescape {
     * @todo handle the error properly
     */
     export const hiscores$ = (rsn: string): Observable<hiscores.LookupResponse> => {
-        if (hiscoreCache[rsn] === undefined) {
-            hiscoreCache[rsn] = from(hiscores.getPlayer(rsn))
-                .pipe(
-                    retry(10),
-                    publishReplay(1, 20 * 60 * 1000),
-                    refCount(), catchError((error: Error): Observable<JSON> => {
-                        utils.logError(error)
-                        return of(null)
-                    })
-                ) as unknown as Observable<hiscores.LookupResponse>
+        if (hiscoreCache[rsn] !== undefined) {
+            const date: Date = new Date(hiscoreCache[rsn].date)
+            date.setMinutes(date.getMinutes() + 20)
+            if (utils.isInPast(date)) {
+                hiscoreCache[rsn] = undefined
+            }
         }
 
-        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn]
+        if (hiscoreCache[rsn] === undefined) {
+            hiscoreCache[rsn] = {
+                observable: from(hiscores.getPlayer(rsn))
+                    .pipe(
+                        retry(10),
+                        publishReplay(1),
+                        refCount(),
+                        catchError((error: Error): Observable<JSON> => {
+                            hiscoreCache[rsn] = undefined
+                            utils.logError(error)
+                            return of(null)
+                        })
+                    ) as unknown as Observable<hiscores.LookupResponse>,
+                date: new Date(),
+            }
+        }
+
+        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn].observable
         const keys = Object.keys(hiscoreCache)
-        if (keys.length >= 10000) {
-            const idxToRemove: number = Math.floor((Math.random() * 10000))
+        if (keys.length >= 1000) {
+            const idxToRemove: number = Math.floor((Math.random() * 1000))
             const keyToRemove: string = keys[idxToRemove]
             hiscoreCache[keyToRemove] = undefined
             return cached
