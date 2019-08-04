@@ -1,10 +1,17 @@
 {
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "paths": ["src"],
+        "extensions": [".ts"]
+      }
+    },
+  },
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint"],
   "extends": ["airbnb-base", "plugin:@typescript-eslint/recommended"],
   "rules": {
-    "semi": [2, "never"],
-    "comma-dangle": [2, "never"],
+    "comma-dangle": [2, "always-multiline"],
     "max-len": "warn",
     "@typescript-eslint/member-delimiter-style": ["error", {
       "multiline": {
@@ -19,6 +26,7 @@
     "@typescript-eslint/no-unused-vars": "warn",
     "@typescript-eslint/explicit-member-accessibility": "off",
     "arrow-parens": "off",
-    "prefer-destructuring": "off"
+    "prefer-destructuring": "off",
+    "@typescript-eslint/prefer-namespace-keyword": "off"
   }
 }

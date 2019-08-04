@@ -10,11 +10,15 @@
     ],
     "cSpell.words": [
         "AMISIGNEDUP",
+        "Jagex",
         "OSRS",
+        "Runescape",
         "SIGNUP",
         "UNSIGNUP",
         "Unnotified",
         "firemaking",
+        "forcesignup",
+        "forceunsignup",
         "herblore",
         "hiscore",
         "hiscores",
@@ -22,7 +26,11 @@
         "regexes",
         "runecraft",
         "runecrafting",
+        "showleaderboard",
         "smithing",
+        "typeparam",
+        "upcoming",
+        "updateleaderboard",
         "uuidv"
     ]
 }

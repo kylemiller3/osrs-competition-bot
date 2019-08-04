@@ -7,67 +7,67 @@ declare module 'osrs-json-api' {
     namespace hiscores {
         export function getPlayer(name: string): Promise<JSON>
 
-        export interface SkillsComponent extends Record<string, string | number> {
+        export interface SkillComponent extends Record<string, string | number> {
             rank: string
             level: number
             xp: number
         }
-        export interface Skills extends Record<string, SkillsComponent> {
-            overall: SkillsComponent
-            attack: SkillsComponent
-            defence: SkillsComponent
-            strength: SkillsComponent
-            hitpoints: SkillsComponent
-            ranged: SkillsComponent
-            prayer: SkillsComponent
-            magic: SkillsComponent
-            cooking: SkillsComponent
-            woodcutting: SkillsComponent
-            fletching: SkillsComponent
-            fishing: SkillsComponent
-            firemaking: SkillsComponent
-            crafting: SkillsComponent
-            smithing: SkillsComponent
-            mining: SkillsComponent
-            herblore: SkillsComponent
-            agility: SkillsComponent
-            thieving: SkillsComponent
-            slayer: SkillsComponent
-            farming: SkillsComponent
-            runecraft: SkillsComponent
-            hunter: SkillsComponent
-            construction: SkillsComponent
+        export interface SkillsInfo extends Record<string, SkillComponent> {
+            overall: SkillComponent
+            attack: SkillComponent
+            defence: SkillComponent
+            strength: SkillComponent
+            hitpoints: SkillComponent
+            ranged: SkillComponent
+            prayer: SkillComponent
+            magic: SkillComponent
+            cooking: SkillComponent
+            woodcutting: SkillComponent
+            fletching: SkillComponent
+            fishing: SkillComponent
+            firemaking: SkillComponent
+            crafting: SkillComponent
+            smithing: SkillComponent
+            mining: SkillComponent
+            herblore: SkillComponent
+            agility: SkillComponent
+            thieving: SkillComponent
+            slayer: SkillComponent
+            farming: SkillComponent
+            runecraft: SkillComponent
+            hunter: SkillComponent
+            construction: SkillComponent
         }
 
-        export interface BountyHunterClueAndLMSComponent extends Record<string, number> {
+        export interface RankAndScoreComponent extends Record<string, number> {
             rank: number
             score: number
         }
-        export interface BountyHunter extends Record<string, BountyHunterClueAndLMSComponent> {
-            hunter: BountyHunterClueAndLMSComponent
-            rogue: BountyHunterClueAndLMSComponent
+        export interface BountyHunterInfo extends Record<string, RankAndScoreComponent> {
+            hunter: RankAndScoreComponent
+            rogue: RankAndScoreComponent
         }
 
-        export interface LastManStanding extends Record<string, BountyHunterClueAndLMSComponent> {
-            lms: BountyHunterClueAndLMSComponent
+        export interface LastManStandingInfo extends Record<string, RankAndScoreComponent> {
+            lms: RankAndScoreComponent
         }
 
-        export interface Clues extends Record<string, BountyHunterClueAndLMSComponent> {
-            all: BountyHunterClueAndLMSComponent
-            beginner: BountyHunterClueAndLMSComponent
-            easy: BountyHunterClueAndLMSComponent
-            medium: BountyHunterClueAndLMSComponent
-            hard: BountyHunterClueAndLMSComponent
-            elite: BountyHunterClueAndLMSComponent
-            master: BountyHunterClueAndLMSComponent
+        export interface CluesInfo extends Record<string, RankAndScoreComponent> {
+            all: RankAndScoreComponent
+            beginner: RankAndScoreComponent
+            easy: RankAndScoreComponent
+            medium: RankAndScoreComponent
+            hard: RankAndScoreComponent
+            elite: RankAndScoreComponent
+            master: RankAndScoreComponent
         }
 
-        export interface HiscoreResponse extends
-            Record<string, Clues | BountyHunter | LastManStanding | Skills> {
-            skills: Skills
-            bh: BountyHunter
-            lms: LastManStanding
-            clues: Clues
+        export interface LookupResponse extends
+            Record<string, CluesInfo | BountyHunterInfo | LastManStandingInfo | SkillsInfo> {
+            skills: SkillsInfo
+            bh: BountyHunterInfo
+            lms: LastManStandingInfo
+            clues: CluesInfo
         }
     }
 

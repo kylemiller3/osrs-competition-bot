@@ -1,11 +1,11 @@
 {
   "name": "osrs-discord-competition-bot",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Runs competitions for osrs on Discord.",
   "main": "n0trout.js",
   "scripts": {
-    "build": "tsc --project ./ && jsdoc ./out -d ./docs",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc --project ./ && typedoc --excludeExternals --out ./docs ./src",
+    "test": "mocha -r ts-node/register src/tests/tests.ts",
     "start": "node ./out/n0trout.js"
   },
   "author": "https://github.com/kylemiller3",
@@ -15,20 +15,28 @@
     "url": "https://github.com/kylemiller3/osrs-competition-bot.git"
   },
   "dependencies": {
-    "@types/node": "^12.6.2",
+    "@types/chai": "^4.1.7",
+    "@types/mocha": "^5.2.7",
+    "@types/node": "^12.6.8",
+    "chai": "^4.2.0",
     "discord.js": "^11.5.1",
     "esm": "^3.2.25",
     "jsonfile": "^5.0.0",
+    "mocha": "^6.2.0",
     "osrs-json-api": "^1.1.1",
     "rxjs": "^6.5.2",
+    "rxjs-marbles": "^5.0.2",
+    "ts-node": "^8.3.0",
     "typescript": "^3.5.3",
     "uuid": "^3.3.2",
+    "uuidv4": "^4.0.0",
     "winston": "^3.2.1"
   },
   "devDependencies": {
     "@types/jsonfile": "^5.0.0",
-    "eslint": "^5.3.0",
+    "@types/uuidv4": "^2.0.0",
+    "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.2.0",
-    "eslint-plugin-import": "^2.18.0"
+    "eslint-plugin-import": "^2.18.2"
   }
 }
