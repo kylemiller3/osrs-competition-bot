@@ -1,10 +1,10 @@
 {
   "name": "osrs-discord-competition-bot",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Runs competitions for osrs on Discord.",
   "main": "n0trout.js",
   "scripts": {
-    "build": "tsc --project ./ && jsdoc ./out -d ./docs",
+    "build": "tsc --project ./ && typedoc --excludeExternals --out ./docs ./src",
     "test": "mocha -r ts-node/register src/tests/tests.ts",
     "start": "node ./out/n0trout.js"
   },

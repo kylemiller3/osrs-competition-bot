@@ -1,23 +1,33 @@
 import {
     hiscores,
-} from 'osrs-json-api'
+} from 'osrs-json-api';
 import {
     Observable, from, of, observable,
-} from 'rxjs'
+} from 'rxjs';
 import {
     retry, publishReplay, refCount, catchError,
-} from 'rxjs/operators'
-import { utils } from './utils'
+} from 'rxjs/operators';
+import { utils } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace runescape {
-    const hiscoreCache: Record<string, { observable: Observable<hiscores.LookupResponse>; date: Date }> = {}
+    /**
+     * @ignore
+     */
+    const hiscoreCache: Record<
+    string,
+    { observable: Observable<hiscores.LookupResponse>; date: Date }
+    > = {};
 
     /**
-    * @description Enum of all Runescape skills
-    * @enum
-    * @default
-    */
+     * @ignore
+     */
+    const CACHE_SIZE = 1000;
+
+    /**
+     * Enum of all Runescape skills
+     * @category Tracking
+     */
     export enum SkillsEnum {
         ATTACK = 'attack',
         STRENGTH = 'strength',
@@ -45,9 +55,8 @@ export namespace runescape {
     }
 
     /**
-     * @description Enum of all bounty hunter items to track
-     * @enum
-     * @default
+     * Enum of all bounty hunter stats to track
+     * @category Tracking
      */
     export enum BountyHunterEnum {
         ROGUE = 'rogue',
@@ -55,9 +64,8 @@ export namespace runescape {
     }
 
     /**
-     * @description Enum of all clue items to track
-     * @enum
-     * @default
+     * Enum of all clue stats to track
+     * @category Tracking
      */
     export enum CluesEnum {
         ALL = 'all',
@@ -69,6 +77,10 @@ export namespace runescape {
         MASTER = 'master'
     }
 
+    /**
+     * Enum of all possible trackings
+     * @category Tracking
+     */
     export enum TrackingEnum {
         SKILLS = 'skills',
         CLUES = 'clues',
@@ -77,8 +89,8 @@ export namespace runescape {
     }
 
     /**
-     * @description Contract containing information about Runescape event participants
-     * @interface
+     * Interface containing information about an Event's Participants
+     * @category Event
      */
     export interface Participant extends Record<string, unknown> {
         discordId: string
@@ -86,16 +98,17 @@ export namespace runescape {
     }
 
     /**
-     * @description Contract containing information about a Runescape account
-     * @interface
+     * @description Interface containing information about a Participant's Runescape account
+     * @category Event
      */
     export interface AccountInfo extends Record<string, unknown> {
         rsn: string
     }
 
     /**
-     * @description Contract extending information about a Runescape account for competitive events
-     * @interface
+     * Interface extending information about a Participant's Runescape account
+     * for competitive events
+     * @category Event
      */
     export interface CompetitiveAccountInfo extends AccountInfo {
         starting: hiscores.LookupResponse
@@ -103,9 +116,8 @@ export namespace runescape {
     }
 
     /**
-     * @description Contract of all possible things to track
-     * @interface
-     * @default
+     * @description Interface of all possible things to track
+     * @category Tracking
      */
     export interface Tracking extends Record<string, unknown> {
         skills: SkillsEnum[]
@@ -115,8 +127,8 @@ export namespace runescape {
     }
 
     /**
-     * @description Contract containing information about a Runescape event
-     * @interface
+     * Interface containing information about a Runescape event
+     * @category Event
      */
     export interface Event extends Record<string, unknown> {
         id: string
@@ -132,18 +144,21 @@ export namespace runescape {
     }
 
     /**
-    * @function
-    * @description Fetches the supplied RSN from hiscores or cache
-    * @param {string} rsn RSN to lookup
-    * @returns {Observable<JSON>} Observable of the JSON response or Observable of null
-    * @todo handle the error properly
+    * Fetches the supplied rsn from Jagex hiscores or cache
+    * @param rsn rsn to lookup on hiscores
+    * @returns Observable of the API response as [[hiscores.LookupResponse]]
     */
-    export const hiscores$ = (rsn: string, pullNew: boolean): Observable<hiscores.LookupResponse> => {
+    export const hiscores$ = (
+        rsn: string,
+        pullNew: boolean
+    ): Observable<hiscores.LookupResponse> => {
         if (hiscoreCache[rsn] !== undefined) {
-            const date: Date = new Date(hiscoreCache[rsn].date)
-            date.setMinutes(date.getMinutes() + 20)
+            const date: Date = new Date(hiscoreCache[rsn].date);
+            date.setMinutes(
+                date.getMinutes() + 20
+            );
             if (utils.isInPast(date) || pullNew) {
-                hiscoreCache[rsn] = undefined
+                hiscoreCache[rsn] = undefined;
             }
         }
 
@@ -155,23 +170,25 @@ export namespace runescape {
                         publishReplay(1),
                         refCount(),
                         catchError((error: Error): Observable<JSON> => {
-                            hiscoreCache[rsn] = undefined
-                            utils.logError(error)
-                            return of(null)
+                            hiscoreCache[rsn] = undefined;
+                            utils.logError(error);
+                            return of(null);
                         })
                     ) as unknown as Observable<hiscores.LookupResponse>,
                 date: new Date(),
-            }
+            };
         }
 
-        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn].observable
-        const keys = Object.keys(hiscoreCache)
-        if (keys.length >= 1000) {
-            const idxToRemove: number = Math.floor((Math.random() * 1000))
-            const keyToRemove: string = keys[idxToRemove]
-            hiscoreCache[keyToRemove] = undefined
-            return cached
+        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn].observable;
+        const keys = Object.keys(hiscoreCache);
+        if (keys.length >= CACHE_SIZE) {
+            const idxToRemove: number = Math.floor(
+                (Math.random() * CACHE_SIZE)
+            );
+            const keyToRemove: string = keys[idxToRemove];
+            hiscoreCache[keyToRemove] = undefined;
+            return cached;
         }
-        return cached
-    }
+        return cached;
+    };
 }

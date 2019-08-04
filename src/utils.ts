@@ -1,44 +1,67 @@
-import * as winston from 'winston'
+import * as winston from 'winston';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace utils {
     /**
-    * @function
-    * @description Returns a new Record with an updated entry
-    * @param {Record<string, T>} record The Record to edit
-    * @param {T} entry The new entry
-    * @returns {Record<string, T>} The new Record object
-    */
-    export const update = <T>(record: Record<string, T>, entry: T):
-    Record<string, T> => Object.assign({}, record, entry)
-
-    export const isInFuture = (date: Date):
-    boolean => date > new Date()
-
-    export const isInPast = (date: Date):
-    boolean => date < new Date()
-
-    export const isNowBetween = (dateStart: Date, dateEnd: Date):
-    boolean => {
-        const now: Date = new Date()
-        return dateStart <= now && now <= dateEnd
-    }
-
-    /**
-     * @function
-     * @description Checks to see if a Date is valid
-     * @param {Date} date The date to check
-     * @returns {boolean} Whether the date is valid
+     * Returns a new Record with an updated entry
+     * @typeparam T The entry type to update
+     * @param record The source Record
+     * @param entry The new entry
+     * @returns The new Record object
      */
-    export const isValidDate = (date: Date):
-    boolean => date instanceof Date && !Number.isNaN(date.getTime())
+    export const update = <T>(
+        record: Record<string, T>,
+        entry: T
+    ): Record<string, T> => Object.assign(
+        {},
+        record,
+        entry
+    );
 
     /**
-    * @description Instance of global winston logger
-    * @type {winston.Logger}
-    * @constant
-    */
-    // create our winston logger
+     * Checks to see if a date is in the future
+     * @param date The date to check
+     */
+    export const isInFuture = (
+        date: Date
+    ): boolean => date > new Date();
+
+    /**
+     * Checks to see if a date is in the past
+     * @param date The date to check
+     */
+    export const isInPast = (
+        date: Date
+    ): boolean => date < new Date();
+
+    /**
+     * Checks to see if now is between two dates
+     * @param dateStart The starting date to check
+     * @param dateEnd The ending date to check
+     */
+    export const isNowBetween = (
+        dateStart: Date,
+        dateEnd: Date
+    ): boolean => {
+        const now: Date = new Date();
+        return dateStart <= now && now <= dateEnd;
+    };
+
+    /**
+     * Checks to see if a Date is valid
+     * @param date The date to check
+     * @returns Whether the date is valid
+     */
+    export const isValidDate = (
+        date: Date
+    ): boolean => date instanceof Date
+        && !Number.isNaN(
+            date.getTime()
+        );
+
+    /**
+     * Instance of global winston logger
+     */
     export const logger: winston.Logger = winston.createLogger({
         level: 'debug',
         format: winston.format.combine(
@@ -55,7 +78,7 @@ export namespace utils {
                 format: winston.format.simple(),
             }),
         ],
-    })
+    });
 
     /**
     * @function
@@ -63,7 +86,7 @@ export namespace utils {
     * @param {Error} error The error
     */
     export const logError = (error: Error): void => {
-        logger.error('Unexpected error')
-        logger.error(error.message)
-    }
+        logger.error('Unexpected error');
+        logger.error(error.message);
+    };
 }

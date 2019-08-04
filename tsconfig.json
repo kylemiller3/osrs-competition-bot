@@ -2,9 +2,9 @@
     "compilerOptions": {
       "resolveJsonModule": true,
       "moduleResolution": "node",
+      "module": "es2015",
       "esModuleInterop": true,
       "sourceMap": true,
       "outDir": "out",
-      "target": "es6"
     }
 }
