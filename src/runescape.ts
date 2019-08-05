@@ -2,10 +2,10 @@ import {
     hiscores,
 } from 'osrs-json-api';
 import {
-    Observable, from, of, observable,
+    Observable, from, of, observable, timer, defer,
 } from 'rxjs';
 import {
-    retry, publishReplay, refCount, catchError,
+    retry, publishReplay, refCount, catchError, retryWhen, delay, take, tap, mergeMap, finalize,
 } from 'rxjs/operators';
 import { utils } from './utils';
 
@@ -144,6 +144,48 @@ export namespace runescape {
     }
 
     /**
+     * Custom HTTP Error class
+     */
+    class HTTPError extends Error {
+        status: number
+    }
+
+    /**
+     * Retries a web service exponentially
+     * @param maxRetryAttempts How many retries to attempt
+     * @param scalingDuration Exponential backoff factor
+     * @param excludedStatusCodes HTTP error codes to abort on
+     */
+    const exponentialBackoff = ({
+        maxRetryAttempts = 10,
+        scalingDuration = 1000,
+        excludedStatusCodes = [],
+    }: {
+        maxRetryAttempts?: number
+        scalingDuration?: number
+        excludedStatusCodes?: number[]
+    } = {}):
+        (errors: Observable<HTTPError>) => Observable<number> => (attempts: Observable<HTTPError>):
+    Observable<number> => attempts.pipe(
+        mergeMap((error: HTTPError, i: number): Observable<number> => {
+            const retryAttempt = i + 1;
+            // if maximum number of retries have been met
+            // or response is a status code we don't wish to retry, throw error
+            if (retryAttempt > maxRetryAttempts
+                || excludedStatusCodes.find((e: number): boolean => e === error.status)) {
+                throw error;
+            }
+            const jitter = Math.floor(
+                (Math.random() * 300) - 150
+            );
+            utils.logger.debug(
+                `Attempt ${retryAttempt}: retrying in ${retryAttempt * scalingDuration + jitter}ms`
+            );
+            return timer(retryAttempt * scalingDuration + jitter);
+        })
+    );
+
+    /**
     * Fetches the supplied rsn from Jagex hiscores or cache
     * @param rsn rsn to lookup on hiscores
     * @returns Observable of the API response as [[hiscores.LookupResponse]]
@@ -152,6 +194,7 @@ export namespace runescape {
         rsn: string,
         pullNew: boolean
     ): Observable<hiscores.LookupResponse> => {
+        utils.logger.info(`Looking up rsn '${rsn}'`);
         if (hiscoreCache[rsn] !== undefined) {
             const date: Date = new Date(hiscoreCache[rsn].date);
             date.setMinutes(
@@ -163,18 +206,23 @@ export namespace runescape {
         }
 
         if (hiscoreCache[rsn] === undefined) {
+            const obs: Observable<hiscores.LookupResponse> = defer(
+                (): Promise<JSON> => hiscores.getPlayer(rsn)
+            )
+                .pipe(
+                    retryWhen(exponentialBackoff()),
+                    publishReplay(1),
+                    refCount(),
+                    catchError((error: Error): Observable<JSON> => {
+                        hiscoreCache[rsn] = undefined;
+                        utils.logError(error);
+                        utils.logger.error(`Could not find rsn '${rsn}'`);
+                        return of(null);
+                    })
+                ) as unknown as Observable<hiscores.LookupResponse>;
+
             hiscoreCache[rsn] = {
-                observable: from(hiscores.getPlayer(rsn))
-                    .pipe(
-                        retry(10),
-                        publishReplay(1),
-                        refCount(),
-                        catchError((error: Error): Observable<JSON> => {
-                            hiscoreCache[rsn] = undefined;
-                            utils.logError(error);
-                            return of(null);
-                        })
-                    ) as unknown as Observable<hiscores.LookupResponse>,
+                observable: obs,
                 date: new Date(),
             };
         }
