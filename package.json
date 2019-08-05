@@ -1,6 +1,6 @@
 {
   "name": "osrs-discord-competition-bot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Runs competitions for osrs on Discord.",
   "main": "n0trout.js",
   "scripts": {
