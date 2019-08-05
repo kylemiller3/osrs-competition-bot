@@ -1,3 +1,10 @@
+// TODO: Auto updating scoreboard
+// Fix hackish late signup
+// 20 min ending warning
+// custom competitive events
+// all time hiscores
+// fun attachments
+
 // ------------------------------//
 // OSRS discord bot by n0trout   //
 // See LICENSE                   //
@@ -598,31 +605,38 @@ const updateParticipantsHiscores$ = (
                     runescape.CompetitiveAccountInfo[] = p.runescapeAccounts.map(
                         (account: runescape.CompetitiveAccountInfo, idx: number):
                         runescape.CompetitiveAccountInfo => {
-                            if(starting) {
-                                const updated = utils.update(
-                                    account, 
-                                {
-                                    starting: hiscoreArr[idx],
-                                    ending: hiscoreArr[idx],
-                                }) as runescape.CompetitiveAccountInfo
-                                return updated
+                            // TODO: Change how I work
+                            // This is a silent error
+                            if (hiscoreArr === null || hiscoreArr[idx] === null) {
+                                utils.logger.error('hiscoreArr === null || hiscoreArr[idx] === null');
+                                return account;
                             }
-                            if(account.starting === undefined) {
+                            if (starting) {
                                 const updated = utils.update(
                                     account,
-                                    { 
+                                    {
                                         starting: hiscoreArr[idx],
                                         ending: hiscoreArr[idx],
                                     }
-                                ) as runescape.CompetitiveAccountInfo
+                                ) as runescape.CompetitiveAccountInfo;
+                                return updated;
+                            }
+                            if (account.starting === undefined) {
+                                const updated = utils.update(
+                                    account,
+                                    {
+                                        starting: hiscoreArr[idx],
+                                        ending: hiscoreArr[idx],
+                                    }
+                                ) as runescape.CompetitiveAccountInfo;
                                 return updated;
                             }
                             const updated = utils.update(
                                 account,
-                                { 
+                                {
                                     ending: hiscoreArr[idx],
                                 }
-                            ) as runescape.CompetitiveAccountInfo
+                            ) as runescape.CompetitiveAccountInfo;
                             return updated;
                         }
                     );
@@ -707,7 +721,7 @@ const getScoreboardString = (
  * @param starting Whether to update starting hiscore or ending hiscore
  * @category Helper
  */
-const forceUpdateHiscores = (
+const forceUpdateStats = (
     event: runescape.Event,
     guild: discord.Guild,
     starting: boolean
@@ -838,7 +852,7 @@ const setTimerStart = (
 
             if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
             // pull new hiscores
-                forceUpdateHiscores(
+                forceUpdateStats(
                     newEvent,
                     guild,
                     true
@@ -890,7 +904,7 @@ function setTimerEnd(
                 newData
             );
 
-            forceUpdateHiscores(
+            forceUpdateStats(
                 newEvent,
                 guild,
                 false

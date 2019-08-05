@@ -1,3 +1,4 @@
+
 import * as jsonfile from 'jsonfile';
 import {
     runescape,
