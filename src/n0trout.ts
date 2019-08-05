@@ -597,17 +597,34 @@ const updateParticipantsHiscores$ = (
                     const newAccountInfos:
                     runescape.CompetitiveAccountInfo[] = p.runescapeAccounts.map(
                         (account: runescape.CompetitiveAccountInfo, idx: number):
-                        runescape.CompetitiveAccountInfo => (
-                            starting
-                                ? utils.update(account, {
+                        runescape.CompetitiveAccountInfo => {
+                            if(starting) {
+                                const updated = utils.update(
+                                    account, 
+                                {
                                     starting: hiscoreArr[idx],
                                     ending: hiscoreArr[idx],
                                 }) as runescape.CompetitiveAccountInfo
-                                : utils.update(
+                                return updated
+                            }
+                            if(account.starting === undefined) {
+                                const updated = utils.update(
                                     account,
-                                    { ending: hiscoreArr[idx] }
+                                    { 
+                                        starting: hiscoreArr[idx],
+                                        ending: hiscoreArr[idx],
+                                    }
                                 ) as runescape.CompetitiveAccountInfo
-                        )
+                                return updated;
+                            }
+                            const updated = utils.update(
+                                account,
+                                { 
+                                    ending: hiscoreArr[idx],
+                                }
+                            ) as runescape.CompetitiveAccountInfo
+                            return updated;
+                        }
                     );
                     const newParticipant:
                     runescape.Participant = utils.update(
