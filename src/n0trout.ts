@@ -66,7 +66,7 @@ const getStatsStr = (
     const averageParticipants: number = Math.floor(
         stats.totalParticipants / stats.totalCompetitiveEvents
     );
-    return `\n${displayName}\n🥇: ${stats.firstPlaceFinishes}\n🥈: ${stats.secondPlaceFinishes}\n🥉: ${stats.thirdPlaceFinishes}\nTop 10: ${stats.topTenPlaceFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage placement: ${averagePlace}/${averageParticipants}`;
+    return `\n${displayName}\n🥇: ${stats.firstPlaceFinishes}\n🥈: ${stats.secondPlaceFinishes}\n🥉: ${stats.thirdPlaceFinishes}\n4-10: ${stats.fourThroughTenFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage placement: ${averagePlace}/${averageParticipants}`;
 };
 
 /**
@@ -470,7 +470,7 @@ const updateStats = (
                     firstPlaceFinishes: 0,
                     secondPlaceFinishes: 0,
                     thirdPlaceFinishes: 0,
-                    topTenPlaceFinishes: 0,
+                    fourThroughTenFinishes: 0,
                     totalParticipants: 0,
                     totalPlaces: 0,
                     totalCompetitiveEvents: 0,
@@ -519,7 +519,7 @@ const updateStats = (
             const newFirstPlaceFinishes = StatsToUse.firstPlaceFinishes + firstPlaceFinish;
             const newSecondPlaceFinishes = StatsToUse.secondPlaceFinishes + secondPlaceFinish;
             const newThirdPlaceFinishes = StatsToUse.thirdPlaceFinishes + thirdPlaceFinish;
-            const newTopTenPlaceFinishes = StatsToUse.topTenPlaceFinishes + topTenPlaceFinishes;
+            const newTopTenPlaceFinishes = StatsToUse.fourThroughTenFinishes + topTenPlaceFinishes;
             const newTotalParticipants = StatsToUse.totalParticipants + participantCount;
             const newTotalPlaces = StatsToUse.totalPlaces + placing + 1;
             const newTotalEvents = StatsToUse.totalCompetitiveEvents + 1;
@@ -532,7 +532,7 @@ const updateStats = (
                 firstPlaceFinishes: newFirstPlaceFinishes,
                 secondPlaceFinishes: newSecondPlaceFinishes,
                 thirdPlaceFinishes: newThirdPlaceFinishes,
-                topTenPlaceFinishes: newTopTenPlaceFinishes,
+                fourThroughTenFinishes: newTopTenPlaceFinishes,
                 totalParticipants: newTotalParticipants,
                 totalPlaces: newTotalPlaces,
                 totalCompetitiveEvents: newTotalEvents,
@@ -677,37 +677,51 @@ const getScoreboardString = (
             tracking
         )
     );
+
+    const maxDisplayLength: number = sortedParticipants.map(
+        (participant: runescape.Participant):
+        number => discordIdToDisplayName(
+            guild,
+            participant.discordId
+        ).length + getTotalEventGain(
+            participant,
+            eventToPrint,
+            tracking
+        ).toString().length
+    ).reduce(
+        (a: number, b: number):
+        number => (a > b ? a : b)
+    );
+
+    const padding = 8;
+    const totalMaxDisplayLength = maxDisplayLength + padding;
+
     const strToPrint: string = sortedParticipants.map(
         (participant: runescape.Participant, idx: number): string => {
-            const name: string = discordIdToDisplayName(
+            const displayName: string = discordIdToDisplayName(
                 guild,
                 participant.discordId
             );
+            const eventGain: number = getTotalEventGain(
+                participant,
+                eventToPrint,
+                tracking
+            );
+
+            const totalLength: number = displayName.length + eventGain.toString().length;
+            const numSpacesToInsert: number = totalMaxDisplayLength - totalLength;
+            const spaces: string = new Array(numSpacesToInsert + 1).join(' ');
+            const displayStr = `${displayName}${spaces}${eventGain}`;
+
             switch (idx) {
                 case 0:
-                    return `🥇\t${name}\t\t\t${getTotalEventGain(
-                        participant,
-                        eventToPrint,
-                        tracking
-                    )}`;
+                    return `🥇\t${displayStr}`;
                 case 1:
-                    return `🥈\t${name}\t\t\t${getTotalEventGain(
-                        participant,
-                        eventToPrint,
-                        tracking
-                    )}`;
+                    return `🥈\t${displayStr}`;
                 case 2:
-                    return `🥉\t${name}\t\t\t${getTotalEventGain(
-                        participant,
-                        eventToPrint,
-                        tracking
-                    )}`;
+                    return `🥉\t${displayStr}`;
                 default:
-                    return `🤡\t${name}\t\t\t${getTotalEventGain(
-                        participant,
-                        eventToPrint,
-                        tracking
-                    )}`;
+                    return `🤡\t${displayStr}`;
             }
         }
     ).join('\n');
@@ -804,7 +818,7 @@ const forceUpdateStats = (
                 guild,
                 newData.settings.notificationChannelId,
                 strToPrint,
-                null
+                { code: true }
             );
         }
     );
@@ -2309,7 +2323,7 @@ showLeaderboard$.subscribe(
             eventToPrint,
             command.guild
         );
-        command.message.reply(`\n${strToPrint}`);
+        command.message.reply(`\n${strToPrint}`, { code: true });
     }
 );
 

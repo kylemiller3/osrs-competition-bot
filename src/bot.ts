@@ -115,7 +115,7 @@ export namespace bot {
         firstPlaceFinishes: number
         secondPlaceFinishes: number
         thirdPlaceFinishes: number
-        topTenPlaceFinishes: number
+        fourThroughTenFinishes: number
         totalParticipants: number
         totalPlaces: number
         totalCompetitiveEvents: number
