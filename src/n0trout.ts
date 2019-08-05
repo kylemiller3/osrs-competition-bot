@@ -257,6 +257,29 @@ string => {
 };
 
 /**
+ * @param guild The guild send the message to
+ * @param channelId The channel id to send the message to
+ * @param attachment The attachment to send
+ * @category Send Guild Message
+ */
+const sendChannelAttachment = (
+    guild: discord.Guild,
+    channelId: string,
+    attachment: discord.Attachment
+): void => {
+    if (guild === null || !guild.available) return;
+    const channel: discord.TextChannel = guild.channels.get(
+        channelId
+    ) as discord.TextChannel;
+    if (channel === undefined || channel.type !== 'text') return;
+    utils.logger.debug('Sending message to Guild');
+
+    if (attachment !== null) {
+        channel.send(attachment);
+    }
+};
+
+/**
  * @function
  * @param guild The guild send the message to
  * @param channelId The channel id to send the message to
@@ -268,13 +291,21 @@ const sendChannelMessage = (
     guild: discord.Guild,
     channelId: string,
     message: string,
-    options: discord.MessageOptions
+    options: discord.MessageOptions = null
 ): void => {
-    if (!guild.available) return;
-    const channel: discord.TextChannel = guild.channels.get(channelId) as discord.TextChannel;
+    if (guild === null || !guild.available) return;
+    const channel: discord.TextChannel = guild.channels.get(
+        channelId
+    ) as discord.TextChannel;
     if (channel === undefined || channel.type !== 'text') return;
     utils.logger.debug('Sending message to Guild');
-    channel.send(message, options);
+
+    if (message !== null) {
+        channel.send(
+            message,
+            options
+        );
+    }
 };
 
 /**
@@ -814,11 +845,19 @@ const forceUpdateStats = (
                 event,
                 guild
             );
+            const channelId = newData.settings.notificationChannelId;
             sendChannelMessage(
                 guild,
-                newData.settings.notificationChannelId,
+                channelId,
                 strToPrint,
                 { code: true }
+            );
+
+            const attachment = new discord.Attachment('./attachments/congratulations.mp3');
+            sendChannelAttachment(
+                guild,
+                channelId,
+                attachment
             );
         }
     );
@@ -1660,7 +1699,10 @@ connect$.subscribe((): void => {
             utils.logger.verbose(`* ${guild.name} (${guild.id})`);
             utils.logger.verbose('* Loading guild json');
 
-            const guildData: bot.Data = bot.load(guild.id, true);
+            const guildData: bot.Data = bot.load(
+                guild.id,
+                true
+            );
             utils.logger.debug(`Loaded json for guild ${guild.id}`);
             utils.logger.silly(`${JSON.stringify(guildData)}`);
 
