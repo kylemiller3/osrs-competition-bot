@@ -2,10 +2,10 @@ import {
     hiscores,
 } from 'osrs-json-api';
 import {
-    Observable, from, of, observable, timer, defer,
+    Observable, of, timer, defer,
 } from 'rxjs';
 import {
-    retry, publishReplay, refCount, catchError, retryWhen, delay, take, tap, mergeMap, finalize,
+    publishReplay, refCount, catchError, retryWhen, mergeMap,
 } from 'rxjs/operators';
 import { utils } from './utils';
 
