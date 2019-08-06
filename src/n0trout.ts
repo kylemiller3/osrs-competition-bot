@@ -532,19 +532,7 @@ const setTimerTwoHoursBefore = (
  * @category Helper
  */
 const getEventTracking = (event: runescape.Event): runescape.TrackingEnum => {
-    if (event.tracking.bh !== null) {
-        return runescape.TrackingEnum.BH;
-    }
-    if (event.tracking.clues !== null) {
-        return runescape.TrackingEnum.CLUES;
-    }
-    if (event.tracking.skills !== null) {
-        return runescape.TrackingEnum.SKILLS;
-    }
-    if (event.tracking.lms !== null) {
-        return runescape.TrackingEnum.LMS;
-    }
-    return null;
+    return runescape.TrackingEnum[event.type.toLocaleUpperCase()];
 };
 
 /**
@@ -893,13 +881,13 @@ const getLeaderboardString = (
                 guild,
                 participant.discordId
             );
-            const eventGain: number = getTotalEventGain(
+            const eventGain: string = getTotalEventGain(
                 participant,
                 eventToPrint,
                 tracking
-            );
+            ).toLocaleString('en-US');
 
-            const totalLength: number = displayName.length + eventGain.toString().length;
+            const totalLength: number = displayName.length + eventGain.length;
             const numSpacesToInsert: number = totalMaxDisplayLength - totalLength;
             const spaces: string = new Array(numSpacesToInsert + 1).join(' ');
             const displayStr = `${displayName}${spaces}${eventGain}`;
@@ -952,7 +940,7 @@ const setTimerStart = (
                 (updatedParticipants: runescape.Participant[]): void => {
                     const newData: bot.Data = bot.load(guild.id);
                     const newFoundEvent: runescape.Event = newData.events.find(
-                        (event: runescape.Event): boolean => event.id === newFoundEvent.id
+                        (event: runescape.Event): boolean => event.id === foundEvent.id
                     );
                     if (newFoundEvent === undefined) return;
                     const updatedEvent: runescape.Event = utils.update(
@@ -981,26 +969,26 @@ const setTimerEnd = (
     const now: Date = new Date();
     return setTimeout(
         (): void => {
-            const data: bot.Data = bot.load(guild.id);
-            const foundEvent: runescape.Event = data.events.find(
+            const oldData: bot.Data = bot.load(guild.id);
+            const foundEvent: runescape.Event = oldData.events.find(
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
             if (foundEvent === undefined) return;
 
-            const event: runescape.Event = notifyAndSaveEndedEvent(
+            const newEvent: runescape.Event = notifyAndSaveEndedEvent(
                 guild,
                 foundEvent,
-                data,
+                oldData,
             );
 
             updateParticipantsHiscores$(
-                event,
+                newEvent,
                 true
             ).subscribe(
                 (updatedParticipants: runescape.Participant[]): void => {
                     const newData: bot.Data = bot.load(guild.id);
                     const newFoundEvent: runescape.Event = newData.events.find(
-                        (e: runescape.Event): boolean => e.id === newFoundEvent.id
+                        (e: runescape.Event): boolean => e.id === newEvent.id
                     );
                     if (newFoundEvent === undefined) return;
                     const tracking: runescape.TrackingEnum = getEventTracking(newFoundEvent);
@@ -1020,7 +1008,7 @@ const setTimerEnd = (
                     const newStats: bot.Stats[] = updateStats(
                         sortedParticipants,
                         newData.stats,
-                        event,
+                        newEvent,
                         true
                     );
                     const updatedEvent: runescape.Event = utils.update(
