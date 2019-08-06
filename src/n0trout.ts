@@ -259,13 +259,14 @@ string => {
 /**
  * @param guild The guild send the message to
  * @param channelId The channel id to send the message to
- * @param attachment The attachment to send
+ * @param attachmentToSend The attachment path to send
  * @category Send Guild Message
  */
 const sendChannelAttachment = (
     guild: discord.Guild,
     channelId: string,
-    attachment: discord.Attachment
+    attachmentToSend: string,
+    text?: string
 ): void => {
     if (guild === null || !guild.available) return;
     const channel: discord.TextChannel = guild.channels.get(
@@ -274,8 +275,12 @@ const sendChannelAttachment = (
     if (channel === undefined || channel.type !== 'text') return;
     utils.logger.debug('Sending message to Guild');
 
-    if (attachment !== null) {
-        channel.send(attachment);
+    if (attachmentToSend !== null) {
+        channel.send(text, {
+            files: [{
+                attachment: attachmentToSend,
+            }],
+        });
     }
 };
 
@@ -853,12 +858,15 @@ const forceUpdateStats = (
                 { code: true }
             );
 
-            const attachment = new discord.Attachment('./attachments/congratulations.mp3');
-            sendChannelAttachment(
-                guild,
-                channelId,
-                attachment
-            );
+            if (sortedParticipants.length > 0) {
+                const attachment = './attachments/congratulations.mp3';
+                sendChannelAttachment(
+                    guild,
+                    channelId,
+                    attachment,
+                    `<@${sortedParticipants[0].discordId}>`
+                );
+            }
         }
     );
 };
