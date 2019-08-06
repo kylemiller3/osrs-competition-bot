@@ -63,6 +63,10 @@ export namespace runescape {
         HUNTER = 'hunter'
     }
 
+    export enum LmsEnum {
+        LMS = 'lms'
+    }
+
     /**
      * Enum of all clue stats to track
      * @category Tracking
@@ -75,17 +79,6 @@ export namespace runescape {
         HARD = 'hard',
         ELITE = 'elite',
         MASTER = 'master'
-    }
-
-    /**
-     * Enum of all possible trackings
-     * @category Tracking
-     */
-    export enum TrackingEnum {
-        SKILLS = 'skills',
-        CLUES = 'clues',
-        BH = 'bh',
-        LMS = 'lms'
     }
 
     /**
@@ -120,10 +113,10 @@ export namespace runescape {
      * @category Tracking
      */
     export interface Tracking extends Record<string, unknown> {
-        skills: SkillsEnum[]
-        bh: BountyHunterEnum[]
-        lms: null
-        clues: CluesEnum[]
+        skills?: SkillsEnum[]
+        bh?: BountyHunterEnum[]
+        lms?: LmsEnum[]
+        clues?: CluesEnum[]
     }
 
     /**
@@ -135,8 +128,9 @@ export namespace runescape {
         name: string
         startingDate: Date
         endingDate: Date
-        type: string
-        tracking: Tracking
+        type: EVENT_TYPE
+        tracking?: Tracking
+        teams?: string[][]
         participants: Participant[]
         hasNotifiedTwoHourWarning: boolean
         hasNotifiedStarted: boolean
@@ -144,12 +138,36 @@ export namespace runescape {
     }
 
     /**
-     * @description Enum of all Event types
-     * @category Event
+     * Enum of all Event types
+     * @category Tracking
      */
     export enum EVENT_TYPE {
-        COMPETITIVE = 'COMPETITIVE',
-        REGULAR = 'REGULAR',
+        SKILLS = 'skills',
+        CLUES = 'clues',
+        BH = 'bh',
+        LMS = 'lms',
+        CUSTOM = 'custom',
+        CASUAL = 'casual'
+    }
+
+    /**
+     * Checks an event to see if it is casual or competitive
+     * @param event The event to check
+     * @returns If the event is a causal event
+     * @category Helper
+     */
+    export const isEventCasual = (event: Event):
+    boolean => event.type === EVENT_TYPE.CASUAL;
+
+    /**
+     * Enum of all possible trackings
+     * @category Tracking
+     */
+    export enum TrackingEnum {
+        SKILLS = 'skills',
+        CLUES = 'clues',
+        BH = 'bh',
+        LMS = 'lms'
     }
 
     /**

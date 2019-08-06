@@ -10,13 +10,12 @@ export namespace utils {
      * @returns The new Record object
      */
     export const update = <T>(
-        record: Record<string, T>,
-        entry: T
-    ): Record<string, T> => Object.assign(
-        {},
-        record,
-        entry
-    );
+        dictionaryA: T,
+        dictionaryB: {}
+    ): T => {
+        const copy = { ...dictionaryA, ...dictionaryB };
+        return copy;
+    };
 
     /**
      * Checks to see if a date is in the future

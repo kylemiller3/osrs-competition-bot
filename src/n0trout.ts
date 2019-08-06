@@ -4,6 +4,7 @@
 // custom competitive events
 // all time hiscores
 // fun attachments
+// score differential
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -56,7 +57,7 @@ const modifyEventArray = (
         (event: runescape.Event): runescape.Event => {
             if (event.id === updatedEvent.id) return updatedEvent;
             return event;
-}
+        }
     );
     return newEvents;
 };
@@ -72,7 +73,7 @@ const modifyDataEventsArray = (
     newEvents: runescape.Event[]
 ): bot.Data => utils.update(data, {
     events: newEvents,
-}) as bot.Data;
+});
 
 /**
  * @param data The source Data object
@@ -86,7 +87,7 @@ const modifyEventParticipantsArray = (
 ): runescape.Event => utils.update(
     eventToUpdate,
     { participants: participantsArr }
-) as runescape.Event;
+);
 
 /**
  * @param data The source Data object
@@ -144,7 +145,7 @@ const updateSettings = (
     updatedSettings: bot.Settings
 ): bot.Data => utils.update(data, {
     settings: updatedSettings,
-}) as bot.Data;
+});
 
 /**
  * @param data The source Data object
@@ -178,7 +179,7 @@ const updateEventAsNotifiedTwoHourWarned = (
 ): runescape.Event => utils.update(
     foundEvent,
     { hasNotifiedTwoHourWarning: true }
-) as runescape.Event;
+);
 
 const updateEventAsNotifiedStarted = (
     foundEvent: runescape.Event
@@ -188,7 +189,7 @@ const updateEventAsNotifiedStarted = (
         hasNotifiedTwoHourWarning: true,
         hasNotifiedStarted: true,
     }
-) as runescape.Event;
+);
 
 const updateEventAsNotifiedEnded = (
     foundEvent: runescape.Event
@@ -199,7 +200,7 @@ const updateEventAsNotifiedEnded = (
         hasNotifiedStarted: true,
         hasNotifiedEnded: true,
     }
-) as runescape.Event;
+);
 
 /**
  * @param displayName The display name of the user to print
@@ -282,7 +283,7 @@ const updateParticipant = (
     );
     const newEvent: runescape.Event = utils.update(oldEvent, {
         participants: newParticipants,
-    }) as runescape.Event;
+    });
     return newEvent;
 };
 
@@ -321,9 +322,10 @@ const signupParticipant = (
     );
     if (foundRsn) return oldEvent;
     const newParticipants: runescape.Participant[] = oldEvent.participants.concat(newParticipant);
-    const newEvent: runescape.Event = utils.update(oldEvent, {
-        participants: newParticipants,
-    }) as runescape.Event;
+    const newEvent: runescape.Event = utils.update(
+        oldEvent,
+        { participants: newParticipants }
+    );
     return newEvent;
 };
 
@@ -345,7 +347,7 @@ const unsignupParticipant = (
     );
     const newEvent: runescape.Event = utils.update(oldEvent, {
         participants: newParticipants,
-    }) as runescape.Event;
+    });
     return newEvent;
 };
 
@@ -672,7 +674,7 @@ const updateStats = (
                 const newStats: bot.Stats = utils.update(
                     StatsToUse,
                     { totalRegularEvents: regularEvents + 1 }
-                ) as bot.Stats;
+                );
                 return newStats;
             }
 
@@ -763,7 +765,7 @@ const saveNewStats = (
     const newData = utils.update(
         oldData,
         { stats: newStats }
-    ) as bot.Data;
+    );
     return bot.save(
         guildId,
         newData
@@ -830,7 +832,7 @@ const updateParticipantsHiscores$ = (
                                         starting: hiscoreArr[idx],
                                         ending: hiscoreArr[idx],
                                     }
-                                ) as runescape.CompetitiveAccountInfo;
+                                );
                                 return updated;
                             }
                             if (account.starting === undefined) {
@@ -840,7 +842,7 @@ const updateParticipantsHiscores$ = (
                                         starting: hiscoreArr[idx],
                                         ending: hiscoreArr[idx],
                                     }
-                                ) as runescape.CompetitiveAccountInfo;
+                                );
                                 return updated;
                             }
                             const updated = utils.update(
@@ -848,7 +850,7 @@ const updateParticipantsHiscores$ = (
                                 {
                                     ending: hiscoreArr[idx],
                                 }
-                            ) as runescape.CompetitiveAccountInfo;
+                            );
                             return updated;
                         }
                     );
@@ -856,7 +858,7 @@ const updateParticipantsHiscores$ = (
                     runescape.Participant = utils.update(
                         p,
                         { runescapeAccounts: newAccountInfos }
-                    ) as runescape.Participant;
+                    );
                     return newParticipant;
                 })
             )
@@ -952,7 +954,7 @@ const forceUpdateStats = (
     guild: discord.Guild,
     starting: boolean
 ): void => {
-    if (event.type === runescape.EVENT_TYPE.REGULAR) {
+    if (runescape.isEventCasual(event)) {
         const oldData: bot.Data = bot.load(
             guild.id,
             false
@@ -982,7 +984,7 @@ const forceUpdateStats = (
                 const newEvent: runescape.Event = utils.update(
                     event,
                     { participants: participantsArr }
-                ) as runescape.Event;
+                );
                 saveNewEvent(
                     oldData,
                     newEvent,
@@ -1052,15 +1054,19 @@ const setTimerStart = (
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
             if (foundEvent === undefined) return;
-            notifyAndSaveStartedEvent(
+            const newEvent: runescape.Event = notifyAndSaveStartedEvent(
                 guild,
                 foundEvent,
                 data
             );
 
             // TODO: fix me
-            if (foundEvent.type === runescape.EVENT_TYPE.COMPETITIVE) {
-            // pull new hiscores
+            if (!runescape.isEventCasual(newEvent)) {
+                forceUpdateStats(
+                    newEvent,
+                    guild,
+                    false
+                );
             }
         }, eventToSetTimers.startingDate.getTime() - now.getTime()
     );
@@ -1123,17 +1129,27 @@ const getUnnotifiedEvents = (
  * @returns The array of matched strings entries or null entries
  * @category Helper
  */
-const findFirstRegexesMatch = (regexes: RegExp[], search: string): string[] => {
-    const foundRegexes: string[][] = regexes.map(
-        (regex: RegExp): string[] => regex.exec(search)
+const findFirstRegexesMatch = (
+    regexMap: Record<string, RegExp>,
+    search: string
+): Record<string, string> => {
+    const mapped = Object.keys(regexMap).map(
+        (key: string): Record<string, string> => {
+            const regex: RegExp = regexMap[key];
+            const results: string[] = regex.exec(search);
+            if (results === null) return { [key]: null };
+            const trimmedStr = results[1].trim();
+            if (trimmedStr.length === 0) return { [key]: null };
+            return { [key]: trimmedStr };
+        }
+    ).reduce(
+        (dict: Record<string, string>, x: Record<string, string>):
+        Record<string, string> => {
+            const newDict: Record<string, string> = utils.update(dict, x);
+            return newDict;
+        }
     );
-    const parsed: string[] = foundRegexes.map(
-        (results: string[]): string => (results !== null ? results[1].trim() : null)
-    );
-    const nonEmpty: string[] = parsed.map(
-        (str: string): string => (str !== null && str.length > 0 ? str : null)
-    );
-    return nonEmpty;
+    return mapped;
 };
 
 //-------------
@@ -1158,12 +1174,6 @@ const timers: Record<string, NodeJS.Timeout[]> = {};
  * @ignore
  */
 const signupTermRegex = 'rsn|$';
-
-/**
- * Regex terminators for command [[bot.COMMANDS.ADD_UPCOMING]]
- * @ignore
- */
-const eventTermRegex = 'type|skills|starting|ending|name|bh|clues|$';
 
 /**
  * Compound regex creator
@@ -1245,7 +1255,8 @@ const filteredMessage$ = (
         // and necessary discord checks
         filter((msg: discord.Message): boolean => msg.guild
             && msg.guild.available
-            && msg.content.toLowerCase().startsWith(botCommand.command)),
+            && msg.content.toLowerCase()
+                .startsWith(botCommand.command)),
 
         // create new observable stream
         // containing the original message
@@ -1337,67 +1348,60 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     return null;
                 }
 
-                const compoundRegex: string = commandRegex(eventTermRegex);
-                const regexes: RegExp[] = [
-                    new RegExp(`name${compoundRegex}`, 'gim'),
-                    new RegExp(`starting${compoundRegex}`, 'gim'),
-                    new RegExp(`ending${compoundRegex}`, 'gim'),
-                    new RegExp(`type${compoundRegex}`, 'gim'),
-                ];
+                const regexes: Record<string, RegExp> = {
+                    name: new RegExp('(?<=name)\\s*(.+?)\\s*(?:starting|ending|type|$)', 'gim'),
+                    starting: new RegExp('(?<=starting)\\s*(.+?)\\s*(?:name|ending|type|$)', 'gim'),
+                    ending: new RegExp('(?<=ending)\\s*(.+?)\\s*(?:name|starting|type|$)', 'gim'),
+                    type: new RegExp('(?<=type)\\s*(\\w+)\\s*.+?\\s*(?:name|starting|ending|type|$)', 'gim'),
+                };
                 const parsedRegexes = findFirstRegexesMatch(
                     regexes,
                     command.input
                 );
                 // require all inputs to be valid
-                if (parsedRegexes[0] === null) {
+                if (parsedRegexes.name === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid event name`);
                     command.message.reply(`invalid event name\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                if (parsedRegexes[1] === null) {
+                if (parsedRegexes.starting === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid starting date`);
                     command.message.reply(`invalid starting date\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                if (parsedRegexes[2] === null) {
+                if (parsedRegexes.ending === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid ending date`);
                     command.message.reply(`invalid ending date\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                if (parsedRegexes[3] === null) {
+                if (parsedRegexes.type === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid type`);
                     command.message.reply(`invalid type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                const dateA: Date = new Date(parsedRegexes[1]);
-                const dateB: Date = new Date(parsedRegexes[2]);
+                const dateA: Date = new Date(parsedRegexes.starting);
+                const dateB: Date = new Date(parsedRegexes.ending);
                 const startingDate: Date = dateA <= dateB ? dateA : dateB;
                 const endingDate: Date = dateA > dateB ? dateA : dateB;
 
-                const inputType: string = parsedRegexes[3].toUpperCase();
+                const inputType: string = parsedRegexes.type.toUpperCase();
                 if (runescape.EVENT_TYPE[inputType] === undefined) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid event type`);
                     command.message.reply(`invalid event type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
-                const tracking: runescape.Tracking = {
-                    skills: null,
-                    bh: null,
-                    clues: null,
-                    lms: null,
-                };
+
                 const type = runescape.EVENT_TYPE[inputType];
-                const clanEvent: runescape.Event = {
+                const event: runescape.Event = {
                     id: uuid(),
-                    name: parsedRegexes[0],
+                    name: parsedRegexes.name,
                     startingDate,
                     endingDate,
                     type,
-                    tracking,
                     participants: [],
                     hasNotifiedTwoHourWarning: false,
                     hasNotifiedStarted: false,
@@ -1428,7 +1432,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     command.message.reply('events must be at least 30 minutes long');
                     return null;
                 }
-                return [command, clanEvent];
+                return [command, event];
             }
         ),
         filter((commandEventArr: [Input, runescape.Event]):
@@ -1446,7 +1450,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
 
 /**
  * An Observable that handles the [[bot.COMMANDS.ADD_UPCOMING]] command for
- * [[runescape.EVENT_TYPE.REGULAR]] events
+ * [[runescape.EVENT_TYPE.CASUAL]] events
  * @category Command Observable
  * @ignore
  */
@@ -1454,14 +1458,16 @@ const filterUpcomingGenericEvent$:
 Observable<[Input, runescape.Event]> = addUpcoming$
     .pipe(
         filter((commandEventArr: [Input, runescape.Event]): boolean => {
-            const clanEvent: runescape.Event = commandEventArr[1];
-            return clanEvent.type === runescape.EVENT_TYPE.REGULAR;
+            const event: runescape.Event = commandEventArr[1];
+            return runescape.isEventCasual(event);
         }),
     );
 
 /**
  * An Observable that handles the [[bot.COMMANDS.ADD_UPCOMING]] command for
- * [[runescape.EVENT_TYPE.COMPETITIVE]] events
+ * [[runescape.EVENT_TYPE.SKILLS_COMPETITIVE]] [[runescape.EVENT_TYPE.CLUES_COMPETITIVE]]
+ * [[runescape.EVENT_TYPE.BH_COMPETITIVE]] [[runescape.EVENT_TYPE.LMS_COMPETITIVE]]
+ * [[runescape.EVENT_TYPE.CUSTOM_COMPETITIVE]] events
  * @category Command Observable
  * @ignore
  */
@@ -1470,141 +1476,146 @@ Observable<[Input, runescape.Event]> = addUpcoming$
     .pipe(
         filter((commandEventArr: [Input, runescape.Event]): boolean => {
             const clanEvent: runescape.Event = commandEventArr[1];
-            return clanEvent.type === runescape.EVENT_TYPE.COMPETITIVE;
+            return !runescape.isEventCasual(clanEvent);
         }),
         map((commandEventArr: [Input, runescape.Event]): [Input, runescape.Event] => {
             const inputCommand: Input = commandEventArr[0];
-            const clanEvent: runescape.Event = commandEventArr[1];
-            const compoundRegex: string = commandRegex(eventTermRegex);
-            const competitiveRegex = [
-                new RegExp(`skills${compoundRegex}`, 'gim'),
-                new RegExp(`bh${compoundRegex}`, 'gim'),
-                new RegExp(`clues${compoundRegex}`, 'gim'),
-            ];
-            const parsedRegex = findFirstRegexesMatch(
+            const event: runescape.Event = commandEventArr[1];
+            const competitiveRegex = {
+                params: new RegExp('(?<=type)\\s*\\w+\\s*(.+?)\\s*(?:name|starting|ending|type|$)'),
+            };
+            const parsedRegexes = findFirstRegexesMatch(
                 competitiveRegex,
                 inputCommand.input
             );
-            if (parsedRegex[0] === null
-                && parsedRegex[1] === null
-                && parsedRegex[2] === null
-            ) {
-                utils.logger.debug(`Admin ${inputCommand.author.id} did not specify what to track`);
-                inputCommand.message.reply(`no skills specified\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
-                return null;
-            }
 
-            const processedRegex: string[][] = parsedRegex.map(
-                (regexToProcess: string): string[] => {
-                    if (regexToProcess === null) return null;
-                    const split = regexToProcess.split(' ');
-                    const trimmed = split.map(
-                        (strToTrim: string): string => strToTrim.trim()
-                    );
-                    const filtered = trimmed.filter(
-                        (strToCheck: string): boolean => strToCheck.length > 0
-                    );
-                    return filtered;
-                }
-            );
-            const setRegex: string[][] = processedRegex.map(
-                (regex: string[]): string[] => Array.from(
-                    new Set(regex)
-                )
-            );
-            const allKeys: string[][] = [
-                Object.keys(runescape.SkillsEnum),
-                Object.keys(runescape.BountyHunterEnum),
-                Object.keys(runescape.CluesEnum),
-            ];
-
-            const allValues: string[][] = [
-                allKeys[0].map(
-                    (key: string): runescape.SkillsEnum => runescape.SkillsEnum[key]
-                ),
-                allKeys[1].map(
-                    (key: string): runescape.BountyHunterEnum => runescape.BountyHunterEnum[key]
-                ),
-                allKeys[2].map(
-                    (key: string): runescape.CluesEnum => runescape.CluesEnum[key]
-                ),
-            ];
             // Skills
-            if (processedRegex[0] !== null) {
-                const skillsArr:
-                runescape.SkillsEnum[] = processedRegex[0] as runescape.SkillsEnum[];
-                const filteredSkills: runescape.SkillsEnum[] = skillsArr.filter(
-                    (skill: runescape.SkillsEnum): boolean => allValues[0].includes(skill)
+            if (event.type === runescape.EVENT_TYPE.SKILLS
+                && parsedRegexes.params !== null) {
+                const inputSkillNames: string[] = parsedRegexes.params.split(' ').map(
+                    (stringToTrim: string): string => stringToTrim.trim()
+                        .toLowerCase()
                 );
-                if (skillsArr.length !== filteredSkills.length) {
+                const allRunescapeSkills: string[] = Object.values(runescape.SkillsEnum);
+                const filteredSkillNames: string[] = inputSkillNames.filter(
+                    (skill: string): boolean => skill.length > 0
+                        && allRunescapeSkills.includes(skill)
+                );
+                if (inputSkillNames.length !== filteredSkillNames.length) {
                     utils.logger.debug(`Admin ${inputCommand.author.id} entered some invalid skill names`);
-                    inputCommand.message.reply(`some skill names entered are invalid\nchoices are: ${allValues[0].toString()}`);
+                    inputCommand.message.reply(`some skill names entered are invalid\nchoices are: ${allRunescapeSkills.toString()}`);
                     return null;
                 }
                 const newTracking: runescape.Tracking = utils.update(
-                    clanEvent.tracking,
-                    { skills: setRegex[0] }
-                ) as runescape.Tracking;
-                const xpEvent: runescape.Event = utils.update(
-                    clanEvent,
+                    event.tracking,
+                    { skills: filteredSkillNames }
+                );
+                const skillsEvent: runescape.Event = utils.update(
+                    event,
                     { tracking: newTracking }
-                ) as runescape.Event;
-                return [inputCommand, xpEvent];
+                );
+                return [inputCommand, skillsEvent];
             }
             // Bounty hunter
-            if (processedRegex[1] !== null) {
-                const bhArr:
-                runescape.BountyHunterEnum[] = processedRegex[1] as runescape.BountyHunterEnum[];
-                const filteredBh: runescape.BountyHunterEnum[] = bhArr.filter(
-                    (bh: runescape.BountyHunterEnum): boolean => allValues[1].includes(bh)
+            if (event.type === runescape.EVENT_TYPE.BH
+                && parsedRegexes.params !== null) {
+                const inputBhInputModeNames: string[] = parsedRegexes.params.split(' ').map(
+                    (stringToTrim: string): string => stringToTrim.trim()
+                        .toLowerCase()
                 );
-                if (bhArr.length !== filteredBh.length) {
+                const allRunescapeBhModeNames: string[] = Object.values(runescape.BountyHunterEnum);
+                const filteredBhModeNames: string[] = inputBhInputModeNames.filter(
+                    (bhMode: string): boolean => bhMode.length > 0
+                        && allRunescapeBhModeNames.includes(bhMode)
+                );
+                if (inputBhInputModeNames.length !== filteredBhModeNames.length) {
                     utils.logger.debug(`Admin ${inputCommand.author.id} entered some invalid bounty hunter names`);
-                    inputCommand.message.reply(`some bounty hunter settings entered are invalid\nchoices are: ${allValues[1].toString()}`);
+                    inputCommand.message.reply(`some bounty hunter settings entered are invalid\nchoices are: ${allRunescapeBhModeNames.toString()}`);
                     return null;
                 }
                 const newTracking: runescape.Tracking = utils.update(
-                    clanEvent.tracking,
-                    { bh: setRegex[1] }
-                ) as runescape.Tracking;
+                    event.tracking,
+                    { bh: filteredBhModeNames }
+                );
                 const bhEvent: runescape.Event = utils.update(
-                    clanEvent,
+                    event,
                     { tracking: newTracking }
-                ) as runescape.Event;
+                );
                 return [inputCommand, bhEvent];
             }
             // Clues
-            if (processedRegex[2] !== null) {
-                const clueArr:
-                runescape.CluesEnum[] = processedRegex[2] as runescape.CluesEnum[];
-                const filteredClues: runescape.CluesEnum[] = clueArr.filter(
-                    (clue: runescape.CluesEnum): boolean => allValues[2].includes(clue)
+            if (event.type === runescape.EVENT_TYPE.CLUES
+                && parsedRegexes.params !== null) {
+                const inputClueModeNames: string[] = parsedRegexes.params.split(' ').map(
+                    (stringToTrim: string): string => stringToTrim.trim()
+                        .toLowerCase()
                 );
-                if (clueArr.length !== filteredClues.length) {
+                const allRunescapeClueModes: string[] = Object.values(runescape.CluesEnum);
+                const filteredClueModes: string[] = inputClueModeNames.filter(
+                    (clueMode: string): boolean => clueMode.length > 0
+                        && allRunescapeClueModes.includes(clueMode)
+                );
+                if (inputClueModeNames.length !== filteredClueModes.length) {
                     utils.logger.debug(`Admin ${inputCommand.author.id} entered some invalid clue names`);
-                    inputCommand.message.reply(`some clue settings entered are invalid\nchoices are: ${allValues[2].toString()}`);
+                    inputCommand.message.reply(`some clue settings entered are invalid\nchoices are: ${allRunescapeClueModes.toString()}`);
                     return null;
                 }
-                const clues: string[] = setRegex[2].includes(
+                const clues: string[] = filteredClueModes.includes(
                     runescape.CluesEnum.ALL
                 )
                 || (
-                    setRegex[2].includes(runescape.CluesEnum.BEGINNER)
-                    && setRegex[2].includes(runescape.CluesEnum.EASY)
-                    && setRegex[2].includes(runescape.CluesEnum.MEDIUM)
-                    && setRegex[2].includes(runescape.CluesEnum.HARD)
-                    && setRegex[2].includes(runescape.CluesEnum.ELITE)
-                    && setRegex[2].includes(runescape.CluesEnum.MASTER)
+                    filteredClueModes.includes(runescape.CluesEnum.BEGINNER)
+                    && filteredClueModes.includes(runescape.CluesEnum.EASY)
+                    && filteredClueModes.includes(runescape.CluesEnum.MEDIUM)
+                    && filteredClueModes.includes(runescape.CluesEnum.HARD)
+                    && filteredClueModes.includes(runescape.CluesEnum.ELITE)
+                    && filteredClueModes.includes(runescape.CluesEnum.MASTER)
                 )
-                    ? [runescape.CluesEnum.ALL] : setRegex[2];
-                const newTracking: runescape.Tracking = utils.update(clanEvent.tracking, {
-                    clues,
-                }) as runescape.Tracking;
+                    ? [runescape.CluesEnum.ALL]
+                    : filteredClueModes;
+                const newTracking: runescape.Tracking = utils.update(
+                    event.tracking,
+                    { clues }
+                );
                 const clueEvent: runescape.Event = utils.update(
-                    clanEvent,
+                    event,
                     { tracking: newTracking }
-                ) as runescape.Event;
+                );
                 return [inputCommand, clueEvent];
+            }
+            // lms
+            if (event.type === runescape.EVENT_TYPE.LMS
+                && parsedRegexes.params !== null) {
+                const inputLmsModeNames: string[] = parsedRegexes.params.split(' ').map(
+                    (stringToTrim: string): string => stringToTrim.trim()
+                        .toLowerCase()
+                );
+                const allRunescapeLmsModes: string[] = Object.values(runescape.LmsEnum);
+                const filteredLmsModes: string[] = inputLmsModeNames.filter(
+                    (lmsMode: string): boolean => lmsMode.length > 0
+                        && allRunescapeLmsModes.includes(lmsMode)
+                );
+                if (inputLmsModeNames.length !== filteredLmsModes.length) {
+                    utils.logger.debug(`Admin ${inputCommand.author.id} entered some invalid clue names`);
+                    inputCommand.message.reply(`some lms settings entered are invalid\nchoices are: ${allRunescapeLmsModes.toString()}`);
+                    return null;
+                }
+
+                const newTracking: runescape.Tracking = utils.update(
+                    event.tracking,
+                    { lms: filteredLmsModes }
+                );
+                const lmsEvent: runescape.Event = utils.update(
+                    event,
+                    { tracking: newTracking }
+                );
+                return [inputCommand, lmsEvent];
+            }
+
+            // custom
+            // TODO: figure out what to do with custom events
+            if (event.type === runescape.EVENT_TYPE.CUSTOM) {
+                return [inputCommand, event];
             }
 
             utils.logger.debug(`Admin ${inputCommand.author.id} entered invalid competition data`);
@@ -1656,17 +1667,17 @@ const signupEvent$: Observable<[
         switchMap((command: Input):
         Observable<[bot.Data, discord.Message, hiscores.LookupResponse]> => {
             const compoundRegex: string = commandRegex(signupTermRegex);
-            const skillsRegex = [
-                new RegExp(`${compoundRegex}`, 'gim'),
-                new RegExp(`rsn${compoundRegex}`, 'gim'),
-            ];
-            const parsedRegex = findFirstRegexesMatch(skillsRegex, command.input);
-            if (parsedRegex[0] === null) {
+            const signupRegex = {
+                eventIdx: new RegExp(`${compoundRegex}`, 'gim'),
+                rsn: new RegExp(`rsn${compoundRegex}`, 'gim'),
+            };
+            const parsedRegexes = findFirstRegexesMatch(signupRegex, command.input);
+            if (parsedRegexes.eventIdx === null) {
                 utils.logger.debug(`${command.author.id} entered invalid index`);
                 command.message.reply(`invalid index\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
                 return of(null);
             }
-            if (parsedRegex[1] === null) {
+            if (parsedRegexes.rsn === null) {
                 utils.logger.debug(`${command.author.id} entered invalid rsn`);
                 command.message.reply(`invalid rsn. Did you forget to add 'rsn'?\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
                 return of(null);
@@ -1679,7 +1690,7 @@ const signupEvent$: Observable<[
                 data.events
             );
             const idxToModify: number = Number.parseInt(
-                parsedRegex[0],
+                parsedRegexes.eventIdx,
                 10
             );
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingAndInFlightEvents.length) {
@@ -1689,7 +1700,7 @@ const signupEvent$: Observable<[
             }
 
             const discordIdToAdd: string = command.author.id;
-            const rsnToAdd: string = parsedRegex[1];
+            const rsnToAdd: string = parsedRegexes.rsn;
 
             // get event to modify and its type
             const eventToModify: runescape.Event = upcomingAndInFlightEvents[idxToModify];
@@ -1922,7 +1933,7 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 { hasNotifiedTwoHourWarning: true }
-                            ) as runescape.Event;
+                            );
                             saveNewEvent(
                                 data,
                                 newEvent,
@@ -1962,7 +1973,7 @@ connect$.subscribe((): void => {
                                     hasNotifiedTwoHourWarning: true,
                                     hasNotifiedStarted: true,
                                 }
-                            ) as runescape.Event;
+                            );
                             saveNewEvent(
                                 data,
                                 newEvent,
@@ -1997,7 +2008,7 @@ connect$.subscribe((): void => {
                                     hasNotifiedTwoHourWarning: true,
                                     hasNotifiedStarted: true,
                                 }
-                            ) as runescape.Event;
+                            );
                             saveNewEvent(
                                 data,
                                 newEvent,
@@ -2034,7 +2045,7 @@ connect$.subscribe((): void => {
                                     hasNotifiedStarted: true,
                                     hasNotifiedEnded: true,
                                 }
-                            ) as runescape.Event;
+                            );
                             saveNewEvent(
                                 data,
                                 newEvent,
@@ -2063,7 +2074,7 @@ connect$.subscribe((): void => {
                                     hasNotifiedStarted: true,
                                     hasNotifiedEnded: true,
                                 }
-                            ) as runescape.Event;
+                            );
                             saveNewEvent(
                                 data,
                                 newEvent,
@@ -2080,7 +2091,7 @@ connect$.subscribe((): void => {
                                 hasNotifiedStarted: true,
                                 hasNotifiedEnded: true,
                             }
-                        ) as runescape.Event;
+                        );
                         saveNewEvent(
                             data,
                             newEvent,
@@ -2218,7 +2229,7 @@ addAdmin$.subscribe(
                     )
                 ),
             }
-        ) as bot.Settings;
+        );
         saveNewSettings(
             oldData,
             newSettings,
@@ -2284,16 +2295,23 @@ listUpcomingEvent$.subscribe(
                 const retStr = event.startingDate > new Date()
                     ? `\n${idx}: upcoming event ${event.name} starting: ${startingDateStr} ending: ${endingDateStr} type: ${event.type}`
                     : `\n${idx}: in-flight event ${event.name} ending: ${endingDateStr} type: ${event.type}`;
-                if (event.tracking.skills !== null) {
-                    return retStr.concat(` skills: ${event.tracking.skills.toString()}`);
+
+                switch (event.type) {
+                    case (runescape.EVENT_TYPE.SKILLS):
+                        return retStr.concat(` ${event.tracking.skills.toString()}`);
+                    case (runescape.EVENT_TYPE.LMS):
+                        return retStr.concat(` mode: ${event.tracking.lms.toString()}`);
+                    case (runescape.EVENT_TYPE.CUSTOM):
+                        return retStr;
+                    case (runescape.EVENT_TYPE.CLUES):
+                        return retStr.concat(` ${event.tracking.clues.toString()}`);
+                    case (runescape.EVENT_TYPE.CASUAL):
+                        return retStr;
+                    case (runescape.EVENT_TYPE.BH):
+                        return retStr.concat(` mode: ${event.tracking.bh.toString()}`);
+                    default:
+                        throw new Error('we shouldn\'t get here');
                 }
-                if (event.tracking.bh !== null) {
-                    return retStr.concat(` bh: ${event.tracking.bh.toString()}`);
-                }
-                if (event.tracking.clues !== null) {
-                    return retStr.concat(` clues: ${event.tracking.clues.toString()}`);
-                }
-                return retStr;
             }
         );
         const reply: string = upcomingAndInFlightEvents.length > 0
@@ -2509,7 +2527,7 @@ setChannel$.subscribe(
             {
                 notificationChannelId: channel.id,
             }
-        ) as bot.Settings;
+        );
         saveNewSettings(
             oldData,
             newSettings,
@@ -2663,7 +2681,7 @@ updateLeaderboard$.subscribe(
                     participantsArr
                 );
                 saveNewEvent(
-                    data,
+                    oldData,
                     newEvent,
                     command.guild.id
                 );
