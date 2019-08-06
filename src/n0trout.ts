@@ -370,6 +370,35 @@ string => {
 /**
  * @param guild The guild send the message to
  * @param channelId The channel id to send the message to
+ * @param attachmentToSend The attachment path to send
+ * @category Send Guild Message
+ */
+const sendChannelAttachment = (
+    guild: discord.Guild,
+    channelId: string,
+    attachmentToSend: string,
+    text?: string
+): void => {
+    if (guild === null || !guild.available) return;
+    const channel: discord.TextChannel = guild.channels.get(
+        channelId
+    ) as discord.TextChannel;
+    if (channel === undefined || channel.type !== 'text') return;
+    utils.logger.debug('Sending message to Guild');
+
+    if (attachmentToSend !== null) {
+        channel.send(text, {
+            files: [{
+                attachment: attachmentToSend,
+            }],
+        });
+    }
+};
+
+/**
+ * @function
+ * @param guild The guild send the message to
+ * @param channelId The channel id to send the message to
  * @param message The message content to send
  * @param options The Discord message options to use
  * @category Send Guild Message
@@ -378,13 +407,21 @@ const sendChannelMessage = (
     guild: discord.Guild,
     channelId: string,
     message: string,
-    options: discord.MessageOptions
+    options: discord.MessageOptions = null
 ): void => {
-    if (!guild.available) return;
-    const channel: discord.TextChannel = guild.channels.get(channelId) as discord.TextChannel;
+    if (guild === null || !guild.available) return;
+    const channel: discord.TextChannel = guild.channels.get(
+        channelId
+    ) as discord.TextChannel;
     if (channel === undefined || channel.type !== 'text') return;
     utils.logger.debug('Sending message to Guild');
-    channel.send(message, options);
+
+    if (message !== null) {
+        channel.send(
+            message,
+            options
+        );
+    }
 };
 
 /**
@@ -531,9 +568,8 @@ const setTimerTwoHoursBefore = (
  * @returns The enum that represents what we tracked
  * @category Helper
  */
-const getEventTracking = (event: runescape.Event): runescape.TrackingEnum => {
-    return runescape.TrackingEnum[event.type.toLocaleUpperCase()];
-};
+const getEventTracking = (event: runescape.Event):
+runescape.TrackingEnum => runescape.TrackingEnum[event.type.toLocaleUpperCase()];
 
 /**
  * See [[runescape.Tracking]] structure
