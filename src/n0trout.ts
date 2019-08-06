@@ -296,7 +296,6 @@ const updateParticipant = (
  * @todo Possible refactor to use [[updateParticipant]]
  */
 const signupParticipant = (
-    data: bot.Data,
     oldEvent: runescape.Event,
     newParticipant: runescape.Participant
 ): runescape.Event => {
@@ -1169,22 +1168,6 @@ const client: discord.Client = new discord.Client();
  */
 const timers: Record<string, NodeJS.Timeout[]> = {};
 
-/**
- * Regex terminator for command [[bot.COMMANDS.SIGNUP_UPCOMING]]
- * @ignore
- */
-const signupTermRegex = 'rsn|$';
-
-/**
- * Compound regex creator
- * @param term The string insert into RegExp string
- * @returns The compound RegExp string
- * @category Helper
- */
-const commandRegex = (
-    term: string
-): string => `(?:\\s|)+(.*?)(?:\\s|)+(?:${term})`;
-
 //----------------------
 // Observables & helpers
 //
@@ -1666,10 +1649,9 @@ const signupEvent$: Observable<[
     .pipe(
         switchMap((command: Input):
         Observable<[bot.Data, discord.Message, hiscores.LookupResponse]> => {
-            const compoundRegex: string = commandRegex(signupTermRegex);
             const signupRegex = {
-                eventIdx: new RegExp(`${compoundRegex}`, 'gim'),
-                rsn: new RegExp(`rsn${compoundRegex}`, 'gim'),
+                eventIdx: new RegExp('.*?([0-9]+).*?$', 'gim'),
+                rsn: new RegExp('\\s*[0-9]+\\s*(.+?)\\s*$', 'gim'),
             };
             const parsedRegexes = findFirstRegexesMatch(signupRegex, command.input);
             if (parsedRegexes.eventIdx === null) {
@@ -1679,7 +1661,7 @@ const signupEvent$: Observable<[
             }
             if (parsedRegexes.rsn === null) {
                 utils.logger.debug(`${command.author.id} entered invalid rsn`);
-                command.message.reply(`invalid rsn. Did you forget to add 'rsn'?\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+                command.message.reply(`invalid rsn\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
                 return of(null);
             }
 
@@ -1715,7 +1697,6 @@ const signupEvent$: Observable<[
             };
 
             const newEvent: runescape.Event = signupParticipant(
-                data,
                 eventToModify,
                 participantToAdd,
             );
@@ -2273,7 +2254,7 @@ saveEvent$.subscribe(
         sendChannelMessage(
             guild,
             newData.settings.notificationChannelId,
-            `@everyone clan event '${event.name}' has just been scheduled for ${event.startingDate.toString()}\nto sign-up type: '${bot.COMMANDS.SIGNUP_UPCOMING.command}${idx} rsn (your RuneScape name)'`,
+            `@everyone clan event '${event.name}' has just been scheduled for ${event.startingDate.toString()}\nto sign-up type: '${bot.COMMANDS.SIGNUP_UPCOMING.command}${idx} (your RuneScape name here)'`,
             null,
         );
     }
