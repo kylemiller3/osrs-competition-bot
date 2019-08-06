@@ -1068,6 +1068,16 @@ const setTimerEnd = (
                         strToPrint,
                         { code: true }
                     );
+
+                    if (sortedParticipants.length > 0) {
+                        const attachment = './attachments/congratulations.mp3';
+                        sendChannelAttachment(
+                            guild,
+                            updatedData.settings.notificationChannelId,
+                            attachment,
+                            `<@${sortedParticipants[0].discordId}>`
+                        );
+                    }
                 }
             );
         }, eventToSetTimers.endingDate.getTime() - now.getTime()
