@@ -144,6 +144,15 @@ export namespace runescape {
     }
 
     /**
+     * @description Enum of all Event types
+     * @category Event
+     */
+    export enum EVENT_TYPE {
+        COMPETITIVE = 'COMPETITIVE',
+        REGULAR = 'REGULAR',
+    }
+
+    /**
      * Custom HTTP Error class
      */
     class HTTPError extends Error {

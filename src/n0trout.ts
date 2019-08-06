@@ -38,17 +38,168 @@ interface Input extends Record<string, unknown> {
     input: string
 }
 
-/**
- * @description Enum of all Event types
- */
-enum EVENT_TYPE {
-    COMPETITIVE = 'COMPETITIVE',
-    REGULAR = 'REGULAR',
-}
-
 //--------
 // Helpers
 //--------
+
+/**
+ * @param data The source Data object
+ * @param updatedEvent The new Event object to insert
+ * @returns A new updated Event array
+ * @category Object Manipulator Helper
+ */
+const modifyEventArray = (
+    data: bot.Data,
+    updatedEvent: runescape.Event
+): runescape.Event[] => {
+    const newEvents: runescape.Event[] = data.events.map(
+        (event: runescape.Event): runescape.Event => {
+            if (event.id === updatedEvent.id) return updatedEvent;
+            return event;
+}
+    );
+    return newEvents;
+};
+
+/**
+ * @param data The source Data object
+ * @param newEvents The new Events array to insert
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const modifyDataEventsArray = (
+    data: bot.Data,
+    newEvents: runescape.Event[]
+): bot.Data => utils.update(data, {
+    events: newEvents,
+}) as bot.Data;
+
+/**
+ * @param data The source Data object
+ * @param updatedSettings The new Settings object to save
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const modifyEventParticipantsArray = (
+    eventToUpdate: runescape.Event,
+    participantsArr: runescape.Participant[]
+): runescape.Event => utils.update(
+    eventToUpdate,
+    { participants: participantsArr }
+) as runescape.Event;
+
+/**
+ * @param data The source Data object
+ * @param newEvents The new Event object to save
+ * @param guildId The id of the guild to modify
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const saveNewEvents = (
+    data: bot.Data,
+    newEvents: runescape.Event[],
+    guildId: string
+): bot.Data => {
+    const newData: bot.Data = modifyDataEventsArray(
+        data,
+        newEvents
+    );
+    return bot.save(
+        guildId,
+        newData
+    );
+};
+
+/**
+ * @param data The source Data object
+ * @param newEvent The new Event object to save
+ * @param guildId The id of the guild to modify
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const saveNewEvent = (
+    data: bot.Data,
+    newEvent: runescape.Event,
+    guildId: string
+): bot.Data => {
+    const newEvents: runescape.Event[] = modifyEventArray(
+        data,
+        newEvent
+    );
+    return saveNewEvents(
+        data,
+        newEvents,
+        guildId
+    );
+};
+
+/**
+ * @param data The source Data object
+ * @param updatedSettings The new Settings object to insert
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const updateSettings = (
+    data: bot.Data,
+    updatedSettings: bot.Settings
+): bot.Data => utils.update(data, {
+    settings: updatedSettings,
+}) as bot.Data;
+
+/**
+ * @param data The source Data object
+ * @param updatedSettings The new Settings object to save
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const saveNewSettings = (
+    data: bot.Data,
+    newSettings: bot.Settings,
+    guildId: string
+): bot.Data => {
+    const newData: bot.Data = updateSettings(
+        data,
+        newSettings
+    );
+    return bot.save(
+        guildId,
+        newData
+    );
+};
+
+/**
+ * @param data The source Data object
+ * @param updatedSettings The new Settings object to save
+ * @returns A new updated Data object
+ * @category Object Manipulator Helper
+ */
+const updateEventAsNotifiedTwoHourWarned = (
+    foundEvent: runescape.Event
+): runescape.Event => utils.update(
+    foundEvent,
+    { hasNotifiedTwoHourWarning: true }
+) as runescape.Event;
+
+const updateEventAsNotifiedStarted = (
+    foundEvent: runescape.Event
+): runescape.Event => utils.update(
+    foundEvent,
+    {
+        hasNotifiedTwoHourWarning: true,
+        hasNotifiedStarted: true,
+    }
+) as runescape.Event;
+
+const updateEventAsNotifiedEnded = (
+    foundEvent: runescape.Event
+): runescape.Event => utils.update(
+    foundEvent,
+    {
+        hasNotifiedTwoHourWarning: true,
+        hasNotifiedStarted: true,
+        hasNotifiedEnded: true,
+    }
+) as runescape.Event;
 
 /**
  * @param displayName The display name of the user to print
@@ -94,74 +245,34 @@ const getUpcomingEvents = (
 );
 
 /**
- * @param oldData The source Data object
- * @param updatedSettings The new Settings object to insert
- * @returns A new updated Data object
- * @category Helper
- */
-const updateSettings = (
-    oldData: bot.Data,
-    updatedSettings: bot.Settings
-): bot.Data => utils.update(oldData, {
-    settings: updatedSettings,
-}) as bot.Data;
-
-/**
- * @param oldData The source Data object
- * @param updatedEvent The new Event object to insert
- * @returns A new updated Data object
- * @category Helper
- */
-const updateEvent = (
-    oldData: bot.Data,
-    updatedEvent: runescape.Event
-): bot.Data => {
-    const newEvents: runescape.Event[] = oldData.events.map(
-        (event: runescape.Event): runescape.Event => {
-            if (event.id === updatedEvent.id) return updatedEvent;
-            return event;
-        }
-    );
-    const newData: bot.Data = utils.update(
-        oldData,
-        { events: newEvents }
-    ) as bot.Data;
-    return newData;
-};
-
-/**
- * @param oldData The source Data object
+ * @param data The source Data object
  * @param eventToDelete The Event object to remove
- * @returns A new updated Data object
+ * @returns A new updated Event array
  * @category Event
  */
 const deleteEvent = (
-    oldData: bot.Data,
+    data: bot.Data,
     eventToDelete: runescape.Event
-): bot.Data => {
-    const newEvents: runescape.Event[] = oldData.events.filter(
+): runescape.Event[] => {
+    const newEvents: runescape.Event[] = data.events.filter(
         (event: runescape.Event):
         boolean => event.id !== eventToDelete.id
     );
-    const newData: bot.Data = utils.update(
-        oldData,
-        { events: newEvents }
-    ) as bot.Data;
-    return newData;
+    return newEvents;
 };
 
 /**
- * @param oldData The source Data object
+ * @param data The source Data object
  * @param oldEvent The source Event object
  * @param updatedParticipant The new Participant object to insert
- * @returns A new updated Data object
+ * @returns A new updated Event object
  * @category Helper
  */
 const updateParticipant = (
-    oldData: bot.Data,
+    data: bot.Data,
     oldEvent: runescape.Event,
     updatedParticipant: runescape.Participant
-): bot.Data => {
+): runescape.Event => {
     const newParticipants: runescape.Participant[] = oldEvent.participants.map(
         (participant: runescape.Participant):
         runescape.Participant => {
@@ -172,27 +283,27 @@ const updateParticipant = (
     const newEvent: runescape.Event = utils.update(oldEvent, {
         participants: newParticipants,
     }) as runescape.Event;
-    return updateEvent(oldData, newEvent);
+    return newEvent;
 };
 
 /**
- * @param oldData The source Data object
+ * @param data The source Data object
  * @param oldEvent The source Event object
  * @param updatedParticipant The new Participant object to insert
- * @returns A new updated Data object
+ * @returns A new updated Event object
  * @category Event
  * @todo Possible refactor to use [[updateParticipant]]
  */
 const signupParticipant = (
-    oldData: bot.Data,
+    data: bot.Data,
     oldEvent: runescape.Event,
     newParticipant: runescape.Participant
-): bot.Data => {
+): runescape.Event => {
     const foundParticipant: runescape.Participant = oldEvent.participants.find(
         (participant: runescape.Participant):
         boolean => participant.discordId === newParticipant.discordId
     );
-    if (foundParticipant !== undefined) return oldData;
+    if (foundParticipant !== undefined) return oldEvent;
     const allRsn: string[] = oldEvent.participants.map(
         (participant: runescape.Participant):
         runescape.AccountInfo[] => participant.runescapeAccounts
@@ -208,26 +319,26 @@ const signupParticipant = (
     const foundRsn: boolean = allRsn.some(
         (rsn: string): boolean => newRsn.includes(rsn)
     );
-    if (foundRsn) return oldData;
+    if (foundRsn) return oldEvent;
     const newParticipants: runescape.Participant[] = oldEvent.participants.concat(newParticipant);
     const newEvent: runescape.Event = utils.update(oldEvent, {
         participants: newParticipants,
     }) as runescape.Event;
-    return updateEvent(oldData, newEvent);
+    return newEvent;
 };
 
 /**
  * @param oldData The source Data object
  * @param oldEvent The source Event object
  * @param participantToRemove The Participant object to remove
- * @returns A new updated Data object
+ * @returns A new updated Event object
  * @category Event
  */
 const unsignupParticipant = (
     oldData: bot.Data,
     oldEvent: runescape.Event,
     participantToRemove: runescape.Participant
-): bot.Data => {
+): runescape.Event => {
     const newParticipants: runescape.Participant[] = oldEvent.participants.filter(
         (participant: runescape.Participant):
         boolean => participant.discordId !== participantToRemove.discordId
@@ -235,11 +346,10 @@ const unsignupParticipant = (
     const newEvent: runescape.Event = utils.update(oldEvent, {
         participants: newParticipants,
     }) as runescape.Event;
-    return updateEvent(oldData, newEvent);
+    return newEvent;
 };
 
 /**
- * @function
  * @param guild The guild to use for display name lookup
  * @param discordId The Discord id to lookup
  * @returns The user's display name
@@ -257,7 +367,6 @@ string => {
 };
 
 /**
- * @function
  * @param guild The guild send the message to
  * @param channelId The channel id to send the message to
  * @param message The message content to send
@@ -278,16 +387,15 @@ const sendChannelMessage = (
 };
 
 /**
- * @function
- * @param event The event containing the participants to notify
  * @param guild The guild to notify
+ * @param event The event containing the participants to notify
  * @param channelId The channel id to send the notification to
  * @param message The message content to send
  * @category Send Guild Message
  */
 const notifyParticipantsInEvent = (
-    event: runescape.Event,
     guild: discord.Guild,
+    event: runescape.Event,
     channelId: string,
     message: string
 ): void => {
@@ -298,6 +406,90 @@ const notifyParticipantsInEvent = (
         (participant: string): string => `<@${participant}>`
     ).join(', ');
     sendChannelMessage(guild, channelId, `event '${event.name}' ${message} ${mentions}`, null);
+};
+
+/**
+ * @param guild The Guild to notify
+ * @param event The Event to notify and save
+ * @param data The source Data object
+ * @returns A new updated Event object
+ * @category Send Guild Message
+ */
+const notifyAndSavedWarnedEvent = (
+    guild: discord.Guild,
+    event: runescape.Event,
+    data: bot.Data
+): runescape.Event => {
+    notifyParticipantsInEvent(
+        guild,
+        event,
+        data.settings.notificationChannelId,
+        'will begin within 2 hours'
+    );
+    // mark 2 hour warning as completed
+    const newEvent: runescape.Event = updateEventAsNotifiedTwoHourWarned(event);
+    saveNewEvent(
+        data,
+        newEvent,
+        guild.id
+    );
+    return newEvent;
+};
+
+/**
+ * @param guild The Guild to notify
+ * @param event The Event to notify and save
+ * @param data The source Data object
+ * @returns A new updated Event object
+ * @category Send Guild Message
+ */
+const notifyAndSaveStartedEvent = (
+    guild: discord.Guild,
+    event: runescape.Event,
+    data: bot.Data
+): runescape.Event => {
+    notifyParticipantsInEvent(
+        guild,
+        event,
+        data.settings.notificationChannelId,
+        'has started'
+    );
+    // mark start date as completed
+    const newEvent: runescape.Event = updateEventAsNotifiedStarted(event);
+    saveNewEvent(
+        data,
+        newEvent,
+        guild.id
+    );
+    return newEvent;
+};
+
+/**
+ * @param guild The Guild to notify
+ * @param event The Event to notify and save
+ * @param data The source Data object
+ * @returns A new updated Event object
+ * @category Send Guild Message
+ */
+const notifyAndSaveEndedEvent = (
+    guild: discord.Guild,
+    event: runescape.Event,
+    data: bot.Data
+): runescape.Event => {
+    notifyParticipantsInEvent(
+        guild,
+        event,
+        data.settings.notificationChannelId,
+        'has ended'
+    );
+    // mark end date as completed
+    const newEvent: runescape.Event = updateEventAsNotifiedEnded(event);
+    saveNewEvent(
+        data,
+        newEvent,
+        guild.id
+    );
+    return newEvent;
 };
 
 /**
@@ -324,18 +516,11 @@ const setTimerTwoHoursBefore = (
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
             if (foundEvent === undefined) return;
-            notifyParticipantsInEvent(
-                foundEvent,
+            notifyAndSavedWarnedEvent(
                 guild,
-                data.settings.notificationChannelId,
-                'will begin within 2 hours'
+                foundEvent,
+                data
             );
-            // mark 2 hour warning as completed
-            const newEvent: runescape.Event = utils.update(foundEvent, {
-                hasNotifiedTwoHourWarning: true,
-            }) as runescape.Event;
-            const newData: bot.Data = updateEvent(data, newEvent);
-            bot.save(guild.id, newData);
         }, twoHoursBeforeStart.getTime() - now.getTime()
     );
 };
@@ -456,7 +641,7 @@ const updateStats = (
     oldData: bot.Data,
     event: runescape.Event,
     competitive: boolean
-): bot.Data => {
+): bot.Stats[] => {
     const updatedStats: bot.Stats[] = sortedParticipants.map(
         (participant: runescape.Participant, placing: number):
         bot.Stats => {
@@ -552,10 +737,37 @@ const updateStats = (
         )
     );
     const newStats: bot.Stats[] = filteredStats.concat(updatedStats);
-    const newData: bot.Data = utils.update(oldData, {
-        stats: newStats,
-    }) as bot.Data;
-    return newData;
+    return newStats;
+};
+
+/**
+ * @param sortedParticipants The numerically ordered participants to update
+ * @param oldData The source Data object
+ * @param event The source Event object
+ * @param guildId The guild to update
+ * @param competitive If the event was competitive or not
+ */
+const saveNewStats = (
+    sortedParticipants: runescape.Participant[],
+    oldData: bot.Data,
+    event: runescape.Event,
+    guildId: string,
+    competitive: boolean,
+): bot.Data => {
+    const newStats: bot.Stats[] = updateStats(
+        sortedParticipants,
+        oldData,
+        event,
+        competitive
+    );
+    const newData = utils.update(
+        oldData,
+        { stats: newStats }
+    ) as bot.Data;
+    return bot.save(
+        guildId,
+        newData
+    );
 };
 
 /**
@@ -740,20 +952,17 @@ const forceUpdateStats = (
     guild: discord.Guild,
     starting: boolean
 ): void => {
-    if (event.type === EVENT_TYPE.REGULAR) {
+    if (event.type === runescape.EVENT_TYPE.REGULAR) {
         const oldData: bot.Data = bot.load(
             guild.id,
             false
         );
-        const newData: bot.Data = updateStats(
+        saveNewStats(
             event.participants,
             oldData,
             event,
-            false
-        );
-        bot.save(
             guild.id,
-            newData
+            false
         );
         return;
     }
@@ -774,13 +983,10 @@ const forceUpdateStats = (
                     event,
                     { participants: participantsArr }
                 ) as runescape.Event;
-                const newData = updateEvent(
+                saveNewEvent(
                     oldData,
-                    newEvent
-                );
-                bot.save(
-                    guild.id,
-                    newData
+                    newEvent,
+                    guild.id
                 );
                 return;
             }
@@ -802,13 +1008,13 @@ const forceUpdateStats = (
                 guild.id,
                 false
             );
-            const newData: bot.Data = updateStats(
+            const newData: bot.Data = saveNewStats(
                 sortedParticipants,
                 oldData,
                 event,
+                guild.id,
                 true
             );
-            bot.save(guild.id, newData);
 
             const strToPrint = getScoreboardString(
                 event,
@@ -823,6 +1029,7 @@ const forceUpdateStats = (
         }
     );
 };
+
 
 /**
  * @param eventToSetTimers The Event to set timers for
@@ -845,32 +1052,15 @@ const setTimerStart = (
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
             if (foundEvent === undefined) return;
-            notifyParticipantsInEvent(
-                foundEvent,
+            notifyAndSaveStartedEvent(
                 guild,
-                data.settings.notificationChannelId,
-                'has started'
-            );
-            // mark start date as completed
-            const newEvent: runescape.Event = utils.update(
-                foundEvent, { hasNotifiedStarted: true }
-            ) as runescape.Event;
-            const newData: bot.Data = updateEvent(
-                data,
-                newEvent
-            );
-            bot.save(
-                guild.id,
-                newData
+                foundEvent,
+                data
             );
 
-            if (foundEvent.type === EVENT_TYPE.COMPETITIVE) {
+            // TODO: fix me
+            if (foundEvent.type === runescape.EVENT_TYPE.COMPETITIVE) {
             // pull new hiscores
-                forceUpdateStats(
-                    newEvent,
-                    guild,
-                    true
-                );
             }
         }, eventToSetTimers.startingDate.getTime() - now.getTime()
     );
@@ -882,10 +1072,10 @@ const setTimerStart = (
  * @returns The global timer handle for potential cancellation
  * @category Timer
  */
-function setTimerEnd(
+const setTimerEnd = (
     eventToSetTimers: runescape.Event,
     guild: discord.Guild
-): NodeJS.Timeout {
+): NodeJS.Timeout => {
     const now: Date = new Date();
     return setTimeout(
         (): void => {
@@ -898,24 +1088,10 @@ function setTimerEnd(
             );
             if (foundEvent === undefined) return;
 
-            notifyParticipantsInEvent(
-                foundEvent,
+            const newEvent: runescape.Event = notifyAndSaveEndedEvent(
                 guild,
-                data.settings.notificationChannelId,
-                'has ended'
-            );
-            // mark end date as completed
-            const newEvent: runescape.Event = utils.update(
                 foundEvent,
-                { hasNotifiedEnded: true }
-            ) as runescape.Event;
-            const newData: bot.Data = updateEvent(
                 data,
-                newEvent
-            );
-            bot.save(
-                guild.id,
-                newData
             );
 
             forceUpdateStats(
@@ -925,7 +1101,7 @@ function setTimerEnd(
             );
         }, eventToSetTimers.endingDate.getTime() - now.getTime()
     );
-}
+};
 
 
 /**
@@ -1203,7 +1379,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                 const endingDate: Date = dateA > dateB ? dateA : dateB;
 
                 const inputType: string = parsedRegexes[3].toUpperCase();
-                if (EVENT_TYPE[inputType] === undefined) {
+                if (runescape.EVENT_TYPE[inputType] === undefined) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid event type`);
                     command.message.reply(`invalid event type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
@@ -1214,7 +1390,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     clues: null,
                     lms: null,
                 };
-                const type = EVENT_TYPE[inputType];
+                const type = runescape.EVENT_TYPE[inputType];
                 const clanEvent: runescape.Event = {
                     id: uuid(),
                     name: parsedRegexes[0],
@@ -1270,7 +1446,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
 
 /**
  * An Observable that handles the [[bot.COMMANDS.ADD_UPCOMING]] command for
- * [[EVENT_TYPE.REGULAR]] events
+ * [[runescape.EVENT_TYPE.REGULAR]] events
  * @category Command Observable
  * @ignore
  */
@@ -1279,13 +1455,13 @@ Observable<[Input, runescape.Event]> = addUpcoming$
     .pipe(
         filter((commandEventArr: [Input, runescape.Event]): boolean => {
             const clanEvent: runescape.Event = commandEventArr[1];
-            return clanEvent.type === EVENT_TYPE.REGULAR;
+            return clanEvent.type === runescape.EVENT_TYPE.REGULAR;
         }),
     );
 
 /**
  * An Observable that handles the [[bot.COMMANDS.ADD_UPCOMING]] command for
- * [[EVENT_TYPE.COMPETITIVE]] events
+ * [[runescape.EVENT_TYPE.COMPETITIVE]] events
  * @category Command Observable
  * @ignore
  */
@@ -1294,7 +1470,7 @@ Observable<[Input, runescape.Event]> = addUpcoming$
     .pipe(
         filter((commandEventArr: [Input, runescape.Event]): boolean => {
             const clanEvent: runescape.Event = commandEventArr[1];
-            return clanEvent.type === EVENT_TYPE.COMPETITIVE;
+            return clanEvent.type === runescape.EVENT_TYPE.COMPETITIVE;
         }),
         map((commandEventArr: [Input, runescape.Event]): [Input, runescape.Event] => {
             const inputCommand: Input = commandEventArr[0];
@@ -1498,9 +1674,9 @@ const signupEvent$: Observable<[
 
             // get upcoming events
             // if index is out of range return
-            const oldData: bot.Data = bot.load(command.guild.id, false);
+            const data: bot.Data = bot.load(command.guild.id, false);
             const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
-                oldData.events
+                data.events
             );
             const idxToModify: number = Number.parseInt(
                 parsedRegex[0],
@@ -1527,13 +1703,24 @@ const signupEvent$: Observable<[
                 runescapeAccounts: [newRsAccount],
             };
 
-            const newData: bot.Data = signupParticipant(
-                oldData,
+            const newEvent: runescape.Event = signupParticipant(
+                data,
                 eventToModify,
                 participantToAdd,
             );
 
-            if (newData === oldData) {
+            const newEvents: runescape.Event[] = modifyEventArray(
+                data,
+                newEvent
+            );
+
+            const newData: bot.Data = modifyDataEventsArray(
+                data,
+                newEvents
+            );
+
+            // TODO: hackish way?
+            if (newData === data) {
                 utils.logger.debug('User already signed up');
                 command.message.reply('Your discord id or rsn is already signed up');
                 return of(null);
@@ -1660,40 +1847,40 @@ connect$.subscribe((): void => {
             utils.logger.verbose(`* ${guild.name} (${guild.id})`);
             utils.logger.verbose('* Loading guild json');
 
-            const guildData: bot.Data = bot.load(guild.id, true);
+            const data: bot.Data = bot.load(guild.id, true);
             utils.logger.debug(`Loaded json for guild ${guild.id}`);
-            utils.logger.silly(`${JSON.stringify(guildData)}`);
+            utils.logger.silly(`${JSON.stringify(data)}`);
 
             // startup tasks
             // handle generic events here
 
-            const unnotifiedEvents = getUnnotifiedEvents(guildData);
+            const unnotifiedEvents = getUnnotifiedEvents(data);
             unnotifiedEvents.forEach(
-                (clanEvent: runescape.Event): void => {
+                (event: runescape.Event): void => {
                     const now: Date = new Date();
                     const twoHoursBeforeStart: Date = new Date(
-                        clanEvent.startingDate.getTime()
+                        event.startingDate.getTime()
                     );
                     twoHoursBeforeStart.setHours(
                         twoHoursBeforeStart.getHours() - 2
                     );
 
                     const toleranceAfterStart: Date = new Date(
-                        clanEvent.startingDate.getTime()
+                        event.startingDate.getTime()
                     );
                     toleranceAfterStart.setMinutes(
                         toleranceAfterStart.getMinutes() + 30
                     );
 
                     const toleranceAfterEnd: Date = new Date(
-                        clanEvent.endingDate.getTime()
+                        event.endingDate.getTime()
                     );
                     toleranceAfterEnd.setMinutes(
                         toleranceAfterEnd.getMinutes() + 30
                     );
 
                     const toleranceAfterEndTolerance: Date = new Date(
-                        clanEvent.endingDate.getTime()
+                        event.endingDate.getTime()
                     );
                     toleranceAfterEndTolerance.setHours(
                         toleranceAfterEndTolerance.getHours() + 2
@@ -1706,169 +1893,157 @@ connect$.subscribe((): void => {
                         // schedule start date notification
                         // schedule end date notification
                         // TODO: change me
-                        timers[clanEvent.id] = [
+                        timers[event.id] = [
                             setTimerTwoHoursBefore(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                             setTimerStart(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                             setTimerEnd(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                         ];
                     } else if (now >= twoHoursBeforeStart
-                        && now < clanEvent.startingDate) {
+                        && now < event.startingDate) {
                         utils.logger.debug('after 2 hour warning');
-                        if (!clanEvent.hasNotifiedTwoHourWarning) {
+                        if (!event.hasNotifiedTwoHourWarning) {
                             utils.logger.debug('notification had not fired');
                             notifyParticipantsInEvent(
-                                clanEvent,
                                 guild,
-                                guildData.settings.notificationChannelId,
+                                event,
+                                data.settings.notificationChannelId,
                                 'will begin within 2 hours'
                             );
                             // mark 2 hour warning as completed
                             const newEvent: runescape.Event = utils.update(
-                                clanEvent,
+                                event,
                                 { hasNotifiedTwoHourWarning: true }
                             ) as runescape.Event;
-                            const newData: bot.Data = updateEvent(
-                                guildData,
-                                newEvent
-                            );
-                            bot.save(
-                                guild.id,
-                                newData
+                            saveNewEvent(
+                                data,
+                                newEvent,
+                                guild.id
                             );
                         }
                         // schedule start date notification
                         // schedule end date notification
                         // TODO: change me
-                        timers[clanEvent.id] = [
+                        timers[event.id] = [
                             setTimerStart(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                             setTimerEnd(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                         ];
-                    } else if (now >= clanEvent.startingDate
+                    } else if (now >= event.startingDate
                         && now < toleranceAfterStart) {
                         utils.logger.debug('after event started');
-                        if (!clanEvent.hasNotifiedStarted) {
+                        if (!event.hasNotifiedStarted) {
                             utils.logger.debug('notification had not fired');
                             // fire start notification
                             // mark 2 hour warning as completed
                             // mark start notification as complete
                             notifyParticipantsInEvent(
-                                clanEvent,
                                 guild,
-                                guildData.settings.notificationChannelId,
+                                event,
+                                data.settings.notificationChannelId,
                                 'has begun'
                             );
                             const newEvent: runescape.Event = utils.update(
-                                clanEvent,
+                                event,
                                 {
                                     hasNotifiedTwoHourWarning: true,
                                     hasNotifiedStarted: true,
                                 }
                             ) as runescape.Event;
-                            const newData: bot.Data = updateEvent(
-                                guildData,
-                                newEvent
-                            );
-                            bot.save(
-                                guild.id,
-                                newData
+                            saveNewEvent(
+                                data,
+                                newEvent,
+                                guild.id
                             );
                         }
                         // TODO: change me
-                        timers[clanEvent.id] = [
+                        timers[event.id] = [
                             setTimerEnd(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                         ];
                     } else if (now >= toleranceAfterStart
-                        && now < clanEvent.endingDate) {
+                        && now < event.endingDate) {
                         utils.logger.debug('after 30 min start tolerance');
-                        if (!clanEvent.hasNotifiedStarted) {
+                        if (!event.hasNotifiedStarted) {
                             utils.logger.error('notification had not fired');
                             // fire start notification
                             // mark 2 hour warning as completed
                             // mark start notification as complete
                             // TODO: apologize lol
                             notifyParticipantsInEvent(
-                                clanEvent,
                                 guild,
-                                guildData.settings.notificationChannelId,
+                                event,
+                                data.settings.notificationChannelId,
                                 'started more than 30 mins ago, yell at n0trout'
                             );
                             const newEvent: runescape.Event = utils.update(
-                                clanEvent,
+                                event,
                                 {
                                     hasNotifiedTwoHourWarning: true,
                                     hasNotifiedStarted: true,
                                 }
                             ) as runescape.Event;
-                            const newData: bot.Data = updateEvent(
-                                guildData,
-                                newEvent
-                            );
-                            bot.save(
-                                guild.id,
-                                newData
+                            saveNewEvent(
+                                data,
+                                newEvent,
+                                guild.id
                             );
                         }
                         // schedule end date notification
                         // TODO: change me
-                        timers[clanEvent.id] = [
+                        timers[event.id] = [
                             setTimerEnd(
-                                clanEvent,
+                                event,
                                 guild
                             ),
                         ];
-                    } else if (now >= clanEvent.endingDate
+                    } else if (now >= event.endingDate
                         && now < toleranceAfterEnd) {
                         utils.logger.debug('after ended');
-                        if (!clanEvent.hasNotifiedEnded) {
+                        if (!event.hasNotifiedEnded) {
                             utils.logger.error('notification had not fired');
                             // fire end notification
                             // mark 2 hour warning as complete (unnecessary)
                             // mark start notification as complete (unnecessary)
                             // mark end notification as complete
                             notifyParticipantsInEvent(
-                                clanEvent,
                                 guild,
-                                guildData.settings.notificationChannelId,
+                                event,
+                                data.settings.notificationChannelId,
                                 'has ended'
                             );
                             const newEvent: runescape.Event = utils.update(
-                                clanEvent,
+                                event,
                                 {
                                     hasNotifiedTwoHourWarning: true,
                                     hasNotifiedStarted: true,
                                     hasNotifiedEnded: true,
                                 }
                             ) as runescape.Event;
-                            const newData: bot.Data = updateEvent(
-                                guildData,
-                                newEvent
-                            );
-                            bot.save(
-                                guild.id,
-                                newData
+                            saveNewEvent(
+                                data,
+                                newEvent,
+                                guild.id
                             );
                         }
                     } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
                         utils.logger.debug('after 2 hour end tolerance');
-                        if (!clanEvent.hasNotifiedEnded) {
+                        if (!event.hasNotifiedEnded) {
                             utils.logger.error('notification had not fired');
                             // fire end notification
                             // apologize
@@ -1876,46 +2051,40 @@ connect$.subscribe((): void => {
                             // mark start notification as complete (unnecessary)
                             // mark end notification as complete
                             notifyParticipantsInEvent(
-                                clanEvent,
                                 guild,
-                                guildData.settings.notificationChannelId,
+                                event,
+                                data.settings.notificationChannelId,
                                 'had ended more than 2 hours ago, yell at n0trout'
                             );
                             const newEvent: runescape.Event = utils.update(
-                                clanEvent,
+                                event,
                                 {
                                     hasNotifiedTwoHourWarning: true,
                                     hasNotifiedStarted: true,
                                     hasNotifiedEnded: true,
                                 }
                             ) as runescape.Event;
-                            const newData: bot.Data = updateEvent(
-                                guildData,
-                                newEvent
-                            );
-                            bot.save(
-                                guild.id,
-                                newData
+                            saveNewEvent(
+                                data,
+                                newEvent,
+                                guild.id
                             );
                         }
                     } else {
                         // too late to do anything
                         // just mark it as fired
                         const newEvent: runescape.Event = utils.update(
-                            clanEvent,
+                            event,
                             {
                                 hasNotifiedTwoHourWarning: true,
                                 hasNotifiedStarted: true,
                                 hasNotifiedEnded: true,
                             }
                         ) as runescape.Event;
-                        const newData: bot.Data = updateEvent(
-                            guildData,
-                            newEvent
-                        );
-                        bot.save(
-                            guild.id,
-                            newData
+                        saveNewEvent(
+                            data,
+                            newEvent,
+                            guild.id
                         );
                     }
                 }
@@ -1926,15 +2095,15 @@ connect$.subscribe((): void => {
             // TODO: full implementation
             // const inFlightEvents: ClanEvent[] = getInFlightEvents()
             // const inFlightXpEvents: ClanEvent[] = inFlightEvents.filter(
-            //     (event: ClanEvent): boolean => event.type === EVENT_TYPE.COMPETITIVE
+            //     (event: ClanEvent): boolean => event.type === runescape.EVENT_TYPE.COMPETITIVE
             // )
             // const endedEvents: ClanEvent[] = getEndedEvents()
             // const endedXpEvents: ClanEvent[] = endedEvents.filter(
-            //     (event: ClanEvent): boolean => event.type === EVENT_TYPE.COMPETITIVE
+            //     (event: ClanEvent): boolean => event.type === runescape.EVENT_TYPE.COMPETITIVE
             // )
 
         // inFlightEvents.forEach((event: ClanEvent): void => {
-        //     if (event.type === EVENT_TYPE.COMPETITIVE) {
+        //     if (event.type === runescape.EVENT_TYPE.COMPETITIVE) {
         //         event.participants.forEach((xpParticipant: XpClanEventParticipant): void => {
         //             xpParticipant.skills.forEach((xpComponent:
         //             XpClanEventParticipantSkillsComponent): void => {
@@ -2050,13 +2219,10 @@ addAdmin$.subscribe(
                 ),
             }
         ) as bot.Settings;
-        const newData: bot.Data = updateSettings(
+        saveNewSettings(
             oldData,
-            newSettings
-        );
-        bot.save(
-            command.guild.id,
-            newData
+            newSettings,
+            command.guild.id
         );
         utils.logger.debug('Admin added');
         command.message.reply('admin added');
@@ -2069,20 +2235,20 @@ saveEvent$.subscribe(
         const command: Input = inputArr[0];
         const event: runescape.Event = inputArr[1];
 
-        const oldData: bot.Data = bot.load(
+        const data: bot.Data = bot.load(
             command.guild.id,
             false
         );
-        const events: runescape.Event[] = oldData.events.concat(event);
+        const events: runescape.Event[] = data.events.concat(event);
         const upcoming: runescape.Event[] = getUpcomingAndInFlightEvents(events);
         const idx: number = upcoming.indexOf(event);
 
         const guild: discord.Guild = command.guild;
-        const newData: bot.Data = utils.update(
-            oldData,
-            { events }
-        ) as bot.Data;
-        bot.save(guild.id, newData);
+        const newData = saveNewEvents(
+            data,
+            events,
+            guild.id
+        );
 
         timers[event.id] = [
             setTimerTwoHoursBefore(event, guild),
@@ -2159,13 +2325,14 @@ deleteUpcomingEvent$.subscribe(
         }
 
         const eventToDelete: runescape.Event = upcomingAndInFlightEvents[idxToRemove];
-        const newData: bot.Data = deleteEvent(
+        const newEvents: runescape.Event[] = deleteEvent(
             oldData,
             eventToDelete
         );
-        bot.save(
-            command.guild.id,
-            newData
+        saveNewEvents(
+            oldData,
+            newEvents,
+            command.guild.id
         );
 
         // cancel timers
@@ -2207,12 +2374,12 @@ unsignupUpcomingEvent$.subscribe(
     (command: Input): void => {
     // get upcoming events
     // if index is out of range return
-        const oldData: bot.Data = bot.load(
+        const data: bot.Data = bot.load(
             command.guild.id,
             false
         );
         const upcomingAndInFlightEvents:
-        runescape.Event[] = getUpcomingAndInFlightEvents(oldData.events);
+        runescape.Event[] = getUpcomingAndInFlightEvents(data.events);
         const idxToModify: number = Number.parseInt(
             command.input,
             10
@@ -2232,14 +2399,15 @@ unsignupUpcomingEvent$.subscribe(
             boolean => participant.discordId === command.author.id
         );
         if (participantToRemove === undefined) return;
-        const newData: bot.Data = unsignupParticipant(
-            oldData,
+        const newEvent: runescape.Event = unsignupParticipant(
+            data,
             eventToModify,
             participantToRemove,
         );
-        bot.save(
-            command.guild.id,
-            newData
+        saveNewEvent(
+            data,
+            newEvent,
+            command.guild.id
         );
 
         utils.logger.debug('Unsignup called');
@@ -2342,13 +2510,10 @@ setChannel$.subscribe(
                 notificationChannelId: channel.id,
             }
         ) as bot.Settings;
-        const newData: bot.Data = updateSettings(
+        saveNewSettings(
             oldData,
-            newSettings
-        );
-        bot.save(
-            command.guild.id,
-            newData
+            newSettings,
+            command.guild.id
         );
         utils.logger.debug('Set channel called');
         command.message.reply(`notification channel set to ${channel}`);
@@ -2493,17 +2658,14 @@ updateLeaderboard$.subscribe(
                     command.guild.id,
                     false
                 );
-                const newEvent: runescape.Event = utils.update(
+                const newEvent: runescape.Event = modifyEventParticipantsArray(
                     eventToUpdate,
-                    { participants: participantsArr }
-                ) as runescape.Event;
-                const newData = updateEvent(
-                    oldData,
-                    newEvent
+                    participantsArr
                 );
-                bot.save(
-                    command.guild.id,
-                    newData
+                saveNewEvent(
+                    data,
+                    newEvent,
+                    command.guild.id
                 );
 
                 const message: discord.Message = mockMessage(
@@ -2599,7 +2761,7 @@ client.login(auth.token);
 //     name: 'Regular Test',
 //     startingDate: new Date(),
 //     endingDate: new Date(),
-//     type: EVENT_TYPE.REGULAR,
+//     type: runescape.EVENT_TYPE.REGULAR,
 //     tracking: null,
 //     participants: [eventParticipant1],
 //     hasNotifiedTwoHourWarning: false,
@@ -2658,7 +2820,7 @@ client.login(auth.token);
 //         name: 'Competitive Test',
 //         startingDate: new Date(),
 //         endingDate: new Date(),
-//         type: EVENT_TYPE.COMPETITIVE,
+//         type: runescape.EVENT_TYPE.COMPETITIVE,
 //         tracking,
 //         participants: [eventParticipant2],
 //         hasNotifiedTwoHourWarning: false,
