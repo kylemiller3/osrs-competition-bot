@@ -512,7 +512,7 @@ const setTimerTwoHoursBefore = (
     );
     return setTimeout(
         (): void => {
-            const data: bot.Data = bot.load(guild.id, false);
+            const data: bot.Data = bot.load(guild.id);
             const foundEvent: runescape.Event = data.events.find(
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
@@ -631,7 +631,7 @@ const getTotalEventGain = (
 
 /**
  * @param sortedParticipants Participants to calculate stats for in desc order
- * @param oldData The source Data object
+ * @param oldStats The source Stats object
  * @param event The source Event object
  * @param competitive If the event was competitive or not
  * @returns A new updated Data object
@@ -639,14 +639,14 @@ const getTotalEventGain = (
  */
 const updateStats = (
     sortedParticipants: runescape.Participant[],
-    oldData: bot.Data,
+    oldStats: bot.Stats[],
     event: runescape.Event,
     competitive: boolean
 ): bot.Stats[] => {
     const updatedStats: bot.Stats[] = sortedParticipants.map(
         (participant: runescape.Participant, placing: number):
         bot.Stats => {
-            const foundStats: bot.Stats = oldData.stats.find(
+            const foundStats: bot.Stats = oldStats.find(
                 (stats: bot.Stats):
                 boolean => stats.discordId === participant.discordId
             );
@@ -730,7 +730,7 @@ const updateStats = (
             };
         }
     );
-    const filteredStats: bot.Stats[] = oldData.stats.filter(
+    const filteredStats: bot.Stats[] = oldStats.filter(
         (statsOuter: bot.Stats):
         boolean => updatedStats.every(
             (statsInner: bot.Stats):
@@ -742,28 +742,18 @@ const updateStats = (
 };
 
 /**
- * @param sortedParticipants The numerically ordered participants to update
  * @param oldData The source Data object
- * @param event The source Event object
+ * @param updatedStats The updated stats
  * @param guildId The guild to update
- * @param competitive If the event was competitive or not
  */
 const saveNewStats = (
-    sortedParticipants: runescape.Participant[],
     oldData: bot.Data,
-    event: runescape.Event,
+    updatedStats: bot.Stats[],
     guildId: string,
-    competitive: boolean,
 ): bot.Data => {
-    const newStats: bot.Stats[] = updateStats(
-        sortedParticipants,
-        oldData,
-        event,
-        competitive
-    );
     const newData = utils.update(
         oldData,
-        { stats: newStats }
+        { stats: updatedStats }
     );
     return bot.save(
         guildId,
@@ -773,14 +763,12 @@ const saveNewStats = (
 
 /**
  * @param event The source event to update with new hiscores
- * @param starting If this is the initial data pull
  * @param pullNew If we should ignore the cache and update hiscores
  * @returns A new updated Data object
  * @category Runescape API Observable
  */
 const updateParticipantsHiscores$ = (
     event: runescape.Event,
-    starting: boolean,
     pullNew: boolean
 ): Observable<runescape.Participant[]> => {
     const update$: Observable<runescape.Participant>[] = event.participants.map(
@@ -824,16 +812,6 @@ const updateParticipantsHiscores$ = (
                                 utils.logger.error('hiscoreArr === null || hiscoreArr[idx] === null');
                                 return account;
                             }
-                            if (starting) {
-                                const updated = utils.update(
-                                    account,
-                                    {
-                                        starting: hiscoreArr[idx],
-                                        ending: hiscoreArr[idx],
-                                    }
-                                );
-                                return updated;
-                            }
                             if (account.starting === undefined) {
                                 const updated = utils.update(
                                     account,
@@ -873,7 +851,7 @@ const updateParticipantsHiscores$ = (
  * @returns A string containing the scoreboard
  * @category Helper
  */
-const getScoreboardString = (
+const getLeaderboardString = (
     eventToPrint: runescape.Event,
     guild: discord.Guild
 ): string => {
@@ -900,7 +878,7 @@ const getScoreboardString = (
             participant,
             eventToPrint,
             tracking
-        ).toString().length
+        ).toLocaleString('en-US').length
     ).reduce(
         (a: number, b: number):
         number => (a > b ? a : b)
@@ -941,96 +919,6 @@ const getScoreboardString = (
     return strToPrint;
 };
 
-/**
- *
- * @param event The source Event
- * @param guild The guild to update
- * @param starting Whether to update starting hiscore or ending hiscore
- * @category Helper
- */
-const forceUpdateStats = (
-    event: runescape.Event,
-    guild: discord.Guild,
-    starting: boolean
-): void => {
-    if (runescape.isEventCasual(event)) {
-        const oldData: bot.Data = bot.load(
-            guild.id,
-            false
-        );
-        saveNewStats(
-            event.participants,
-            oldData,
-            event,
-            guild.id,
-            false
-        );
-        return;
-    }
-
-    const newParticipant$: Observable<runescape.Participant[]> = updateParticipantsHiscores$(
-        event,
-        starting,
-        true
-    );
-    newParticipant$.subscribe(
-        (participantsArr: runescape.Participant[]): void => {
-            if (starting) {
-                const oldData: bot.Data = bot.load(
-                    guild.id,
-                    false
-                );
-                const newEvent: runescape.Event = utils.update(
-                    event,
-                    { participants: participantsArr }
-                );
-                saveNewEvent(
-                    oldData,
-                    newEvent,
-                    guild.id
-                );
-                return;
-            }
-            // we should do stats here if it's an ending event
-            const tracking: runescape.TrackingEnum = getEventTracking(event);
-            const sortedParticipants: runescape.Participant[] = participantsArr.sort(
-                (a: runescape.Participant, b: runescape.Participant):
-                number => getTotalEventGain(
-                    b,
-                    event,
-                    tracking
-                ) - getTotalEventGain(
-                    a,
-                    event,
-                    tracking
-                )
-            );
-            const oldData = bot.load(
-                guild.id,
-                false
-            );
-            const newData: bot.Data = saveNewStats(
-                sortedParticipants,
-                oldData,
-                event,
-                guild.id,
-                true
-            );
-
-            const strToPrint = getScoreboardString(
-                event,
-                guild
-            );
-            sendChannelMessage(
-                guild,
-                newData.settings.notificationChannelId,
-                strToPrint,
-                { code: true }
-            );
-        }
-    );
-};
-
 
 /**
  * @param eventToSetTimers The Event to set timers for
@@ -1045,28 +933,37 @@ const setTimerStart = (
     const now: Date = new Date();
     return setTimeout(
         (): void => {
-            const data: bot.Data = bot.load(
-                guild.id,
-                false
-            );
-            const foundEvent: runescape.Event = data.events.find(
+            const oldData: bot.Data = bot.load(guild.id);
+            const foundEvent: runescape.Event = oldData.events.find(
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
             if (foundEvent === undefined) return;
+
             const newEvent: runescape.Event = notifyAndSaveStartedEvent(
                 guild,
                 foundEvent,
-                data
+                oldData
             );
 
-            // TODO: fix me
-            if (!runescape.isEventCasual(newEvent)) {
-                forceUpdateStats(
-                    newEvent,
-                    guild,
-                    false
-                );
-            }
+            updateParticipantsHiscores$(
+                newEvent,
+                true
+            ).subscribe(
+                (updatedParticipants: runescape.Participant[]): void => {
+                    const newData: bot.Data = bot.load(guild.id);
+                    const newFoundEvent: runescape.Event = newData.events.find(
+                        (event: runescape.Event): boolean => event.id === newFoundEvent.id
+                    );
+                    if (newFoundEvent === undefined) return;
+                    const updatedEvent: runescape.Event = utils.update(
+                        newFoundEvent,
+                        {
+                            participants: updatedParticipants,
+                        }
+                    );
+                    saveNewEvent(newData, updatedEvent, guild.id);
+                }
+            );
         }, eventToSetTimers.startingDate.getTime() - now.getTime()
     );
 };
@@ -1084,25 +981,70 @@ const setTimerEnd = (
     const now: Date = new Date();
     return setTimeout(
         (): void => {
-            const data: bot.Data = bot.load(
-                guild.id,
-                false
-            );
+            const data: bot.Data = bot.load(guild.id);
             const foundEvent: runescape.Event = data.events.find(
                 (event: runescape.Event): boolean => event.id === eventToSetTimers.id
             );
             if (foundEvent === undefined) return;
 
-            const newEvent: runescape.Event = notifyAndSaveEndedEvent(
+            const event: runescape.Event = notifyAndSaveEndedEvent(
                 guild,
                 foundEvent,
                 data,
             );
 
-            forceUpdateStats(
-                newEvent,
-                guild,
-                false
+            updateParticipantsHiscores$(
+                event,
+                true
+            ).subscribe(
+                (updatedParticipants: runescape.Participant[]): void => {
+                    const newData: bot.Data = bot.load(guild.id);
+                    const newFoundEvent: runescape.Event = newData.events.find(
+                        (e: runescape.Event): boolean => e.id === newFoundEvent.id
+                    );
+                    if (newFoundEvent === undefined) return;
+                    const tracking: runescape.TrackingEnum = getEventTracking(newFoundEvent);
+                    const sortedParticipants: runescape.Participant[] = updatedParticipants.sort(
+                        (a: runescape.Participant, b: runescape.Participant):
+                        number => getTotalEventGain(
+                            b,
+                            newFoundEvent,
+                            tracking
+                        ) - getTotalEventGain(
+                            a,
+                            newFoundEvent,
+                            tracking
+                        )
+                    );
+
+                    const newStats: bot.Stats[] = updateStats(
+                        sortedParticipants,
+                        newData.stats,
+                        event,
+                        true
+                    );
+                    const updatedEvent: runescape.Event = utils.update(
+                        newFoundEvent,
+                        {
+                            participants: updatedParticipants,
+                        }
+                    );
+                    const updatedData = saveNewEvent(newData, updatedEvent, guild.id);
+                    saveNewStats(updatedData, newStats, guild.id);
+
+                    // leaderboard
+                    const strToPrint = getLeaderboardString(
+                        updatedEvent,
+                        guild
+                    );
+
+                    sendChannelMessage(
+                        guild,
+                        updatedData.settings.notificationChannelId,
+                        strToPrint,
+                        { code: true }
+                    );
+                }
             );
         }, eventToSetTimers.endingDate.getTime() - now.getTime()
     );
@@ -1277,10 +1219,7 @@ const filteredMessage$ = (
             utils.logger.debug(`input: ${command.input}`);
         }),
         filter((command: Input): boolean => botCommand.accessControl.controlFunction(
-            command.author.id, bot.load(
-                command.guild.id,
-                false
-            )
+            command.author.id, bot.load(command.guild.id)
         ))
     );
 
@@ -1318,10 +1257,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
         // we need at least a name, starting date and end date, and type
         map(
             (command: Input): [Input, runescape.Event] => {
-                const oldData: bot.Data = bot.load(
-                    command.guild.id,
-                    false
-                );
+                const oldData: bot.Data = bot.load(command.guild.id);
 
                 // let's only allow 10 upcoming events per Guild
                 const upcomingEvents: runescape.Event[] = getUpcomingEvents(oldData.events);
@@ -1667,7 +1603,7 @@ const signupEvent$: Observable<[
 
             // get upcoming events
             // if index is out of range return
-            const data: bot.Data = bot.load(command.guild.id, false);
+            const data: bot.Data = bot.load(command.guild.id);
             const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
                 data.events
             );
@@ -1839,7 +1775,10 @@ connect$.subscribe((): void => {
             utils.logger.verbose(`* ${guild.name} (${guild.id})`);
             utils.logger.verbose('* Loading guild json');
 
-            const data: bot.Data = bot.load(guild.id, true);
+            const data: bot.Data = bot.load(
+                guild.id,
+                true
+            );
             utils.logger.debug(`Loaded json for guild ${guild.id}`);
             utils.logger.silly(`${JSON.stringify(data)}`);
 
@@ -2175,10 +2114,7 @@ error$.subscribe(
 debug$.subscribe(
     (command: Input): void => {
         utils.logger.info('Debug called');
-        const data: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const data: bot.Data = bot.load(command.guild.id);
         utils.logger.debug(
             JSON.stringify(
                 data,
@@ -2191,10 +2127,7 @@ debug$.subscribe(
 
 addAdmin$.subscribe(
     (command: Input): void => {
-        const oldData: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const oldData: bot.Data = bot.load(command.guild.id);
         const oldSettings: bot.Settings = oldData.settings;
 
         const mentions: string[] = command.message.mentions.members.array()
@@ -2227,10 +2160,7 @@ saveEvent$.subscribe(
         const command: Input = inputArr[0];
         const event: runescape.Event = inputArr[1];
 
-        const data: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const data: bot.Data = bot.load(command.guild.id);
         const events: runescape.Event[] = data.events.concat(event);
         const upcoming: runescape.Event[] = getUpcomingAndInFlightEvents(events);
         const idx: number = upcoming.indexOf(event);
@@ -2262,10 +2192,7 @@ saveEvent$.subscribe(
 
 listUpcomingEvent$.subscribe(
     (command: Input): void => {
-        const oldData: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const oldData: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
             oldData.events
         );
@@ -2305,10 +2232,7 @@ listUpcomingEvent$.subscribe(
 
 deleteUpcomingEvent$.subscribe(
     (command: Input): void => {
-        const oldData: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const oldData: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
             oldData.events
         );
@@ -2373,10 +2297,7 @@ unsignupUpcomingEvent$.subscribe(
     (command: Input): void => {
     // get upcoming events
     // if index is out of range return
-        const data: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const data: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(data.events);
         const idxToModify: number = Number.parseInt(
@@ -2416,10 +2337,7 @@ unsignupUpcomingEvent$.subscribe(
 
 amISignedUp$.subscribe(
     (command: Input): void => {
-        const oldData: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const oldData: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(oldData.events);
         const idxToCheck: number = Number.parseInt(
@@ -2457,10 +2375,7 @@ amISignedUp$.subscribe(
 
 listParticipant$.subscribe(
     (command: Input): void => {
-        const oldData: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const oldData: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(oldData.events);
         const idxToCheck: number = Number.parseInt(
@@ -2498,10 +2413,7 @@ listParticipant$.subscribe(
 
 setChannel$.subscribe(
     (command: Input): void => {
-        const oldData: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const oldData: bot.Data = bot.load(command.guild.id);
         const channel: discord.Channel = command.message.mentions.channels.first();
         const newSettings: bot.Settings = utils.update(
             oldData.settings,
@@ -2523,10 +2435,7 @@ help$.subscribe(
     (command: Input): void => {
         const keys: string[] = Object.keys(bot.COMMANDS).filter(
             (key: string): boolean => {
-                const data: bot.Data = bot.load(
-                    command.guild.id,
-                    false
-                );
+                const data: bot.Data = bot.load(command.guild.id);
                 const admin: boolean = bot.isAdmin(
                     command.author.id,
                     data
@@ -2626,7 +2535,7 @@ forceUnsignup$.subscribe(
 
 updateLeaderboard$.subscribe(
     (command: Input): void => {
-        const data: bot.Data = bot.load(command.guild.id, false);
+        const data: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(data.events);
         const idxToUpdate: number = Number.parseInt(
@@ -2649,14 +2558,10 @@ updateLeaderboard$.subscribe(
         const participant$ = updateParticipantsHiscores$(
             eventToUpdate,
             false,
-            false
         );
         participant$.subscribe(
             (participantsArr: runescape.Participant[]): void => {
-                const oldData: bot.Data = bot.load(
-                    command.guild.id,
-                    false
-                );
+                const oldData: bot.Data = bot.load(command.guild.id);
                 const newEvent: runescape.Event = modifyEventParticipantsArray(
                     eventToUpdate,
                     participantsArr
@@ -2681,10 +2586,7 @@ updateLeaderboard$.subscribe(
 
 showLeaderboard$.subscribe(
     (command: Input): void => {
-        const data: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const data: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(data.events);
         const idxToPrint: number = Number.parseInt(
@@ -2705,7 +2607,7 @@ showLeaderboard$.subscribe(
             return;
         }
 
-        const strToPrint: string = getScoreboardString(
+        const strToPrint: string = getLeaderboardString(
             eventToPrint,
             command.guild
         );
@@ -2715,10 +2617,7 @@ showLeaderboard$.subscribe(
 
 showStat$.subscribe(
     (command: Input): void => {
-        const data: bot.Data = bot.load(
-            command.guild.id,
-            false
-        );
+        const data: bot.Data = bot.load(command.guild.id);
         const user: discord.User = command.message.mentions.members.array().length > 0
             ? command.message.mentions.users.array()[0]
             : command.author;

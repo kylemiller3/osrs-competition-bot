@@ -287,7 +287,7 @@ export namespace bot {
      */
     export const load = (
         id: string,
-        dirty: boolean
+        dirty: boolean = false
     ): bot.Data => {
         if (dirty || loadCache[id] === undefined) {
             try {
