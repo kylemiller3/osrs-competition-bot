@@ -178,7 +178,7 @@ const updateEventAsNotifiedTwoHourWarned = (
     foundEvent: runescape.Event
 ): runescape.Event => utils.update(
     foundEvent,
-    { hasNotifiedTwoHourWarning: true }
+    { passTwoHourWarning: true }
 );
 
 const updateEventAsNotifiedStarted = (
@@ -186,8 +186,8 @@ const updateEventAsNotifiedStarted = (
 ): runescape.Event => utils.update(
     foundEvent,
     {
-        hasNotifiedTwoHourWarning: true,
-        hasNotifiedStarted: true,
+        passTwoHourWarning: true,
+        hasStarted: true,
     }
 );
 
@@ -196,9 +196,9 @@ const updateEventAsNotifiedEnded = (
 ): runescape.Event => utils.update(
     foundEvent,
     {
-        hasNotifiedTwoHourWarning: true,
-        hasNotifiedStarted: true,
-        hasNotifiedEnded: true,
+        passTwoHourWarning: true,
+        hasStarted: true,
+        hasEnded: true,
     }
 );
 
@@ -972,9 +972,9 @@ const setTimerEnd = (
 const getUnnotifiedEvents = (
     data: bot.Data
 ): runescape.Event[] => data.events.filter(
-    (event: runescape.Event): boolean => !event.hasNotifiedTwoHourWarning
-    || !event.hasNotifiedStarted
-    || !event.hasNotifiedEnded
+    (event: runescape.Event): boolean => !event.passTwoHourWarning
+    || !event.hasStarted
+    || !event.hasEnded
 );
 
 /**
@@ -1235,9 +1235,9 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     endingDate,
                     type,
                     participants: [],
-                    hasNotifiedTwoHourWarning: false,
-                    hasNotifiedStarted: false,
-                    hasNotifiedEnded: false,
+                    passTwoHourWarning: false,
+                    hasStarted: false,
+                    hasEnded: false,
                 };
                 if (!utils.isValidDate(dateA) || !utils.isValidDate(dateB)) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid date`);
@@ -1761,7 +1761,7 @@ connect$.subscribe((): void => {
                     } else if (now >= twoHoursBeforeStart
                         && now < event.startingDate) {
                         utils.logger.debug('after 2 hour warning');
-                        if (!event.hasNotifiedTwoHourWarning) {
+                        if (!event.passTwoHourWarning) {
                             utils.logger.debug('notification had not fired');
                             notifyParticipantsInEvent(
                                 guild,
@@ -1772,7 +1772,7 @@ connect$.subscribe((): void => {
                             // mark 2 hour warning as completed
                             const newEvent: runescape.Event = utils.update(
                                 event,
-                                { hasNotifiedTwoHourWarning: true }
+                                { passTwoHourWarning: true }
                             );
                             saveNewEvent(
                                 data,
@@ -1796,7 +1796,7 @@ connect$.subscribe((): void => {
                     } else if (now >= event.startingDate
                         && now < toleranceAfterStart) {
                         utils.logger.debug('after event started');
-                        if (!event.hasNotifiedStarted) {
+                        if (!event.hasStarted) {
                             utils.logger.debug('notification had not fired');
                             // fire start notification
                             // mark 2 hour warning as completed
@@ -1810,8 +1810,8 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    hasNotifiedTwoHourWarning: true,
-                                    hasNotifiedStarted: true,
+                                    passTwoHourWarning: true,
+                                    hasStarted: true,
                                 }
                             );
                             saveNewEvent(
@@ -1830,7 +1830,7 @@ connect$.subscribe((): void => {
                     } else if (now >= toleranceAfterStart
                         && now < event.endingDate) {
                         utils.logger.debug('after 30 min start tolerance');
-                        if (!event.hasNotifiedStarted) {
+                        if (!event.hasStarted) {
                             utils.logger.error('notification had not fired');
                             // fire start notification
                             // mark 2 hour warning as completed
@@ -1845,8 +1845,8 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    hasNotifiedTwoHourWarning: true,
-                                    hasNotifiedStarted: true,
+                                    passTwoHourWarning: true,
+                                    hasStarted: true,
                                 }
                             );
                             saveNewEvent(
@@ -1866,7 +1866,7 @@ connect$.subscribe((): void => {
                     } else if (now >= event.endingDate
                         && now < toleranceAfterEnd) {
                         utils.logger.debug('after ended');
-                        if (!event.hasNotifiedEnded) {
+                        if (!event.hasEnded) {
                             utils.logger.error('notification had not fired');
                             // fire end notification
                             // mark 2 hour warning as complete (unnecessary)
@@ -1881,9 +1881,9 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    hasNotifiedTwoHourWarning: true,
-                                    hasNotifiedStarted: true,
-                                    hasNotifiedEnded: true,
+                                    passTwoHourWarning: true,
+                                    hasStarted: true,
+                                    hasEnded: true,
                                 }
                             );
                             saveNewEvent(
@@ -1894,7 +1894,7 @@ connect$.subscribe((): void => {
                         }
                     } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
                         utils.logger.debug('after 2 hour end tolerance');
-                        if (!event.hasNotifiedEnded) {
+                        if (!event.hasEnded) {
                             utils.logger.error('notification had not fired');
                             // fire end notification
                             // apologize
@@ -1910,9 +1910,9 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    hasNotifiedTwoHourWarning: true,
-                                    hasNotifiedStarted: true,
-                                    hasNotifiedEnded: true,
+                                    passTwoHourWarning: true,
+                                    hasStarted: true,
+                                    hasEnded: true,
                                 }
                             );
                             saveNewEvent(
@@ -1927,9 +1927,9 @@ connect$.subscribe((): void => {
                         const newEvent: runescape.Event = utils.update(
                             event,
                             {
-                                hasNotifiedTwoHourWarning: true,
-                                hasNotifiedStarted: true,
-                                hasNotifiedEnded: true,
+                                passTwoHourWarning: true,
+                                hasStarted: true,
+                                hasEnded: true,
                             }
                         );
                         saveNewEvent(
@@ -2469,7 +2469,7 @@ updateLeaderboard$.subscribe(
         }
 
         const eventToUpdate: runescape.Event = upcomingAndInFlightEvents[idxToUpdate];
-        if (!eventToUpdate.hasNotifiedStarted) {
+        if (!eventToUpdate.hasStarted) {
             utils.logger.debug('User tried to update event that hasn\'t started yet');
             command.message.reply('cannot update an event that hasn\'t started yet');
             return;
@@ -2648,7 +2648,7 @@ eventParticipantsDidUpdate$.subscribe(
         );
 
         // update stats
-        if (newEvent.hasNotifiedEnded) {
+        if (newEvent.hasEnded) {
             const tracking: runescape.TrackingEnum = getEventTracking(newEvent);
             const sortedParticipants: runescape.Participant[] = updatedParticipants.sort(
                 (a: runescape.Participant, b: runescape.Participant):
@@ -2704,7 +2704,7 @@ showLeaderboard$.subscribe(
         }
 
         const eventToPrint: runescape.Event = upcomingAndInFlightEvents[idxToPrint];
-        if (!eventToPrint.hasNotifiedStarted) {
+        if (!eventToPrint.hasStarted) {
             utils.logger.debug('User tried to print event that hasn\'t started yet');
             command.message.reply('cannot print an event that hasn\'t started yet');
             return;
@@ -2767,9 +2767,9 @@ client.login(auth.token);
 //     type: runescape.EVENT_TYPE.REGULAR,
 //     tracking: null,
 //     participants: [eventParticipant1],
-//     hasNotifiedTwoHourWarning: false,
-//     hasNotifiedStarted: false,
-//     hasNotifiedEnded: false
+//     passTwoHourWarning: false,
+//     hasStarted: false,
+//     hasEnded: false
 // }
 
 // const botSettings1: Bot.Settings = {
@@ -2826,9 +2826,9 @@ client.login(auth.token);
 //         type: runescape.EVENT_TYPE.COMPETITIVE,
 //         tracking,
 //         participants: [eventParticipant2],
-//         hasNotifiedTwoHourWarning: false,
-//         hasNotifiedStarted: false,
-//         hasNotifiedEnded: false,
+//         passTwoHourWarning: false,
+//         hasStarted: false,
+//         hasEnded: false,
 //     }
 
 //     const botSettings2: Bot.Settings = {
