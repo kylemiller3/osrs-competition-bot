@@ -869,82 +869,6 @@ const updateParticipantsHiscores$ = (
 
 
 /**
- * @param eventToPrint The event to print
- * @param guild The guild to lookup discord ids
- * @param pullNew If we should ignore the cache and update hiscores
- * @returns A string containing the scoreboard
- * @category Helper
- */
-const getLeaderboardString = (
-    eventToPrint: runescape.Event,
-    guild: discord.Guild
-): string => {
-    const tracking: runescape.TrackingEnum = getEventTracking(eventToPrint);
-    const sortedParticipants: runescape.Participant[] = eventToPrint.participants.sort(
-        (a: runescape.Participant, b: runescape.Participant):
-        number => getTotalEventGain(
-            b,
-            eventToPrint,
-            tracking
-        ) - getTotalEventGain(
-            a,
-            eventToPrint,
-            tracking
-        )
-    );
-
-    const maxDisplayLength: number = sortedParticipants.map(
-        (participant: runescape.Participant):
-        number => discordIdToDisplayName(
-            guild,
-            participant.discordId
-        ).length + getTotalEventGain(
-            participant,
-            eventToPrint,
-            tracking
-        ).toLocaleString('en-US').length
-    ).reduce(
-        (a: number, b: number):
-        number => (a > b ? a : b)
-    );
-
-    const padding = 8;
-    const totalMaxDisplayLength = maxDisplayLength + padding;
-
-    const strToPrint: string = sortedParticipants.map(
-        (participant: runescape.Participant, idx: number): string => {
-            const displayName: string = discordIdToDisplayName(
-                guild,
-                participant.discordId
-            );
-            const eventGain: string = getTotalEventGain(
-                participant,
-                eventToPrint,
-                tracking
-            ).toLocaleString('en-US');
-
-            const totalLength: number = displayName.length + eventGain.length;
-            const numSpacesToInsert: number = totalMaxDisplayLength - totalLength;
-            const spaces: string = new Array(numSpacesToInsert + 1).join(' ');
-            const displayStr = `${displayName}${spaces}${eventGain}`;
-
-            switch (idx) {
-                case 0:
-                    return `🥇\t${displayStr}`;
-                case 1:
-                    return `🥈\t${displayStr}`;
-                case 2:
-                    return `🥉\t${displayStr}`;
-                default:
-                    return `🤡\t${displayStr}`;
-            }
-        }
-    ).join('\n');
-    return strToPrint;
-};
-
-
-/**
  * @param eventToSetTimers The Event to set timers for
  * @param guild The guild to notify on timer completion
  * @returns The global timer handle for potential cancellation
@@ -973,19 +897,22 @@ const setTimerStart = (
                 newEvent,
                 true
             ).subscribe(
-                (updatedParticipants: runescape.Participant[]): void => {
-                    const newData: bot.Data = bot.load(guild.id);
-                    const newFoundEvent: runescape.Event = newData.events.find(
-                        (event: runescape.Event): boolean => event.id === foundEvent.id
-                    );
-                    if (newFoundEvent === undefined) return;
-                    const updatedEvent: runescape.Event = utils.update(
-                        newFoundEvent,
+                (participantsArr: runescape.Participant[]): void => {
+                    eventParticipantsDidUpdate$.next(
                         {
-                            participants: updatedParticipants,
+                            guild,
+                            eventIdToUpdate: newEvent.id,
+                            newParticipants: participantsArr,
                         }
                     );
-                    saveNewEvent(newData, updatedEvent, guild.id);
+
+                    // const message: discord.Message = mockMessage(
+                    //     bot.COMMANDS.SHOWLEADERBOARD,
+                    //     command.input,
+                    //     command.message,
+                    //     command.message.author
+                    // );
+                    // injectedMessages$.next(message);
                 }
             );
         }, eventToSetTimers.startingDate.getTime() - now.getTime()
@@ -1021,63 +948,15 @@ const setTimerEnd = (
                 newEvent,
                 true
             ).subscribe(
-                (updatedParticipants: runescape.Participant[]): void => {
-                    const newData: bot.Data = bot.load(guild.id);
-                    const newFoundEvent: runescape.Event = newData.events.find(
-                        (e: runescape.Event): boolean => e.id === newEvent.id
-                    );
-                    if (newFoundEvent === undefined) return;
-                    const tracking: runescape.TrackingEnum = getEventTracking(newFoundEvent);
-                    const sortedParticipants: runescape.Participant[] = updatedParticipants.sort(
-                        (a: runescape.Participant, b: runescape.Participant):
-                        number => getTotalEventGain(
-                            b,
-                            newFoundEvent,
-                            tracking
-                        ) - getTotalEventGain(
-                            a,
-                            newFoundEvent,
-                            tracking
-                        )
-                    );
-
-                    const newStats: bot.Stats[] = updateStats(
-                        sortedParticipants,
-                        newData.stats,
-                        newEvent,
-                        true
-                    );
-                    const updatedEvent: runescape.Event = utils.update(
-                        newFoundEvent,
+                (updatedParticipants: runescape.Participant[]):
+                void => {
+                    eventParticipantsDidUpdate$.next(
                         {
-                            participants: updatedParticipants,
+                            guild,
+                            eventIdToUpdate: newEvent.id,
+                            newParticipants: updatedParticipants,
                         }
                     );
-                    const updatedData = saveNewEvent(newData, updatedEvent, guild.id);
-                    saveNewStats(updatedData, newStats, guild.id);
-
-                    // leaderboard
-                    const strToPrint = getLeaderboardString(
-                        updatedEvent,
-                        guild
-                    );
-
-                    sendChannelMessage(
-                        guild,
-                        updatedData.settings.notificationChannelId,
-                        strToPrint,
-                        { code: true }
-                    );
-
-                    if (sortedParticipants.length > 0) {
-                        const attachment = './attachments/congratulations.mp3';
-                        sendChannelAttachment(
-                            guild,
-                            updatedData.settings.notificationChannelId,
-                            attachment,
-                            `<@${sortedParticipants[0].discordId}>`
-                        );
-                    }
                 }
             );
         }, eventToSetTimers.endingDate.getTime() - now.getTime()
@@ -1791,6 +1670,13 @@ const showLeaderboard$: Observable<Input> = filteredMessage$(
 const showStat$: Observable<Input> = filteredMessage$(
     bot.COMMANDS.SHOWSTATS
 );
+
+const eventParticipantsDidUpdate$:
+Subject<{
+    guild: discord.Guild
+    eventIdToUpdate: string
+    newParticipants: runescape.Participant[]
+}> = new Subject();
 
 //------------------------
 // Subscriptions & helpers
@@ -2595,26 +2481,209 @@ updateLeaderboard$.subscribe(
         );
         participant$.subscribe(
             (participantsArr: runescape.Participant[]): void => {
-                const oldData: bot.Data = bot.load(command.guild.id);
-                const newEvent: runescape.Event = modifyEventParticipantsArray(
-                    eventToUpdate,
-                    participantsArr
-                );
-                saveNewEvent(
-                    oldData,
-                    newEvent,
-                    command.guild.id
+                eventParticipantsDidUpdate$.next(
+                    {
+                        guild: command.guild,
+                        eventIdToUpdate: eventToUpdate.id,
+                        newParticipants: participantsArr,
+
+                    }
                 );
 
-                const message: discord.Message = mockMessage(
-                    bot.COMMANDS.SHOWLEADERBOARD,
-                    command.input,
-                    command.message,
-                    command.message.author
-                );
-                injectedMessages$.next(message);
+                // const message: discord.Message = mockMessage(
+                //     bot.COMMANDS.SHOWLEADERBOARD,
+                //     command.input,
+                //     command.message,
+                //     command.message.author
+                // );
+                // injectedMessages$.next(message);
             }
         );
+    }
+);
+
+const updateLeaderboard = (
+    guildToPrint: discord.Guild,
+    oldEvent: runescape.Event,
+    updatedEvent: runescape.Event
+): string => {
+    const tracking: runescape.TrackingEnum = getEventTracking(updatedEvent);
+    const sortedParticipants: runescape.Participant[] = updatedEvent.participants.sort(
+        (a: runescape.Participant, b: runescape.Participant):
+        number => getTotalEventGain(
+            b,
+            updatedEvent,
+            tracking
+        ) - getTotalEventGain(
+            a,
+            updatedEvent,
+            tracking
+        )
+    );
+
+    const xpDiff: number[] = updatedEvent.participants.map(
+        (updatedParticipant: runescape.Participant): number => {
+            const foundParticipant = oldEvent.participants.find(
+                (participant: runescape.Participant):
+                boolean => participant.discordId === updatedParticipant.discordId
+            );
+            if (foundParticipant === undefined) return 0;
+            const diff: number = getTotalEventGain(
+                updatedParticipant,
+                updatedEvent,
+                tracking
+            ) - getTotalEventGain(
+                foundParticipant,
+                oldEvent,
+                tracking
+            );
+            return diff;
+        }
+    );
+
+    const nameMaxDisplayLength: number = sortedParticipants.map(
+        (participant: runescape.Participant):
+        number => discordIdToDisplayName(
+            guildToPrint,
+            participant.discordId
+        ).length + getTotalEventGain(
+            participant,
+            updatedEvent,
+            tracking
+        ).toLocaleString('en-US').length
+    ).reduce(
+        (a: number, b: number):
+        number => (a > b ? a : b)
+    );
+
+    const xpDiffMaxDisplayLength: number = xpDiff.map(
+        (diff: number):
+        number => diff.toLocaleString('en-US').length
+    ).reduce(
+        (a: number, b: number):
+        number => (a > b ? a : b)
+    );
+
+    const namePadding = 8;
+    const plusPadding = 0;
+    const diffPadding = 4;
+    const totalNameMaxLength = namePadding + nameMaxDisplayLength;
+    // look ugly
+    // const totalDiffMaxLength = plusPadding + xpDiffMaxDisplayLength;
+
+    const strToPrint: string = sortedParticipants.map(
+        (participant: runescape.Participant, idx: number): string => {
+            const displayName: string = discordIdToDisplayName(
+                guildToPrint,
+                participant.discordId
+            );
+            const eventGain: string = getTotalEventGain(
+                participant,
+                updatedEvent,
+                tracking
+            ).toLocaleString('en-US');
+            const xpDiffStr = xpDiff[idx].toLocaleString('en-US');
+
+            const numNameSpacesToInsert:
+            number = totalNameMaxLength - displayName.length - eventGain.length;
+            // const numDiffSpacesToInsert:
+            // number = totalDiffMaxLength - xpDiffStr.length;
+
+            const nameSpaces: string = new Array(numNameSpacesToInsert + 1).join(' ');
+            const diffSpaces: string = new Array(diffPadding + 1).join(' ');
+            const plusSpaces = new Array(plusPadding + 1).join(' ');
+            const displayStr = `${displayName}${nameSpaces}${eventGain}${diffSpaces}+${plusSpaces}${xpDiffStr}`;
+
+            switch (idx) {
+                case 0:
+                    return `🥇\t${displayStr}`;
+                case 1:
+                    return `🥈\t${displayStr}`;
+                case 2:
+                    return `🥉\t${displayStr}`;
+                default:
+                    return `🤡\t${displayStr}`;
+            }
+        }
+    ).join('\n');
+    return strToPrint;
+};
+
+eventParticipantsDidUpdate$.subscribe(
+    ({
+        guild,
+        eventIdToUpdate,
+        newParticipants: updatedParticipants,
+    }): void => {
+        const data: bot.Data = bot.load(guild.id);
+        const foundEvent = data.events.find(
+            (event: runescape.Event): boolean => event.id === eventIdToUpdate
+        );
+        if (foundEvent === undefined) return;
+
+        const newEvent: runescape.Event = modifyEventParticipantsArray(
+            foundEvent,
+            updatedParticipants
+        );
+        const newData = saveNewEvent(
+            data,
+            newEvent,
+            guild.id
+        );
+
+        // update leaderboard
+        const strToPrint: string = updateLeaderboard(
+            guild,
+            foundEvent,
+            newEvent
+        );
+        utils.logger.debug(strToPrint);
+
+        // TODO: temp
+        sendChannelMessage(
+            guild,
+            newData.settings.notificationChannelId,
+            strToPrint,
+            { code: true }
+        );
+
+        // update stats
+        if (newEvent.hasNotifiedEnded) {
+            const tracking: runescape.TrackingEnum = getEventTracking(newEvent);
+            const sortedParticipants: runescape.Participant[] = updatedParticipants.sort(
+                (a: runescape.Participant, b: runescape.Participant):
+                number => getTotalEventGain(
+                    b,
+                    newEvent,
+                    tracking
+                ) - getTotalEventGain(
+                    a,
+                    newEvent,
+                    tracking
+                )
+            );
+            const stats: bot.Stats[] = updateStats(
+                sortedParticipants,
+                newData.stats,
+                foundEvent,
+                !runescape.isEventCasual(foundEvent)
+            );
+            const updatedData: bot.Data = saveNewStats(
+                newData,
+                stats,
+                guild.id
+            );
+
+            if (sortedParticipants.length > 0) {
+                const attachment = './attachments/congratulations.mp3';
+                sendChannelAttachment(
+                    guild,
+                    updatedData.settings.notificationChannelId,
+                    attachment,
+                    `<@${sortedParticipants[0].discordId}>`
+                );
+            }
+        }
     }
 );
 
@@ -2641,9 +2710,11 @@ showLeaderboard$.subscribe(
             return;
         }
 
-        const strToPrint: string = getLeaderboardString(
+        // TODO: temp
+        const strToPrint: string = updateLeaderboard(
+            command.guild,
             eventToPrint,
-            command.guild
+            eventToPrint
         );
         command.message.reply(`\n${strToPrint}`, { code: true });
     }
