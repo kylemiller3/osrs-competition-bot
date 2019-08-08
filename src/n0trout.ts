@@ -3,8 +3,6 @@
 // 20 min ending warning
 // custom competitive events
 // all time hiscores
-// fun attachments
-// score differential
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -637,7 +635,7 @@ const getTotalEventGain = (
 ): number => {
     switch (tracking) {
         case 'skills': {
-            if (event.tracking.skills === null) return 0;
+            if (event.tracking.skills === undefined) return 0;
             const xps: number[] = participant.runescapeAccounts.map(
                 (account: runescape.CompetitiveAccountInfo): number => {
                     if (account.starting === undefined
@@ -669,9 +667,9 @@ const getTotalEventGain = (
         case 'bh':
         case 'clues':
         case 'lms': {
-            if (event.tracking.bh === null
-                && event.tracking.clues === null
-                && event.tracking.lms === null) return 0;
+            if (event.tracking.bh === undefined
+                && event.tracking.clues === undefined
+                && event.tracking.lms === undefined) return 0;
             const gains: number[] = participant.runescapeAccounts.map(
                 (account: runescape.CompetitiveAccountInfo): number => {
                     const rankAndScoreComponents:
