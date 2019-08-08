@@ -2655,7 +2655,8 @@ const updateLeaderboard = (
             }
         }
     ).join('\n');
-    return strToPrint;
+    const titleAndPrint = oldEvent.name.concat('\n\n').concat(strToPrint);
+    return titleAndPrint;
 };
 
 eventParticipantsDidUpdate$.subscribe(
