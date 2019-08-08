@@ -132,7 +132,7 @@ export namespace runescape {
         tracking?: Tracking
         teams?: string[][]
         participants: Participant[]
-        passTwoHourWarning: boolean
+        passedTwoHourWarning: boolean
         hasStarted: boolean
         hasEnded: boolean
     }

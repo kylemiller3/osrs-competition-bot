@@ -176,7 +176,7 @@ const updateEventAsNotifiedTwoHourWarned = (
     foundEvent: runescape.Event
 ): runescape.Event => utils.update(
     foundEvent,
-    { passTwoHourWarning: true }
+    { passedTwoHourWarning: true }
 );
 
 const updateEventAsNotifiedStarted = (
@@ -184,7 +184,7 @@ const updateEventAsNotifiedStarted = (
 ): runescape.Event => utils.update(
     foundEvent,
     {
-        passTwoHourWarning: true,
+        passedTwoHourWarning: true,
         hasStarted: true,
     }
 );
@@ -194,7 +194,7 @@ const updateEventAsNotifiedEnded = (
 ): runescape.Event => utils.update(
     foundEvent,
     {
-        passTwoHourWarning: true,
+        passedTwoHourWarning: true,
         hasStarted: true,
         hasEnded: true,
     }
@@ -1021,7 +1021,7 @@ const setTimerEnd = (
 const getUnnotifiedEvents = (
     data: bot.Data
 ): runescape.Event[] => data.events.filter(
-    (event: runescape.Event): boolean => !event.passTwoHourWarning
+    (event: runescape.Event): boolean => !event.passedTwoHourWarning
     || !event.hasStarted
     || !event.hasEnded
 );
@@ -1284,7 +1284,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     endingDate,
                     type,
                     participants: [],
-                    passTwoHourWarning: false,
+                    passedTwoHourWarning: false,
                     hasStarted: false,
                     hasEnded: false,
                 };
@@ -1810,7 +1810,7 @@ connect$.subscribe((): void => {
                     } else if (now >= twoHoursBeforeStart
                         && now < event.startingDate) {
                         utils.logger.debug('after 2 hour warning');
-                        if (!event.passTwoHourWarning) {
+                        if (!event.passedTwoHourWarning) {
                             utils.logger.debug('notification had not fired');
                             notifyParticipantsInEvent(
                                 guild,
@@ -1821,7 +1821,7 @@ connect$.subscribe((): void => {
                             // mark 2 hour warning as completed
                             const newEvent: runescape.Event = utils.update(
                                 event,
-                                { passTwoHourWarning: true }
+                                { passedTwoHourWarning: true }
                             );
                             saveNewEvent(
                                 data,
@@ -1859,7 +1859,7 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    passTwoHourWarning: true,
+                                    passedTwoHourWarning: true,
                                     hasStarted: true,
                                 }
                             );
@@ -1894,7 +1894,7 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    passTwoHourWarning: true,
+                                    passedTwoHourWarning: true,
                                     hasStarted: true,
                                 }
                             );
@@ -1930,7 +1930,7 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    passTwoHourWarning: true,
+                                    passedTwoHourWarning: true,
                                     hasStarted: true,
                                     hasEnded: true,
                                 }
@@ -1959,7 +1959,7 @@ connect$.subscribe((): void => {
                             const newEvent: runescape.Event = utils.update(
                                 event,
                                 {
-                                    passTwoHourWarning: true,
+                                    passedTwoHourWarning: true,
                                     hasStarted: true,
                                     hasEnded: true,
                                 }
@@ -1976,7 +1976,7 @@ connect$.subscribe((): void => {
                         const newEvent: runescape.Event = utils.update(
                             event,
                             {
-                                passTwoHourWarning: true,
+                                passedTwoHourWarning: true,
                                 hasStarted: true,
                                 hasEnded: true,
                             }
@@ -2835,7 +2835,7 @@ client.login(auth.token);
 //     type: runescape.EVENT_TYPE.REGULAR,
 //     tracking: null,
 //     participants: [eventParticipant1],
-//     passTwoHourWarning: false,
+//     passedTwoHourWarning: false,
 //     hasStarted: false,
 //     hasEnded: false
 // }
@@ -2894,7 +2894,7 @@ client.login(auth.token);
 //         type: runescape.EVENT_TYPE.COMPETITIVE,
 //         tracking,
 //         participants: [eventParticipant2],
-//         passTwoHourWarning: false,
+//         passedTwoHourWarning: false,
 //         hasStarted: false,
 //         hasEnded: false,
 //     }
