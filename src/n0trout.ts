@@ -399,15 +399,16 @@ const sendChannelAttachment = (
  * @function
  * @param guild The guild send the message to
  * @param channelId The channel id to send the message to
- * @param message The message content to send
+ * @param content The message content to send
  * @param options The Discord message options to use
  * @category Send Guild Message
  */
 const sendChannelMessage = (
     guild: discord.Guild,
     channelId: string,
-    message: string,
-    options: discord.MessageOptions = null
+    content: string,
+    options: discord.MessageOptions = null,
+    setMessageToEdit: boolean = false,
 ): void => {
     if (guild === null || !guild.available) return;
     const channel: discord.TextChannel = guild.channels.get(
@@ -415,13 +416,63 @@ const sendChannelMessage = (
     ) as discord.TextChannel;
     if (channel === undefined || channel.type !== 'text') return;
     utils.logger.debug('Sending message to Guild');
-
-    if (message !== null) {
+    if (content !== null) {
         channel.send(
-            message,
+            content,
             options
+        ).then(
+            (m: discord.Message): void => {
+                if (setMessageToEdit) {
+                    const data: bot.Data = bot.load(guild.id);
+                    const newSettings: bot.Settings = utils.update(
+                        data.settings,
+                        { messageToEditId: m.id }
+                    );
+                    saveNewSettings(
+                        data,
+                        newSettings,
+                        guild.id
+                    );
+                }
+            }
         );
     }
+};
+
+const editChannelMessage = (
+    guild: discord.Guild,
+    channelId: string,
+    messageId: string,
+    content: string,
+    options: discord.MessageOptions = null,
+): void => {
+    if (guild === null || !guild.available) return;
+    const channel: discord.TextChannel = guild.channels.get(
+        channelId
+    ) as discord.TextChannel;
+    if (channel === undefined || channel.type !== 'text') return;
+
+    utils.logger.debug('Editing message');
+    channel.fetchMessage(messageId).then(
+        (message: discord.Message): void => {
+            if (message === undefined) {
+                utils.logger.debug('message to edit not found');
+                sendChannelMessage(
+                    guild,
+                    channelId,
+                    content,
+                    options,
+                    true
+                );
+                return;
+            }
+
+            message.edit(
+                content,
+                options
+            );
+        }
+    );
 };
 
 /**
@@ -2556,13 +2607,13 @@ const updateLeaderboard = (
         number => (a > b ? a : b)
     );
 
-    const xpDiffMaxDisplayLength: number = xpDiff.map(
-        (diff: number):
-        number => diff.toLocaleString('en-US').length
-    ).reduce(
-        (a: number, b: number):
-        number => (a > b ? a : b)
-    );
+    // const xpDiffMaxDisplayLength: number = xpDiff.map(
+    //     (diff: number):
+    //     number => diff.toLocaleString('en-US').length
+    // ).reduce(
+    //     (a: number, b: number):
+    //     number => (a > b ? a : b)
+    // );
 
     const namePadding = 8;
     const plusPadding = 0;
@@ -2637,15 +2688,24 @@ eventParticipantsDidUpdate$.subscribe(
             foundEvent,
             newEvent
         );
-        utils.logger.debug(strToPrint);
 
-        // TODO: temp
-        sendChannelMessage(
-            guild,
-            newData.settings.notificationChannelId,
-            strToPrint,
-            { code: true }
-        );
+        if (newData.settings.messageToEditId !== undefined) {
+            editChannelMessage(
+                guild,
+                newData.settings.notificationChannelId,
+                newData.settings.messageToEditId,
+                strToPrint,
+                { code: true }
+            );
+        } else {
+            sendChannelMessage(
+                guild,
+                newData.settings.notificationChannelId,
+                strToPrint,
+                { code: true },
+                true
+            );
+        }
 
         // update stats
         if (newEvent.hasEnded) {
@@ -2671,6 +2731,16 @@ eventParticipantsDidUpdate$.subscribe(
             const updatedData: bot.Data = saveNewStats(
                 newData,
                 stats,
+                guild.id
+            );
+
+            const newSettings: bot.Settings = utils.update(
+                data.settings,
+                { messageToEditId: undefined }
+            );
+            saveNewSettings(
+                data,
+                newSettings,
                 guild.id
             );
 

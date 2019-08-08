@@ -20,6 +20,7 @@ export namespace bot {
         settings: {
             admins: [],
             notificationChannelId: undefined,
+            messageToEditId: undefined,
         },
 
         events: [],
@@ -94,6 +95,7 @@ export namespace bot {
     export interface Settings extends Record<string, unknown> {
         admins: string[]
         notificationChannelId: string
+        messageToEditId: string
     }
 
     /**
