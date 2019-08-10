@@ -2738,7 +2738,7 @@ eventParticipantsDidUpdate$.subscribe(
                 { messageToEditId: undefined }
             );
             saveNewSettings(
-                data,
+                updatedData,
                 newSettings,
                 guild.id
             );
