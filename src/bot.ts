@@ -110,26 +110,6 @@ export namespace bot {
     }
 
     /**
-     * Interface describing a Guild's Stats
-     * @category Configuration
-     */
-    export interface Stats extends Record<string, unknown> {
-        discordId: string
-        firstPlaceFinishes: number
-        secondPlaceFinishes: number
-        thirdPlaceFinishes: number
-        fourThroughTenFinishes: number
-        totalParticipants: number
-        totalPlaces: number
-        totalCompetitiveEvents: number
-        totalRegularEvents: number
-        totalSkillsGain: number
-        totalCluesGain: number
-        totalLmsGain: number
-        totalBhGain: number
-    }
-
-    /**
      * Implementation of [[bot.AccessControl]] for unset
      * Guild configuration or admin users only access
      * @category Access Control

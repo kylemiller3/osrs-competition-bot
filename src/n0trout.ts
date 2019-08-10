@@ -216,25 +216,6 @@ const saveNewSettings = (
 };
 
 /**
- * @param displayName The display name of the user to print
- * @param stats The Stats object to display
- * @returns A string describing the Stats object
- * @category Helper
- */
-const getStatsStr = (
-    displayName: string,
-    stats: bot.Stats
-): string => {
-    const averagePlace: number = Math.floor(
-        stats.totalPlaces / stats.totalCompetitiveEvents
-    );
-    const averageParticipants: number = Math.floor(
-        stats.totalParticipants / stats.totalCompetitiveEvents
-    );
-    return `\n${displayName}\n🥇: ${stats.firstPlaceFinishes}\n🥈: ${stats.secondPlaceFinishes}\n🥉: ${stats.thirdPlaceFinishes}\n4-10: ${stats.fourThroughTenFinishes}\n\nTotal events: ${stats.totalCompetitiveEvents + stats.totalRegularEvents}\nAverage placement: ${averagePlace}/${averageParticipants}`;
-};
-
-/**
  * @param events The list of all Events to filter
  * @returns A new array of upcoming and in-flight Events
  * @category Event
@@ -691,138 +672,6 @@ const getTotalEventGain = (
 };
 
 /**
- * @param sortedParticipants Participants to calculate stats for in desc order
- * @param oldStats The source Stats object
- * @param event The source Event object
- * @param competitive If the event was competitive or not
- * @returns A new updated Data object
- * @category Calculation
- */
-const updateStats = (
-    sortedParticipants: runescape.Participant[],
-    oldStats: bot.Stats[],
-    event: runescape.Event,
-    competitive: boolean
-): bot.Stats[] => {
-    const updatedStats: bot.Stats[] = sortedParticipants.map(
-        (participant: runescape.Participant, placing: number):
-        bot.Stats => {
-            const foundStats: bot.Stats = oldStats.find(
-                (stats: bot.Stats):
-                boolean => stats.discordId === participant.discordId
-            );
-            const StatsToUse: bot.Stats = foundStats === undefined
-                ? {
-                    discordId: participant.discordId,
-                    firstPlaceFinishes: 0,
-                    secondPlaceFinishes: 0,
-                    thirdPlaceFinishes: 0,
-                    fourThroughTenFinishes: 0,
-                    totalParticipants: 0,
-                    totalPlaces: 0,
-                    totalCompetitiveEvents: 0,
-                    totalRegularEvents: 0,
-                    totalSkillsGain: 0,
-                    totalCluesGain: 0,
-                    totalLmsGain: 0,
-                    totalBhGain: 0,
-                }
-                : foundStats;
-
-            if (!competitive) {
-                const regularEvents: number = StatsToUse.totalRegularEvents;
-                const newStats: bot.Stats = utils.update(
-                    StatsToUse,
-                    { totalRegularEvents: regularEvents + 1, }
-                );
-                return newStats;
-            }
-
-            const firstPlaceFinish = placing === 0 ? 1 : 0;
-            const secondPlaceFinish = placing === 1 ? 1 : 0;
-            const thirdPlaceFinish = placing === 2 ? 1 : 0;
-            const topTenPlaceFinishes = (placing > 2 && placing < 10) ? 1 : 0;
-            const participantCount = sortedParticipants.length;
-            const skillGain = getTotalEventGain(
-                participant,
-                event,
-                runescape.TrackingEnum.SKILLS
-            );
-            const bhGain = getTotalEventGain(
-                participant,
-                event,
-                runescape.TrackingEnum.BH
-            );
-            const lmsGain = getTotalEventGain(
-                participant,
-                event,
-                runescape.TrackingEnum.LMS
-            );
-            const cluesGain = getTotalEventGain(
-                participant,
-                event,
-                runescape.TrackingEnum.CLUES
-            );
-            const newFirstPlaceFinishes = StatsToUse.firstPlaceFinishes + firstPlaceFinish;
-            const newSecondPlaceFinishes = StatsToUse.secondPlaceFinishes + secondPlaceFinish;
-            const newThirdPlaceFinishes = StatsToUse.thirdPlaceFinishes + thirdPlaceFinish;
-            const newTopTenPlaceFinishes = StatsToUse.fourThroughTenFinishes + topTenPlaceFinishes;
-            const newTotalParticipants = StatsToUse.totalParticipants + participantCount;
-            const newTotalPlaces = StatsToUse.totalPlaces + placing + 1;
-            const newTotalEvents = StatsToUse.totalCompetitiveEvents + 1;
-            const newTotalSkillsGain = StatsToUse.totalSkillsGain + skillGain;
-            const newTotalBhGain = StatsToUse.totalBhGain + bhGain;
-            const newLmsGain = StatsToUse.totalLmsGain + lmsGain;
-            const newCluesGain = StatsToUse.totalCluesGain + cluesGain;
-            return {
-                discordId: StatsToUse.discordId,
-                firstPlaceFinishes: newFirstPlaceFinishes,
-                secondPlaceFinishes: newSecondPlaceFinishes,
-                thirdPlaceFinishes: newThirdPlaceFinishes,
-                fourThroughTenFinishes: newTopTenPlaceFinishes,
-                totalParticipants: newTotalParticipants,
-                totalPlaces: newTotalPlaces,
-                totalCompetitiveEvents: newTotalEvents,
-                totalRegularEvents: StatsToUse.totalRegularEvents,
-                totalSkillsGain: newTotalSkillsGain,
-                totalBhGain: newTotalBhGain,
-                totalLmsGain: newLmsGain,
-                totalCluesGain: newCluesGain,
-            };
-        }
-    );
-    const filteredStats: bot.Stats[] = oldStats.filter(
-        (statsOuter: bot.Stats):
-        boolean => updatedStats.every(
-            (statsInner: bot.Stats):
-            boolean => statsInner.discordId !== statsOuter.discordId
-        )
-    );
-    const newStats: bot.Stats[] = filteredStats.concat(updatedStats);
-    return newStats;
-};
-
-/**
- * @param oldData The source Data object
- * @param updatedStats The updated stats
- * @param guildId The guild to update
- */
-const saveNewStats = (
-    oldData: bot.Data,
-    updatedStats: bot.Stats[],
-    guildId: string,
-): bot.Data => {
-    const newData = utils.update(
-        oldData,
-        { stats: updatedStats, }
-    );
-    return bot.save(
-        guildId,
-        newData
-    );
-};
-
-/**
  * @param participants The source participants to update with new hiscores
  * @param pullNew If we should ignore the cache and update hiscores
  * @returns A new updated Data object
@@ -947,6 +796,149 @@ const findFirstRegexesMatch = (
     return mapped;
 };
 
+/**
+ * @param data The Data input to process
+ * @param discordId The Discord id to display stats for
+ * @returns A string describing a players statistics
+ * @category Helper
+ */
+const getStatsStr = (
+    data: bot.Data,
+    discordId: string,
+): string => {
+    interface Stats {
+        firstPlaceFinishes: number
+        secondPlaceFinishes: number
+        thirdPlaceFinishes: number
+        fourthAndFifthPlaceFinishes: number
+        totalCompetitivePlaces: number
+        totalCompetitiveParticipants: number
+        totalCompetitiveEvents: number
+        totalCasualEvents: number
+        totalXpGain: number
+        totalCluesGain: number
+        totalLmsGain: number
+        totalBhGain: number
+        totalTeamEvents: number
+        totalCustomEvents: number
+    }
+
+    const participatedEvents = data.events.filter(
+        (event: runescape.Event): boolean => event.participants.some(
+            (participant: runescape.Participant): boolean => participant.discordId === discordId
+        )
+    );
+    const mappedStats = participatedEvents.map(
+        (event: runescape.Event):
+        Stats => {
+            const tracking: runescape.TrackingEnum = getEventTracking(
+                event
+            );
+            const sortedParticipants: runescape.Participant[] = event.participants.sort(
+                (a: runescape.Participant, b: runescape.Participant):
+                number => getTotalEventGain(
+                    b,
+                    event,
+                    tracking
+                ) - getTotalEventGain(
+                    a,
+                    event,
+                    tracking
+                )
+            );
+            const foundParticipant = sortedParticipants.find(
+                (participant: runescape.Participant):
+                boolean => participant.discordId === discordId
+            );
+            const idx = event.participants.indexOf(
+                foundParticipant
+            );
+
+            if (runescape.isEventCasual(event)) {
+                const stats: Stats = {
+                    firstPlaceFinishes: 0,
+                    secondPlaceFinishes: 0,
+                    thirdPlaceFinishes: 0,
+                    fourthAndFifthPlaceFinishes: 0,
+                    totalCompetitivePlaces: 0,
+                    totalCompetitiveParticipants: 0,
+                    totalCompetitiveEvents: 0,
+                    totalCasualEvents: 1,
+                    totalCluesGain: 0,
+                    totalXpGain: 0,
+                    totalLmsGain: 0,
+                    totalBhGain: 0,
+                    totalTeamEvents: 0,
+                    totalCustomEvents: 0,
+                };
+                return stats;
+            }
+            const stats: Stats = {
+                firstPlaceFinishes: idx === 0 ? 1 : 0,
+                secondPlaceFinishes: idx === 1 ? 1 : 0,
+                thirdPlaceFinishes: idx === 2 ? 1 : 0,
+                fourthAndFifthPlaceFinishes: idx >= 3 && idx <= 4 ? 1 : 0,
+                totalCompetitivePlaces: idx + 1,
+                totalCompetitiveParticipants: event.participants.length,
+                totalCompetitiveEvents: 1,
+                totalCasualEvents: 0,
+                totalCluesGain: getTotalEventGain(
+                    foundParticipant,
+                    event,
+                    runescape.TrackingEnum.CLUES
+                ),
+                totalXpGain: getTotalEventGain(
+                    foundParticipant,
+                    event,
+                    runescape.TrackingEnum.SKILLS
+                ),
+                totalLmsGain: getTotalEventGain(
+                    foundParticipant,
+                    event,
+                    runescape.TrackingEnum.LMS
+                ),
+                totalBhGain: getTotalEventGain(
+                    foundParticipant,
+                    event,
+                    runescape.TrackingEnum.BH
+                ),
+                totalTeamEvents: runescape.isTeamEvent(event) ? 1 : 0,
+                totalCustomEvents: runescape.isEventCustom(event) ? 1 : 0,
+            };
+            return stats;
+        }
+    );
+
+    const stats: Stats = mappedStats.reduce(
+        (acc: Stats, x: Stats): Stats => {
+            acc.firstPlaceFinishes += x.firstPlaceFinishes;
+            acc.secondPlaceFinishes += x.secondPlaceFinishes;
+            acc.thirdPlaceFinishes += x.thirdPlaceFinishes;
+            acc.fourthAndFifthPlaceFinishes += x.fourthAndFifthPlaceFinishes;
+            acc.totalCompetitivePlaces += x.totalCompetitivePlaces;
+            acc.totalCompetitiveParticipants += x.totalCompetitiveParticipants;
+            acc.totalCompetitiveEvents += x.totalCompetitiveEvents;
+            acc.totalCasualEvents += x.totalCasualEvents;
+            acc.totalCluesGain += x.totalCluesGain;
+            acc.totalXpGain += x.totalXpGain;
+            acc.totalLmsGain += x.totalLmsGain;
+            acc.totalBhGain += x.totalBhGain;
+            acc.totalTeamEvents += x.totalTeamEvents;
+            acc.totalCustomEvents += x.totalCustomEvents;
+            return acc;
+        }
+    );
+    const averagePlace: number = stats.totalCompetitivePlaces / stats.totalCompetitiveEvents;
+    const averageParticipants: number = Math.floor(
+        stats.totalCompetitiveParticipants / stats.totalCompetitiveEvents
+    );
+    const displayName: string = discordIdToDisplayName(
+        data.guildId,
+        discordId
+    );
+    return `\n${displayName}\n🥇:\t${stats.firstPlaceFinishes}\n🥈:\t${stats.secondPlaceFinishes}\n🥉:\t${stats.thirdPlaceFinishes}\n4-5:\t${stats.fourthAndFifthPlaceFinishes}\n\nTotal events:\t${stats.totalCompetitiveEvents + stats.totalCasualEvents}\nAverage placement:\t${averagePlace}/${averageParticipants}`;
+};
+
 //----------------------
 // Observables & helpers
 //
@@ -1036,6 +1028,7 @@ const filteredMessage$ = (
                     return input;
                 })
                 // we probably want to die on load/save errors
+                // keep this commented out
                 // catchError((error: Error): Observable<Input> => {
                 //     utils.logError(error)
                 //     return forkJoin(
@@ -1597,7 +1590,7 @@ const forceUnsignup$: Observable<Input> = filteredMessage$(bot.COMMANDS.FORCEUNS
  * An Observable that handles the [[bot.COMMANDS.SHOWSTATS]] command
  * @category Command Observable
  */
-const showStat$: Observable<Input> = filteredMessage$(
+const showStats$: Observable<Input> = filteredMessage$(
     bot.COMMANDS.SHOWSTATS
 );
 
@@ -2129,6 +2122,15 @@ connect$.subscribe((): void => {
                 guild.id,
                 true
             );
+
+            if (data.guildId === undefined) {
+                data.guildId = guild.id;
+                bot.save(
+                    guild.id,
+                    data
+                );
+            }
+
             utils.logger.debug(`Loaded json for guild ${guild.id}`);
             utils.logger.silly(`${JSON.stringify(data)}`);
 
@@ -2893,32 +2895,23 @@ forceUnsignup$.subscribe(
     }
 );
 
+showStats$.subscribe(
+    (command: Input): void => {
+        const data: bot.Data = bot.load(command.guild.id);
+        const user: discord.User = command.message.mentions.members.array().length > 0
+            ? command.message.mentions.users.array()[0]
+            : command.author;
 
-// un-implement for now
-// showStat$.subscribe(
-//     (command: Input): void => {
-//         const data: bot.Data = bot.load(command.guild.id);
-//         const user: discord.User = command.message.mentions.members.array().length > 0
-//             ? command.message.mentions.users.array()[0]
-//             : command.author;
-//         const foundStats: bot.Stats = data.stats.find(
-//             (stats: bot.Stats): boolean => stats.discordId === user.id
-//         );
-//         const displayName: string = discordIdToDisplayName(
-//             command.guild,
-//             user.id
-//         );
-//         if (foundStats === undefined) {
-//             command.message.reply(`${displayName} has not completed any events yet`);
-//             return;
-//         }
-//         const stats: string = getStatsStr(
-//             displayName,
-//             foundStats
-//         );
-//         command.message.reply(stats);
-//     }
-// );
+        const statsStr: string = getStatsStr(
+            data,
+            user.id
+        );
+        command.message.reply(
+            statsStr,
+            { code: true, },
+        );
+    }
+);
 
 //--------------
 // Global script

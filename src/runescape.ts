@@ -152,6 +152,15 @@ export namespace runescape {
     }
 
     /**
+     * Checks an event to see if it is a team event
+     * @param event The event to check
+     * @returns If the event is a team event
+     * @category Helper
+     */
+    export const isTeamEvent = (event: Event):
+    boolean => event.teams !== undefined;
+
+    /**
      * Checks an event to see if it is casual or competitive
      * @param event The event to check
      * @returns If the event is a causal event
