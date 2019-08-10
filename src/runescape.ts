@@ -7,7 +7,7 @@ import {
 import {
     publishReplay, refCount, catchError, retryWhen, mergeMap,
 } from 'rxjs/operators';
-import { utils } from './utils';
+import { utils, } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace runescape {
@@ -125,6 +125,7 @@ export namespace runescape {
      */
     export interface Event extends Record<string, unknown> {
         id: string
+        scoreboardMessageId?: string
         name: string
         startingDate: Date
         endingDate: Date
@@ -132,7 +133,7 @@ export namespace runescape {
         tracking?: Tracking
         teams?: string[][]
         participants: Participant[]
-        passedTwoHourWarning: boolean
+        hasPassedTwoHourWarning: boolean
         hasStarted: boolean
         hasEnded: boolean
     }
@@ -158,6 +159,15 @@ export namespace runescape {
      */
     export const isEventCasual = (event: Event):
     boolean => event.type === EVENT_TYPE.CASUAL;
+
+    /**
+     * Checks an event to see if it is custom or not
+     * @param event The event to check
+     * @returns If the event is a custom event
+     * @category Helper
+     */
+    export const isEventCustom = (event: Event):
+    boolean => event.type === EVENT_TYPE.CUSTOM;
 
     /**
      * Enum of all possible trackings

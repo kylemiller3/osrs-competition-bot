@@ -13,7 +13,10 @@ export namespace utils {
         dictionaryA: T,
         dictionaryB: {}
     ): T => {
-        const copy = { ...dictionaryA, ...dictionaryB };
+        const copy = {
+            ...dictionaryA,
+            ...dictionaryB,
+        };
         return copy;
     };
 

@@ -3,7 +3,7 @@ import * as jsonfile from 'jsonfile';
 import {
     runescape,
 } from './runescape';
-import { utils } from './utils';
+import { utils, } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace bot {
@@ -17,14 +17,13 @@ export namespace bot {
      * @category Configuration
      */
     const DATA_DEFAULT: bot.Data = {
+        guildId: undefined,
         settings: {
             admins: [],
             notificationChannelId: undefined,
-            messageToEditId: undefined,
         },
 
         events: [],
-        stats: [],
     };
 
     /**
@@ -86,6 +85,9 @@ export namespace bot {
         LIST_PARTICIPANTS_UPCOMING: Command
         HELP: Command
         SET_CHANNEL: Command
+        FORCESIGNUP_UPCOMING: Command
+        FORCEUNSIGNUP_UPCOMING: Command
+        SHOWSTATS: Command
     }
 
     /**
@@ -95,7 +97,6 @@ export namespace bot {
     export interface Settings extends Record<string, unknown> {
         admins: string[]
         notificationChannelId: string
-        messageToEditId: string
     }
 
     /**
@@ -103,9 +104,9 @@ export namespace bot {
      * @category Configuration
      */
     export interface Data extends Record<string, unknown> {
+        guildId: string
         settings: Settings
         events: runescape.Event[]
-        stats: Stats[]
     }
 
     /**
@@ -172,7 +173,6 @@ export namespace bot {
             accessControl: ONLY_ADMIN,
             parameters: '',
         },
-
         ADD_ADMIN: {
             command: '!f add admin ',
             description: 'adds administration for this guild',
@@ -255,20 +255,6 @@ export namespace bot {
             description: 'forces un-signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
             accessControl: ONLY_ADMIN,
             parameters: '(index mention)',
-        },
-
-        UPDATELEADERBOARD: {
-            command: '!f updateleaderboard ',
-            description: 'updates and prints an event\'s leaderboard (use with \'!f events\')',
-            accessControl: ANY_USER,
-            parameters: '(index)',
-        },
-
-        SHOWLEADERBOARD: {
-            command: '!f showleaderboard ',
-            description: 'prints an event\'s leaderboard (use with \'!f events\')',
-            accessControl: ANY_USER,
-            parameters: '(index)',
         },
 
         SHOWSTATS: {
