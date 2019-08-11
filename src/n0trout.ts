@@ -32,7 +32,7 @@ import auth from './auth.json';
 //
 //----------
 
-const TWO_HOUR_WARN_STR = 'will begin in 2 hours.';
+const TWO_HOUR_WARN_STR = 'will begin within 2 hours.';
 const START_STR = 'has begun.';
 const END_STR = 'has ended.';
 
@@ -404,83 +404,53 @@ const sendChannelAttachment = (
  * @param options The Discord message options to use
  * @category Send Guild Message
  */
-const sendChannelMessage = (
+const sendChannelMessage = async (
     guildId: string,
     channelId: string,
     content: string,
     options: discord.MessageOptions = null,
-    setMessageToEdit: boolean = false,
-): void => {
+): Promise<discord.Message> => {
+    if (content === undefined) return Promise.reject();
+    if (guildId === undefined) return Promise.reject();
     const guild: discord.Guild = client.guilds.get(
         guildId
     ) as discord.Guild;
-    if (guild === undefined || !guild.available) return;
+    if (guild === undefined || !guild.available) return Promise.reject();
     const channel: discord.TextChannel = guild.channels.get(
         channelId
     ) as discord.TextChannel;
-    if (channel === undefined || channel.type !== 'text') return;
+    if (channel === undefined || channel.type !== 'text') return Promise.reject();
     utils.logger.debug('Sending message to Guild');
-    if (content !== null) {
-        channel.send(
-            content,
-            options
-        ).then(
-            (m: discord.Message): void => {
-                if (setMessageToEdit) {
-                    const data: bot.Data = bot.load(guild.id);
-                    const newSettings: bot.Settings = utils.update(
-                        data.settings,
-                        // TODO: fix me
-                        { messageToEditId: m.id, }
-                    );
-                    saveNewSettings(
-                        data,
-                        newSettings,
-                        guild.id
-                    );
-                }
-            }
-        );
-    }
+    const message: discord.Message = await channel.send(
+        content,
+        options
+    ) as discord.Message;
+    return message;
 };
 
-const editChannelMessage = (
+const editChannelMessage = async (
     guildId: string,
     channelId: string,
     messageId: string,
     content: string,
     options: discord.MessageOptions = null,
-): void => {
-    if (guildId === undefined) return;
+): Promise<discord.Message> => {
+    if (content === undefined) return Promise.reject();
+    if (guildId === undefined) return Promise.reject();
     const guild: discord.Guild = client.guilds.get(
         guildId
     ) as discord.Guild;
-    if (guild === undefined || !guild.available) return;
+    if (guild === undefined || !guild.available) return Promise.reject();
     const channel: discord.TextChannel = guild.channels.get(
         channelId
     ) as discord.TextChannel;
-    if (channel === undefined || channel.type !== 'text') return;
+    if (channel === undefined || channel.type !== 'text') return Promise.reject();
 
     utils.logger.debug('Editing message');
-    channel.fetchMessage(messageId).then(
-        (message: discord.Message): void => {
-            if (message === undefined) {
-                utils.logger.debug('message to edit not found');
-                sendChannelMessage(
-                    guildId,
-                    channelId,
-                    content,
-                    options,
-                    true
-                );
-                return;
-            }
-
-            message.edit(
-                content,
-                options
-            );
-        }
+    const message: discord.Message = await channel.fetchMessage(messageId);
+    return message.edit(
+        content,
+        options
     );
 };
 
@@ -507,78 +477,6 @@ const notifyParticipantsInEvent = (
         `event '${event.name}' ${message} ${mentions}`,
         null
     );
-};
-
-/**
- * @param guildId The Guild id to notify and process
- * @param eventId The source Event id
- * @returns A new updated Event object
- * @category Send Guild Message
- */
-const notifyAndSaveWarnedEvent = (
-    guildId: string,
-    eventId: string,
-): runescape.Event => {
-    const data: bot.Data = bot.load(
-        guildId
-    );
-    const fetchedEvent: runescape.Event = fetchUpdatedEvent(
-        data,
-        eventId,
-    );
-    notifyParticipantsInEvent(
-        data,
-        fetchedEvent,
-        TWO_HOUR_WARN_STR,
-    );
-
-    // mark 2 hour warning as completed
-    const newEvent: runescape.Event = {
-        ...fetchedEvent,
-    };
-    newEvent.hasPassedTwoHourWarning = true;
-    saveNewEvent(
-        data,
-        newEvent,
-    );
-    return newEvent;
-};
-
-/**
- * @param guildId The Guild id to notify and process
- * @param eventId The source Event id
- * @returns A new updated Event object
- * @category Send Guild Message
- */
-const notifyAndSaveEndedEvent = (
-    guildId: string,
-    eventId: string,
-): runescape.Event => {
-    const data: bot.Data = bot.load(
-        guildId
-    );
-    const fetchedEvent: runescape.Event = fetchUpdatedEvent(
-        data,
-        eventId,
-    );
-
-    notifyParticipantsInEvent(
-        data,
-        fetchedEvent,
-        END_STR,
-    );
-
-    // mark end date as completed
-    const newEvent: runescape.Event = {
-        ...fetchedEvent,
-    };
-    newEvent.hasEnded = true;
-
-    saveNewEvent(
-        data,
-        newEvent,
-    );
-    return newEvent;
 };
 
 /**
@@ -681,6 +579,7 @@ const updateParticipantsHiscores$ = (
     participants: runescape.Participant[],
     pullNew: boolean = true
 ): Observable<runescape.Participant[]> => {
+    if (participants.length === 0) return of([]);
     const update$: Observable<runescape.Participant>[] = participants.map(
         (participant: runescape.Participant):
         Observable<runescape.Participant> => of(participant)
@@ -811,6 +710,7 @@ const getStatsStr = (
         secondPlaceFinishes: number
         thirdPlaceFinishes: number
         fourthAndFifthPlaceFinishes: number
+        sixThroughTenPlaceFinishes: number
         totalCompetitivePlaces: number
         totalCompetitiveParticipants: number
         totalCompetitiveEvents: number
@@ -860,6 +760,7 @@ const getStatsStr = (
                     secondPlaceFinishes: 0,
                     thirdPlaceFinishes: 0,
                     fourthAndFifthPlaceFinishes: 0,
+                    sixThroughTenPlaceFinishes: 0,
                     totalCompetitivePlaces: 0,
                     totalCompetitiveParticipants: 0,
                     totalCompetitiveEvents: 0,
@@ -878,6 +779,7 @@ const getStatsStr = (
                 secondPlaceFinishes: idx === 1 ? 1 : 0,
                 thirdPlaceFinishes: idx === 2 ? 1 : 0,
                 fourthAndFifthPlaceFinishes: idx >= 3 && idx <= 4 ? 1 : 0,
+                sixThroughTenPlaceFinishes: idx >= 5 && idx <= 9 ? 1 : 0,
                 totalCompetitivePlaces: idx + 1,
                 totalCompetitiveParticipants: event.participants.length,
                 totalCompetitiveEvents: 1,
@@ -915,6 +817,7 @@ const getStatsStr = (
             acc.secondPlaceFinishes += x.secondPlaceFinishes;
             acc.thirdPlaceFinishes += x.thirdPlaceFinishes;
             acc.fourthAndFifthPlaceFinishes += x.fourthAndFifthPlaceFinishes;
+            acc.sixThroughTenPlaceFinishes += x.sixThroughTenPlaceFinishes;
             acc.totalCompetitivePlaces += x.totalCompetitivePlaces;
             acc.totalCompetitiveParticipants += x.totalCompetitiveParticipants;
             acc.totalCompetitiveEvents += x.totalCompetitiveEvents;
@@ -926,17 +829,147 @@ const getStatsStr = (
             acc.totalTeamEvents += x.totalTeamEvents;
             acc.totalCustomEvents += x.totalCustomEvents;
             return acc;
+        },
+        {
+            firstPlaceFinishes: 0,
+            secondPlaceFinishes: 0,
+            thirdPlaceFinishes: 0,
+            fourthAndFifthPlaceFinishes: 0,
+            sixThroughTenPlaceFinishes: 0,
+            totalCompetitivePlaces: 0,
+            totalCompetitiveParticipants: 0,
+            totalCompetitiveEvents: 0,
+            totalCasualEvents: 0,
+            totalCluesGain: 0,
+            totalXpGain: 0,
+            totalLmsGain: 0,
+            totalBhGain: 0,
+            totalTeamEvents: 0,
+            totalCustomEvents: 0,
         }
     );
-    const averagePlace: number = stats.totalCompetitivePlaces / stats.totalCompetitiveEvents;
-    const averageParticipants: number = Math.floor(
-        stats.totalCompetitiveParticipants / stats.totalCompetitiveEvents
-    );
+
     const displayName: string = discordIdToDisplayName(
         data.guildId,
         discordId
     );
-    return `\n${displayName}\n🥇:\t${stats.firstPlaceFinishes}\n🥈:\t${stats.secondPlaceFinishes}\n🥉:\t${stats.thirdPlaceFinishes}\n4-5:\t${stats.fourthAndFifthPlaceFinishes}\n\nTotal events:\t${stats.totalCompetitiveEvents + stats.totalCasualEvents}\nAverage placement:\t${averagePlace}/${averageParticipants}`;
+
+    const placePadding = 4;
+    const statisticsPadding = 4;
+
+    const placingStrs: [
+        string,
+        string
+    ][] = [
+        [
+            '🥇',
+            stats.firstPlaceFinishes.toLocaleString('en-US'),
+        ],
+        [
+            '🥈',
+            stats.secondPlaceFinishes.toLocaleString('en-US'),
+        ],
+        [
+            '🥉',
+            stats.thirdPlaceFinishes.toLocaleString('en-US'),
+        ],
+        [
+            '4th-5th',
+            stats.fourthAndFifthPlaceFinishes.toLocaleString('en-US'),
+        ],
+        [
+            '6th-10th',
+            stats.sixThroughTenPlaceFinishes.toLocaleString('en-US'),
+        ],
+    ];
+
+    const maxPlacingStrLength: number = Math.max(...placingStrs.map(
+        (strs: [string, string]): number => strs[0].length
+    ));
+
+    const placingOutputStr: string = placingStrs.map(
+        (strs: [string, string]): string => {
+            const spacesToInsert: string = new Array(
+                maxPlacingStrLength + placePadding - strs[0].length + 1
+            ).join(' ');
+            return `${strs[0]}${spacesToInsert}${strs[1]}`;
+        }
+    ).join('\n');
+
+    const statsStrs: [
+        string,
+        string
+    ][] = [
+        [
+            'Casual events',
+            stats.totalCasualEvents.toLocaleString('en-US'),
+        ],
+        [
+            'Competitive events',
+            stats.totalCompetitiveEvents.toLocaleString('en-US'),
+        ],
+        [
+            'Team events',
+            stats.totalTeamEvents.toLocaleString('en-US'),
+        ],
+        [
+            'Custom events',
+            stats.totalCustomEvents.toLocaleString('en-US'),
+        ],
+        [
+            'Total events',
+            (stats.totalCasualEvents + stats.totalCompetitiveEvents).toLocaleString('en-US'),
+        ],
+        [
+            'Total XP gain',
+            stats.totalXpGain.toLocaleString('en-US'),
+        ],
+        [
+            'Total clues found',
+            stats.totalCluesGain.toLocaleString('en-US'),
+        ],
+        [
+            'Total LMS points',
+            stats.totalLmsGain.toLocaleString('en-US'),
+        ],
+        [
+            'Total Bounty Hunter points',
+            stats.totalBhGain.toLocaleString('en-US'),
+        ],
+        [
+            'Average placement',
+            (stats.totalCompetitivePlaces / stats.totalCompetitiveEvents).toLocaleString(
+                'en-US',
+                {
+                    maximumFractionDigits: 1,
+                }
+            ),
+        ],
+        [
+            'Participants/competition',
+            (stats.totalCompetitiveParticipants / stats.totalCompetitiveEvents).toLocaleString(
+                'en-US',
+                {
+                    maximumFractionDigits: 1,
+                }
+            ),
+        ],
+    ];
+
+    const maxStatsStrLength: number = Math.max(...statsStrs.map(
+        (strs: [string, string]): number => strs[0].length
+    ));
+
+    const statsOutputStr: string = statsStrs.map(
+        (strs: [string, string]): string => {
+            const spacesToInsert: string = new Array(
+                maxStatsStrLength + statisticsPadding - strs[0].length + 1
+            ).join(' ');
+            return `${strs[0]}${spacesToInsert}${strs[1]}`;
+        }
+    ).join('\n');
+
+    return `${displayName}\n${placingOutputStr}\n\n${statsOutputStr}`;
 };
 
 //----------------------
@@ -1736,8 +1769,15 @@ eventDidStart$.subscribe(
         && !runescape.isEventCustom(newEvent)) {
             timers[newEvent.id].autoUpdate = setInterval(
                 (): void => {
+                    const newUpdatedData: bot.Data = bot.load(
+                        guildData.guildId,
+                    );
+                    const newFetchedEvent: runescape.Event = fetchUpdatedEvent(
+                        newUpdatedData,
+                        eventThatStarted.id,
+                    );
                     updateParticipantsHiscores$(
-                        newEvent.participants
+                        newFetchedEvent.participants
                     ).subscribe(
                         (newParticipants: runescape.Participant[]): void => {
                             eventParticipantsDidUpdate$.next(
@@ -1750,7 +1790,7 @@ eventDidStart$.subscribe(
                         }
                     );
                 },
-                30 * 60 * 1000
+                1 * 60 * 1000
             );
         }
     }
@@ -1795,7 +1835,7 @@ const getLeaderboardStr = (
         }
     );
 
-    const nameMaxDisplayLength: number = sortedParticipants.map(
+    const nameMaxDisplayLength: number = Math.max(...sortedParticipants.map(
         (participant: runescape.Participant):
         number => discordIdToDisplayName(
             guildIdToPrint,
@@ -1805,10 +1845,7 @@ const getLeaderboardStr = (
             updatedEvent,
             tracking
         ).toLocaleString('en-US').length
-    ).reduce(
-        (a: number, b: number):
-        number => (a > b ? a : b)
-    );
+    ));
 
     const namePadding = 8;
     const plusPadding = 0;
@@ -1886,6 +1923,7 @@ eventParticipantsDidUpdate$.subscribe(
             updatedEvent,
         );
 
+        // TODO: make observable
         if (updatedEvent.scoreboardMessageId !== undefined) {
             editChannelMessage(
                 updatedData.guildId,
@@ -1893,6 +1931,34 @@ eventParticipantsDidUpdate$.subscribe(
                 updatedEvent.scoreboardMessageId,
                 strToPrint,
                 { code: true, }
+            ).catch(
+                (): void => {
+                    sendChannelMessage(
+                        updatedData.guildId,
+                        updatedData.settings.notificationChannelId,
+                        strToPrint,
+                        { code: true, },
+                    ).then(
+                        (message: discord.Message): void => {
+                            const newUpdatedData: bot.Data = bot.load(
+                                guildId
+                            );
+                            const newUpdatedFetchedEvent: runescape.Event = fetchUpdatedEvent(
+                                newUpdatedData,
+                                eventId,
+                            );
+                            if (newUpdatedFetchedEvent === undefined) return;
+                            const newUpdatedEvent = {
+                                ...newUpdatedFetchedEvent,
+                            };
+                            newUpdatedEvent.scoreboardMessageId = message.id;
+                            saveNewEvent(
+                                newUpdatedData,
+                                newUpdatedEvent,
+                            );
+                        }
+                    );
+                }
             );
         } else {
             sendChannelMessage(
@@ -1900,7 +1966,25 @@ eventParticipantsDidUpdate$.subscribe(
                 updatedData.settings.notificationChannelId,
                 strToPrint,
                 { code: true, },
-                true
+            ).then(
+                (message: discord.Message): void => {
+                    const newUpdatedData: bot.Data = bot.load(
+                        guildId
+                    );
+                    const newUpdatedFetchedEvent: runescape.Event = fetchUpdatedEvent(
+                        newUpdatedData,
+                        eventId,
+                    );
+                    if (newUpdatedFetchedEvent === undefined) return;
+                    const newUpdatedEvent = {
+                        ...newUpdatedFetchedEvent,
+                    };
+                    newUpdatedEvent.scoreboardMessageId = message.id;
+                    saveNewEvent(
+                        newUpdatedData,
+                        newUpdatedEvent,
+                    );
+                }
             );
         }
     }
@@ -1925,7 +2009,7 @@ const setTimerEnd = (
                     event: eventToSetTimers,
                 }
             );
-        }, eventToSetTimers.startingDate.getTime() - now.getTime()
+        }, eventToSetTimers.endingDate.getTime() - now.getTime()
     );
 };
 
@@ -1981,24 +2065,24 @@ eventWillWarnStart$.subscribe(
 eventDidWarnStart$.subscribe(
     (obj: GuildDataAndEvent): void => {
         const guildData: bot.Data = obj.guildData;
-        const event: runescape.Event = obj.event;
+        const eventThatStarted: runescape.Event = obj.event;
 
-        const data: bot.Data = bot.load(
-            guildData.guildId
+        const updatedData: bot.Data = bot.load(
+            guildData.guildId,
         );
         const fetchedEvent: runescape.Event = fetchUpdatedEvent(
-            data,
-            event.id,
+            updatedData,
+            eventThatStarted.id,
         );
-        if (fetchedEvent === undefined) return;
-        const updatedEvent = {
+
+        const newEvent: runescape.Event = {
             ...fetchedEvent,
         };
-        updatedEvent.hasEnded = true;
+        newEvent.hasPassedTwoHourWarning = true;
 
         saveNewEvent(
-            data,
-            updatedEvent,
+            updatedData,
+            newEvent,
         );
     }
 );
