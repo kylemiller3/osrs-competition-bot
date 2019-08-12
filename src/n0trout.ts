@@ -884,13 +884,13 @@ const getStatsStr = (
     ];
 
     const maxPlacingStrLength: number = Math.max(...placingStrs.map(
-        (strs: [string, string]): number => strs[0].length
+        (strs: [string, string]): number => strs[0].length + strs[1].length + placePadding
     ));
 
     const placingOutputStr: string = placingStrs.map(
         (strs: [string, string]): string => {
             const spacesToInsert: string = new Array(
-                maxPlacingStrLength + placePadding - strs[0].length + 1
+                maxPlacingStrLength - strs[0].length - strs[1].length + 1
             ).join(' ');
             return `${strs[0]}${spacesToInsert}${strs[1]}`;
         }
@@ -957,13 +957,13 @@ const getStatsStr = (
     ];
 
     const maxStatsStrLength: number = Math.max(...statsStrs.map(
-        (strs: [string, string]): number => strs[0].length
+        (strs: [string, string]): number => strs[0].length + strs[1].length + statisticsPadding
     ));
 
     const statsOutputStr: string = statsStrs.map(
         (strs: [string, string]): string => {
             const spacesToInsert: string = new Array(
-                maxStatsStrLength + statisticsPadding - strs[0].length + 1
+                maxStatsStrLength - strs[0].length - strs[1].length + 1
             ).join(' ');
             return `${strs[0]}${spacesToInsert}${strs[1]}`;
         }
@@ -1848,6 +1848,9 @@ const getLeaderboardStr = (
         }
     );
 
+    const namePadding = 8;
+    const plusPadding = 0;
+    const diffPadding = 4;
     const nameMaxDisplayLength: number = Math.max(...sortedParticipants.map(
         (participant: runescape.Participant):
         number => discordIdToDisplayName(
@@ -1858,12 +1861,7 @@ const getLeaderboardStr = (
             updatedEvent,
             tracking
         ).toLocaleString('en-US').length
-    ));
-
-    const namePadding = 8;
-    const plusPadding = 0;
-    const diffPadding = 4;
-    const totalNameMaxLength = namePadding + nameMaxDisplayLength;
+    )) + namePadding;
 
     const strToPrint: string = sortedParticipants.map(
         (participant: runescape.Participant, idx: number): string => {
@@ -1879,7 +1877,7 @@ const getLeaderboardStr = (
             const xpDiffStr = xpDiff[idx].toLocaleString('en-US');
 
             const numNameSpacesToInsert:
-            number = totalNameMaxLength - displayName.length - eventGain.length;
+            number = nameMaxDisplayLength - displayName.length - eventGain.length;
 
             const nameSpaces: string = new Array(numNameSpacesToInsert + 1).join(' ');
             const diffSpaces: string = new Array(diffPadding + 1).join(' ');
