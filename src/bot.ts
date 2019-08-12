@@ -238,7 +238,7 @@ export namespace bot {
         },
 
         SHOWSTATS: {
-            command: '!f showstats',
+            command: '!f stats',
             description: 'prints stats for a user',
             accessControl: ANY_USER,
             parameters: ' ?(mention)',

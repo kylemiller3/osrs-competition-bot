@@ -854,7 +854,7 @@ const getStatsStr = (
         discordId
     );
 
-    const placePadding = 4;
+    const placePadding = 8;
     const statisticsPadding = 4;
 
     const placingStrs: [
@@ -901,6 +901,22 @@ const getStatsStr = (
         string
     ][] = [
         [
+            'Total XP gain',
+            stats.totalXpGain.toLocaleString('en-US'),
+        ],
+        [
+            'Total clues found',
+            stats.totalCluesGain.toLocaleString('en-US'),
+        ],
+        [
+            'Total LMS points',
+            stats.totalLmsGain.toLocaleString('en-US'),
+        ],
+        [
+            'Total Bounty Hunter points',
+            stats.totalBhGain.toLocaleString('en-US'),
+        ],
+        [
             'Casual events',
             stats.totalCasualEvents.toLocaleString('en-US'),
         ],
@@ -921,22 +937,6 @@ const getStatsStr = (
             (stats.totalCasualEvents + stats.totalCompetitiveEvents).toLocaleString('en-US'),
         ],
         [
-            'Total XP gain',
-            stats.totalXpGain.toLocaleString('en-US'),
-        ],
-        [
-            'Total clues found',
-            stats.totalCluesGain.toLocaleString('en-US'),
-        ],
-        [
-            'Total LMS points',
-            stats.totalLmsGain.toLocaleString('en-US'),
-        ],
-        [
-            'Total Bounty Hunter points',
-            stats.totalBhGain.toLocaleString('en-US'),
-        ],
-        [
             'Average placement',
             (stats.totalCompetitivePlaces / stats.totalCompetitiveEvents).toLocaleString(
                 'en-US',
@@ -946,7 +946,7 @@ const getStatsStr = (
             ),
         ],
         [
-            'Participants/competition',
+            'Participants / competition',
             (stats.totalCompetitiveParticipants / stats.totalCompetitiveEvents).toLocaleString(
                 'en-US',
                 {
@@ -1722,6 +1722,40 @@ eventWillStart$.subscribe(
 );
 
 /**
+ *
+ * @param eventId The event to set the timer for
+ * @param guildId The source input data
+ */
+const setTimerAutoUpdate = (
+    eventId: string,
+    guildId: string,
+): NodeJS.Timeout => setInterval(
+    (): void => {
+        const data: bot.Data = bot.load(
+            guildId
+        );
+        const newFetchedEvent: runescape.Event = fetchUpdatedEvent(
+            data,
+            eventId,
+        );
+        updateParticipantsHiscores$(
+            newFetchedEvent.participants
+        ).subscribe(
+            (newParticipants: runescape.Participant[]):
+            void => {
+                eventParticipantsDidUpdate$.next(
+                    {
+                        guildId,
+                        eventId,
+                        participants: newParticipants,
+                    }
+                );
+            }
+        );
+    }, 60 * 60 * 1000
+);
+
+/**
  * @param obj Object containing the Guild Data and Event that did start
  * @category Event Lifecycle
  */
@@ -1767,30 +1801,9 @@ eventDidStart$.subscribe(
 
         if (!runescape.isEventCasual(newEvent)
         && !runescape.isEventCustom(newEvent)) {
-            timers[newEvent.id].autoUpdate = setInterval(
-                (): void => {
-                    const newUpdatedData: bot.Data = bot.load(
-                        guildData.guildId,
-                    );
-                    const newFetchedEvent: runescape.Event = fetchUpdatedEvent(
-                        newUpdatedData,
-                        eventThatStarted.id,
-                    );
-                    updateParticipantsHiscores$(
-                        newFetchedEvent.participants
-                    ).subscribe(
-                        (newParticipants: runescape.Participant[]): void => {
-                            eventParticipantsDidUpdate$.next(
-                                {
-                                    guildId: guildData.guildId,
-                                    eventId: newEvent.id,
-                                    participants: newParticipants,
-                                }
-                            );
-                        }
-                    );
-                },
-                1 * 60 * 1000
+            timers[newEvent.id].autoUpdate = setTimerAutoUpdate(
+                newEvent.id,
+                guildData.guildId
             );
         }
     }
@@ -1923,7 +1936,7 @@ eventParticipantsDidUpdate$.subscribe(
             updatedEvent,
         );
 
-        // TODO: make observable
+        // TODO: make observable?
         if (updatedEvent.scoreboardMessageId !== undefined) {
             editChannelMessage(
                 updatedData.guildId,
@@ -2259,7 +2272,6 @@ connect$.subscribe((): void => {
                         // schedule 2 hour warning
                         // schedule start date notification
                         // schedule end date notification
-                        // TODO: change me
                         timers[event.id] = {
                             autoUpdate: undefined,
                             twoHoursBeforeEventTimer: setTimerTwoHoursBefore(
@@ -2337,7 +2349,10 @@ connect$.subscribe((): void => {
                         }
                         // TODO: change me
                         timers[event.id] = {
-                            autoUpdate: undefined,
+                            autoUpdate: setTimerAutoUpdate(
+                                event.id,
+                                data.guildId,
+                            ),
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: undefined,
                             eventEndedTimer: setTimerEnd(
@@ -2374,7 +2389,10 @@ connect$.subscribe((): void => {
                         // schedule end date notification
                         // TODO: change me
                         timers[event.id] = {
-                            autoUpdate: undefined,
+                            autoUpdate: setTimerAutoUpdate(
+                                event.id,
+                                data.guildId,
+                            ),
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: undefined,
                             eventEndedTimer: setTimerEnd(
@@ -2701,7 +2719,8 @@ deleteUpcomingEvent$.subscribe(
         );
 
         // cancel timers
-        Object.keys(timers).forEach(
+        // TODO: error here
+        Object.keys(timers[eventToDelete.id]).forEach(
             (key: string): void => {
                 const timer: NodeJS.Timeout = timers[eventToDelete.id][key];
                 if (timer === undefined) return;
