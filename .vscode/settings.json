@@ -17,6 +17,7 @@
         "SIGNUP",
         "UNSIGNUP",
         "Unnotified",
+        "appenders",
         "firemaking",
         "forcesignup",
         "forceunsignup",

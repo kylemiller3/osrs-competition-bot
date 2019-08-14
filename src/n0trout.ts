@@ -2207,11 +2207,11 @@ connect$.subscribe((): void => {
     utils.logger.info(`* ${client.user.username}`);
     utils.logger.info(`* ${client.user.id}`);
 
-    utils.logger.verbose(`In ${client.guilds.size} guilds:`);
+    utils.logger.trace(`In ${client.guilds.size} guilds:`);
     client.guilds.forEach(
         (guild: discord.Guild): void => {
-            utils.logger.verbose(`* ${guild.name} (${guild.id})`);
-            utils.logger.verbose('* Loading guild json');
+            utils.logger.trace(`* ${guild.name} (${guild.id})`);
+            utils.logger.trace('* Loading guild json');
 
             const data: bot.Data = bot.load(
                 guild.id,
@@ -2227,7 +2227,7 @@ connect$.subscribe((): void => {
             }
 
             utils.logger.debug(`Loaded json for guild ${guild.id}`);
-            utils.logger.silly(`${JSON.stringify(data)}`);
+            utils.logger.trace(`${JSON.stringify(data)}`);
 
             // startup tasks
             // handle generic events here
@@ -2552,7 +2552,9 @@ connect$.subscribe((): void => {
 });
 
 reconnect$.subscribe(
-    utils.logger.info('Reconnected')
+    (): void => {
+        utils.logger.info('Reconnected');
+    }
 );
 
 error$.subscribe(

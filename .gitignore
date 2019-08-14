@@ -3,5 +3,6 @@ out
 docs
 .git
 auth.json
-log
+*.log
+*.out
 !.gitignore

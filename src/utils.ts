@@ -1,4 +1,4 @@
-import * as winston from 'winston';
+import * as log4js from 'log4js';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace utils {
@@ -62,25 +62,54 @@ export namespace utils {
         );
 
     /**
-     * Instance of global winston logger
+     * Instance of global log4js logger
      */
-    export const logger: winston.Logger = winston.createLogger({
-        level: 'debug',
-        format: winston.format.combine(
-            winston.format.colorize(),
-            winston.format.timestamp({
-                format: 'YYYY-MM-DD HH:mm:ss',
-            })
-        ),
-        transports: [
-            new winston.transports.File({
-                filename: 'log',
-            }),
-            new winston.transports.Console({
-                format: winston.format.simple(),
-            }),
-        ],
+    log4js.configure({
+        appenders: {
+            file: {
+                type: 'file',
+                filename: 'n0trout.log',
+                maxLogSize: 10485760,
+                backups: 3,
+                compress: true,
+                layout: {
+                    type: 'pattern', pattern: '%d %p %c %f:%l %m%n',
+                },
+            },
+        },
+        categories: {
+            default: {
+                appenders: [
+                    'file',
+                ],
+                level: 'debug',
+                enableCallStack: true,
+            },
+        },
     });
+    export const logger = log4js.getLogger();
+
+    process.on(
+        'beforeExit',
+        (code: number):
+        void => {
+            logger.info(`Process is shutting down: ${code}`);
+        }
+    );
+
+    process.on(
+        'uncaughtException',
+        (error: Error):
+        void => {
+            logger.fatal(error);
+            log4js.shutdown(
+                (err: Error): void => {
+                    console.log(`Shutdown: ${err}`);
+                    process.exit(1);
+                }
+            );
+        }
+    );
 
     /**
     * @function
