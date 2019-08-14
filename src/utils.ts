@@ -66,6 +66,10 @@ export namespace utils {
      */
     log4js.configure({
         appenders: {
+            out: {
+                type: 'stdout',
+                layout: { type: 'colored', },
+            },
             file: {
                 type: 'file',
                 filename: 'n0trout.log',
@@ -81,6 +85,7 @@ export namespace utils {
             default: {
                 appenders: [
                     'file',
+                    'out',
                 ],
                 level: 'debug',
                 enableCallStack: true,
