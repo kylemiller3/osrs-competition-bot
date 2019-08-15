@@ -543,6 +543,8 @@ const getTotalEventGain = (
                 && event.tracking.lms === undefined) return 0;
             const gains: number[] = participant.runescapeAccounts.map(
                 (account: runescape.CompetitiveAccountInfo): number => {
+                    if (account.starting === undefined
+                        || account.ending === undefined) return NaN;
                     const rankAndScoreComponents:
                     hiscores.RankAndScoreComponent[][] = (
                         event.tracking[tracking] as unknown[]
@@ -1271,7 +1273,7 @@ Observable<[Input, runescape.Event]> = addUpcoming$
             const inputCommand: Input = commandEventArr[0];
             const event: runescape.Event = commandEventArr[1];
             const competitiveRegex = {
-                params: new RegExp('(?<=type)\\s*(\\w+).*(?:name|starting|ending|type|$)'),
+                params: new RegExp('(?<=type)\\s*\\w+\\s*(.+?)\\s*(?:name|starting|ending|type|$)'),
             };
             const parsedRegexes = findFirstRegexesMatch(
                 competitiveRegex,
@@ -2112,7 +2114,6 @@ eventParticipantsDidUpdate$.subscribe(
             updatedEvent,
         );
 
-        // TODO: make observable?
         if (updatedEvent.scoreboardMessageId !== undefined) {
             editChannelMessage(
                 updatedData.guildId,
@@ -2874,7 +2875,7 @@ signupEvent$.subscribe(
         hiscores.LookupResponse,
     ]): void => {
         const data: bot.Data = inputArr[0];
-        const event: runescape.Event = inputArr[1]
+        const event: runescape.Event = inputArr[1];
         const message: discord.Message = inputArr[2];
         const hiscore: hiscores.LookupResponse = inputArr[3];
         if (hiscore === null) {
@@ -2889,13 +2890,33 @@ signupEvent$.subscribe(
         utils.logger.debug('Signup called');
         message.reply('signed up for event');
 
-        eventParticipantsDidUpdate$.next(
-            {
-                guildId: message.guild.id,
-                eventId: event.id,
-                participants: event.participants,
+        if (event.hasStarted
+            && !event.hasEnded) {
+            if (runescape.isEventCustom(event)) {
+                eventParticipantsDidUpdate$.next(
+                    {
+                        guildId: message.guild.id,
+                        eventId: event.id,
+                        participants: event.participants,
+                    }
+                );
+            } else {
+                updateParticipantsHiscores$(
+                    event.participants
+                ).subscribe(
+                    (newParticipants: runescape.Participant[]):
+                    void => {
+                        eventParticipantsDidUpdate$.next(
+                            {
+                                guildId: message.guild.id,
+                                eventId: event.id,
+                                participants: newParticipants,
+                            }
+                        );
+                    }
+                );
             }
-        );
+        }
     }
 );
 
@@ -2932,6 +2953,14 @@ unsignupUpcomingEvent$.subscribe(
         saveNewEvent(
             data,
             newEvent,
+        );
+
+        eventParticipantsDidUpdate$.next(
+            {
+                guildId: data.guildId,
+                eventId: newEvent.id,
+                participants: newEvent.participants,
+            }
         );
 
         utils.logger.debug('Unsignup called');
