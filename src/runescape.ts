@@ -87,6 +87,7 @@ export namespace runescape {
      */
     export interface Participant extends Record<string, unknown> {
         discordId: string
+        customScore?: number
         runescapeAccounts: AccountInfo[]
     }
 
@@ -136,6 +137,7 @@ export namespace runescape {
         hasPassedTwoHourWarning: boolean
         hasStarted: boolean
         hasEnded: boolean
+        isFinalized?: boolean
     }
 
     /**

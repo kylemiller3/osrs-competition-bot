@@ -15,6 +15,7 @@
         "OSRS",
         "Runescape",
         "SIGNUP",
+        "UNFINALIZED",
         "UNSIGNUP",
         "Unnotified",
         "appenders",
@@ -33,6 +34,7 @@
         "typeparam",
         "upcoming",
         "updateleaderboard",
+        "updatescore",
         "uuidv"
     ]
 }

@@ -1,8 +1,7 @@
 // TODO:
-// Fix hackish late signup
 // 20 min ending warning
-// custom competitive events
 // all time hiscores
+// teams
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -224,7 +223,7 @@ const getUpcomingAndInFlightEvents = (
     events: runescape.Event[]
 ): runescape.Event[] => events.filter(
     (event: runescape.Event):
-    boolean => utils.isInFuture(event.endingDate)
+    boolean => !event.hasEnded
 );
 
 /**
@@ -236,7 +235,8 @@ const getUpcomingEvents = (
     events: runescape.Event[]
 ): runescape.Event[] => events.filter(
     (event: runescape.Event):
-    boolean => utils.isInFuture(event.startingDate)
+    boolean => !event.hasStarted
+    && !event.hasEnded
 );
 
 /**
@@ -500,6 +500,10 @@ const getTotalEventGain = (
     event: runescape.Event,
     tracking: runescape.TrackingEnum,
 ): number => {
+    if (runescape.isEventCustom(event)) {
+        return participant.customScore;
+    }
+
     switch (tracking) {
         case 'skills': {
             if (event.tracking.skills === undefined) return 0;
@@ -1134,7 +1138,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     name: new RegExp('(?<=name)\\s*(.+?)\\s*(?:starting|ending|type|$)', 'gim'),
                     starting: new RegExp('(?<=starting)\\s*(.+?)\\s*(?:name|ending|type|$)', 'gim'),
                     ending: new RegExp('(?<=ending)\\s*(.+?)\\s*(?:name|starting|type|$)', 'gim'),
-                    type: new RegExp('(?<=type)\\s*(\\w+)\\s*.+?\\s*(?:name|starting|ending|type|$)', 'gim'),
+                    type: new RegExp('(?<=type)\\s*(\\w+).*(?:name|starting|ending|type|$)', 'gim'),
                 };
                 const parsedRegexes = findFirstRegexesMatch(
                     regexes,
@@ -1267,7 +1271,7 @@ Observable<[Input, runescape.Event]> = addUpcoming$
             const inputCommand: Input = commandEventArr[0];
             const event: runescape.Event = commandEventArr[1];
             const competitiveRegex = {
-                params: new RegExp('(?<=type)\\s*\\w+\\s*(.+?)\\s*(?:name|starting|ending|type|$)'),
+                params: new RegExp('(?<=type)\\s*(\\w+).*(?:name|starting|ending|type|$)'),
             };
             const parsedRegexes = findFirstRegexesMatch(
                 competitiveRegex,
@@ -1414,6 +1418,7 @@ Observable<[Input, runescape.Event]> = addUpcoming$
             // custom
             // TODO: figure out what to do with custom events
             if (event.type === runescape.EVENT_TYPE.CUSTOM) {
+                event.isFinalized = false;
                 return [
                     inputCommand,
                     event,
@@ -1460,6 +1465,7 @@ Observable<Input> = filteredMessage$(
  */
 const signupEvent$: Observable<[
     bot.Data,
+    runescape.Event,
     discord.Message,
     hiscores.LookupResponse
 ]> = filteredMessage$(
@@ -1467,7 +1473,7 @@ const signupEvent$: Observable<[
 )
     .pipe(
         switchMap((command: Input):
-        Observable<[bot.Data, discord.Message, hiscores.LookupResponse]> => {
+        Observable<[bot.Data, runescape.Event, discord.Message, hiscores.LookupResponse]> => {
             const signupRegex = {
                 eventIdx: new RegExp('.*?([0-9]+).*?$', 'gim'),
                 rsn: new RegExp('\\s*[0-9]+\\s*(.+?)\\s*$', 'gim'),
@@ -1497,7 +1503,7 @@ const signupEvent$: Observable<[
             if (Number.isNaN(idxToModify) || idxToModify >= upcomingAndInFlightEvents.length) {
                 utils.logger.debug(`User did not specify index (${idxToModify})`);
                 command.message.reply(`invalid index ${idxToModify}\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
-                return of<[bot.Data, discord.Message, hiscores.LookupResponse]>(null);
+                return of(null);
             }
 
             const discordIdToAdd: string = command.author.id;
@@ -1516,6 +1522,10 @@ const signupEvent$: Observable<[
                     newRsAccount,
                 ],
             };
+
+            if (runescape.isEventCustom(eventToModify)) {
+                participantToAdd.customScore = 0;
+            }
 
             const newEvent: runescape.Event = signupParticipant(
                 eventToModify,
@@ -1541,11 +1551,12 @@ const signupEvent$: Observable<[
 
             return forkJoin(
                 of<bot.Data>(newData),
+                of<runescape.Event>(newEvent),
                 of<discord.Message>(command.message),
                 runescape.hiscores$(rsnToAdd, false)
             );
         }),
-        filter((dataMsgHiArr: [bot.Data, discord.Message, hiscores.LookupResponse]):
+        filter((dataMsgHiArr: [bot.Data, runescape.Event, discord.Message, hiscores.LookupResponse]):
         boolean => dataMsgHiArr !== null),
     );
 
@@ -1628,6 +1639,33 @@ const showStats$: Observable<Input> = filteredMessage$(
 );
 
 /**
+ * An Observable that handles the [[bot.COMMANDS.FINALIZE]] command
+ */
+const finalize$: Observable<Input> = filteredMessage$(
+    bot.COMMANDS.FINALIZE
+);
+
+/**
+ * An Observable that handles the [[bot.COMMANDS.LIST_CUSTOM]] command
+ */
+const listCustom$: Observable<Input> = filteredMessage$(
+    bot.COMMANDS.LIST_CUSTOM
+);
+
+/**
+ * An Observable that handles the [[bot.COMMANDS.UPDATESCORE]] command
+ */
+const updateScore$: Observable<Input> = filteredMessage$(
+    bot.COMMANDS.UPDATESCORE
+)
+    .pipe(
+        filter(
+            (command: Input):
+            boolean => command.message.mentions.members.array().length > 0
+        ),
+    );
+
+/**
  * Subject helper that helps an event lifecycle
  */
 const eventParticipantsDidUpdate$:
@@ -1674,6 +1712,128 @@ Subject<GuildDataAndEvent> = new Subject();
 //
 //------------------------
 
+const getUnfinalizedEvents = (events: runescape.Event[]):
+runescape.Event[] => {
+    const filteredEvents: runescape.Event[] = events.filter(
+        (event: runescape.Event):
+        boolean => runescape.isEventCustom(event)
+        && !event.isFinalized
+    );
+    return filteredEvents;
+};
+
+finalize$.subscribe(
+    (command: Input): void => {
+        const data: bot.Data = bot.load(command.guild.id);
+        const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(
+            data.events
+        );
+        const idxToFinalize: number = parseInt(
+            command.input,
+            10
+        );
+        if (Number.isNaN(idxToFinalize)
+        || idxToFinalize >= unfinalizedEvents.length) {
+            utils.logger.debug(`Admin did not specify index (${idxToFinalize})`);
+            command.message.reply(`invalid index ${idxToFinalize}\n${bot.COMMANDS.FINALIZE.parameters}`);
+            return;
+        }
+
+        const eventToFinalize: runescape.Event = unfinalizedEvents[idxToFinalize];
+        if (!eventToFinalize.hasEnded) {
+            command.message.reply('cannot finalize an event that has not ended yet');
+            return;
+        }
+
+        const newEvent: runescape.Event = { ...eventToFinalize, };
+        newEvent.isFinalized = true;
+        saveNewEvent(
+            data,
+            newEvent
+        );
+        utils.logger.debug('saved finalized event');
+    }
+);
+
+listCustom$.subscribe(
+    (command: Input): void => {
+        const data: bot.Data = bot.load(
+            command.guild.id
+        );
+        const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(
+            data.events
+        );
+        const eventsStr: string = unfinalizedEvents.map(
+            (event: runescape.Event, idx: number):
+            string => `\n${idx}: unfinalized event ${event.name}`
+        ).join('');
+        command.message.reply(eventsStr);
+    }
+);
+
+updateScore$.subscribe(
+    (command: Input): void => {
+        const data: bot.Data = bot.load(command.guild.id);
+        const newInput = command.input.replace(/\s*<@[0-9]+>/g, '');
+        const updateScore = {
+            score: new RegExp('(?<!event)[0-9]+.*?(-?[0-9]+)', 'gim'),
+            event: new RegExp('event\\s*([0-9]+)', 'gim'),
+        };
+        const parsedRegexes = findFirstRegexesMatch(updateScore, newInput);
+        if (parsedRegexes.score === null) {
+            utils.logger.debug(`${command.author.id} entered invalid score`);
+            command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            return;
+        }
+        if (parsedRegexes.event === null) {
+            utils.logger.debug(`${command.author.id} entered invalid event`);
+            command.message.reply(`invalid event\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            return;
+        }
+        const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(data.events);
+        const idxToModify: number = parseInt(
+            parsedRegexes.event,
+            10,
+        );
+        if (Number.isNaN(idxToModify)
+        || idxToModify >= unfinalizedEvents.length) {
+            utils.logger.debug(`Admin did not specify index (${idxToModify})`);
+            command.message.reply(`invalid index ${idxToModify}\n${bot.COMMANDS.FINALIZE.parameters}`);
+            return;
+        }
+        const numToAdd: number = parseInt(
+            parsedRegexes.score,
+            10,
+        );
+        if (Number.isNaN(numToAdd)) {
+            utils.logger.debug(`${command.author.id} entered invalid score`);
+            command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            return;
+        }
+        const mention: discord.User = command.message.mentions.users.array()[0];
+        const mentionId: string = mention.id;
+        const eventToModify: runescape.Event = unfinalizedEvents[idxToModify];
+        const foundParticipant: runescape.Participant = eventToModify.participants.find(
+            (participant: runescape.Participant):
+            boolean => participant.discordId === mentionId
+        );
+        if (foundParticipant === undefined) return;
+        const newParticipant: runescape.Participant = { ...foundParticipant, };
+        newParticipant.customScore += numToAdd;
+        const newEvent: runescape.Event = updateParticipant(
+            eventToModify,
+            newParticipant,
+        );
+        eventParticipantsDidUpdate$.next(
+            {
+                guildId: command.guild.id,
+                eventId: newEvent.id,
+                participants: newEvent.participants,
+            }
+        );
+    }
+);
+
 /**
  * @param eventToSetTimers The Event to set timers for
  * @param guildData The Guild Data to process on timer completion
@@ -1681,19 +1841,27 @@ Subject<GuildDataAndEvent> = new Subject();
  * @category Timer
  */
 const setTimerStart = (
-    eventToSetTimers: runescape.Event,
-    guildData: bot.Data,
+    guildId: string,
+    eventId: string,
+    startDate: Date
 ): NodeJS.Timeout => {
     const now: Date = new Date();
     return setTimeout(
         (): void => {
+            const data: bot.Data = bot.load(
+                guildId
+            );
+            const newFetchedEvent: runescape.Event = fetchUpdatedEvent(
+                data,
+                eventId,
+            );
             eventWillStart$.next(
                 {
-                    guildData,
-                    event: eventToSetTimers,
+                    guildData: data,
+                    event: newFetchedEvent,
                 }
             );
-        }, eventToSetTimers.startingDate.getTime() - now.getTime()
+        }, startDate.getTime() - now.getTime()
     );
 };
 
@@ -1782,6 +1950,16 @@ eventDidStart$.subscribe(
             newEvent
         );
 
+        if (runescape.isEventCustom(newEvent)) {
+            eventParticipantsDidUpdate$.next(
+                {
+                    guildId: guildData.guildId,
+                    eventId: newEvent.id,
+                    participants: newEvent.participants,
+                }
+            );
+        }
+
         if (!runescape.isEventCasual(newEvent)
         && !runescape.isEventCustom(newEvent)) {
             updateParticipantsHiscores$(
@@ -1828,14 +2006,14 @@ const getLeaderboardStr = (
         )
     );
 
-    const xpDiff: number[] = updatedEvent.participants.map(
+    const diff: number[] = updatedEvent.participants.map(
         (updatedParticipant: runescape.Participant): number => {
             const foundParticipant = event.participants.find(
                 (participant: runescape.Participant):
                 boolean => participant.discordId === updatedParticipant.discordId
             );
             if (foundParticipant === undefined) return 0;
-            const diff: number = getTotalEventGain(
+            const d: number = getTotalEventGain(
                 updatedParticipant,
                 updatedEvent,
                 tracking
@@ -1844,7 +2022,7 @@ const getLeaderboardStr = (
                 event,
                 tracking
             );
-            return diff;
+            return d;
         }
     );
 
@@ -1874,7 +2052,7 @@ const getLeaderboardStr = (
                 updatedEvent,
                 tracking
             ).toLocaleString('en-US');
-            const xpDiffStr = xpDiff[idx].toLocaleString('en-US');
+            const xpDiffStr = diff[idx].toLocaleString('en-US');
 
             const numNameSpacesToInsert:
             number = nameMaxDisplayLength - displayName.length - eventGain.length;
@@ -2008,19 +2186,27 @@ eventParticipantsDidUpdate$.subscribe(
  * @category Timer
  */
 const setTimerEnd = (
-    eventToSetTimers: runescape.Event,
-    guildData: bot.Data,
+    guildId: string,
+    eventId: string,
+    endDate: Date,
 ): NodeJS.Timeout => {
     const now: Date = new Date();
     return setTimeout(
         (): void => {
+            const data: bot.Data = bot.load(
+                guildId
+            );
+            const newFetchedEvent: runescape.Event = fetchUpdatedEvent(
+                data,
+                eventId,
+            );
             eventWillEnd$.next(
                 {
-                    guildData,
-                    event: eventToSetTimers,
+                    guildData: data,
+                    event: newFetchedEvent,
                 }
             );
-        }, eventToSetTimers.endingDate.getTime() - now.getTime()
+        }, endDate.getTime() - now.getTime()
     );
 };
 
@@ -2031,22 +2217,30 @@ const setTimerEnd = (
  * @category Timer
  */
 const setTimerTwoHoursBefore = (
-    eventToSetTimers: runescape.Event,
-    guildData: bot.Data
+    guildId: string,
+    eventId: string,
+    startDate: Date,
 ): NodeJS.Timeout => {
     const now: Date = new Date();
     const twoHoursBeforeStart: Date = new Date(
-        eventToSetTimers.startingDate.getTime()
+        startDate.getTime()
     );
     twoHoursBeforeStart.setHours(
         twoHoursBeforeStart.getHours() - 2
     );
     return setTimeout(
         (): void => {
+            const data: bot.Data = bot.load(
+                guildId
+            );
+            const newFetchedEvent: runescape.Event = fetchUpdatedEvent(
+                data,
+                eventId,
+            );
             eventWillWarnStart$.next(
                 {
-                    guildData,
-                    event: eventToSetTimers,
+                    guildData: data,
+                    event: newFetchedEvent,
                 }
             );
         }, twoHoursBeforeStart.getTime() - now.getTime()
@@ -2273,16 +2467,19 @@ connect$.subscribe((): void => {
                         timers[event.id] = {
                             autoUpdate: undefined,
                             twoHoursBeforeEventTimer: setTimerTwoHoursBefore(
-                                event,
-                                data,
+                                data.guildId,
+                                event.id,
+                                event.startingDate
                             ),
                             eventStartedTimer: setTimerStart(
-                                event,
-                                data,
+                                data.guildId,
+                                event.id,
+                                event.startingDate
                             ),
                             eventEndedTimer: setTimerEnd(
-                                event,
-                                data,
+                                data.guildId,
+                                event.id,
+                                event.endingDate
                             ),
                         };
                     } else if (now >= twoHoursBeforeStart
@@ -2312,12 +2509,14 @@ connect$.subscribe((): void => {
                             autoUpdate: undefined,
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: setTimerStart(
-                                event,
-                                data
+                                data.guildId,
+                                event.id,
+                                event.startingDate
                             ),
                             eventEndedTimer: setTimerEnd(
-                                event,
-                                data
+                                data.guildId,
+                                event.id,
+                                event.endingDate
                             ),
                         };
                     } else if (now >= event.startingDate
@@ -2345,17 +2544,19 @@ connect$.subscribe((): void => {
                                 newEvent,
                             );
                         }
-                        // TODO: change me
                         timers[event.id] = {
-                            autoUpdate: setTimerAutoUpdate(
-                                event.id,
-                                data.guildId,
-                            ),
+                            autoUpdate: runescape.isEventCustom(event)
+                                ? undefined
+                                : setTimerAutoUpdate(
+                                    event.id,
+                                    data.guildId,
+                                ),
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: undefined,
                             eventEndedTimer: setTimerEnd(
-                                event,
-                                data
+                                data.guildId,
+                                event.id,
+                                event.endingDate
                             ),
                         };
                     } else if (now >= toleranceAfterStart
@@ -2385,17 +2586,19 @@ connect$.subscribe((): void => {
                             );
                         }
                         // schedule end date notification
-                        // TODO: change me
                         timers[event.id] = {
-                            autoUpdate: setTimerAutoUpdate(
-                                event.id,
-                                data.guildId,
-                            ),
+                            autoUpdate: runescape.isEventCustom(event)
+                                ? undefined
+                                : setTimerAutoUpdate(
+                                    event.id,
+                                    data.guildId,
+                                ),
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: undefined,
                             eventEndedTimer: setTimerEnd(
-                                event,
-                                data,
+                                data.guildId,
+                                event.id,
+                                event.endingDate
                             ),
                         };
                     } else if (now >= event.endingDate
@@ -2470,83 +2673,6 @@ connect$.subscribe((): void => {
                     }
                 }
             );
-
-            // are we in flight for an event?
-            // make sure they are properly setup
-            // TODO: full implementation
-            // const inFlightEvents: ClanEvent[] = getInFlightEvents()
-            // const inFlightXpEvents: ClanEvent[] = inFlightEvents.filter(
-            //     (event: ClanEvent): boolean => event.type === runescape.EVENT_TYPE.COMPETITIVE
-            // )
-            // const endedEvents: ClanEvent[] = getEndedEvents()
-            // const endedXpEvents: ClanEvent[] = endedEvents.filter(
-            //     (event: ClanEvent): boolean => event.type === runescape.EVENT_TYPE.COMPETITIVE
-            // )
-
-        // inFlightEvents.forEach((event: ClanEvent): void => {
-        //     if (event.type === runescape.EVENT_TYPE.COMPETITIVE) {
-        //         event.participants.forEach((xpParticipant: XpClanEventParticipant): void => {
-        //             xpParticipant.skills.forEach((xpComponent:
-        //             XpClanEventParticipantSkillsComponent): void => {
-        //                 if (xpComponent.startingXp < 0) {
-        //                     hiscores$(xpParticipant.rsn)
-        //                         .pipe(
-        //                             switchMap((hiscore: hiscores.HiscoreResponse): Observable<Bot.Database> => {
-        //                                 const newXpComponent: XpClanEventParticipantSkillsComponent = utils.update(xpComponent, {
-        //                                     startingXp: hiscore.skills[xpComponent.name].xp
-        //                                 }) as XpClanEventParticipantSkillsComponent
-        //                                 const newXpParticipant: XpClanEventParticipant = utils.update(xpParticipant, {
-        //                                     skills: newXpComponent
-        //                                 }) as XpClanEventParticipant
-        //                                 const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
-        //                                 const newEvent: ClanEvent = utils.update(event, {
-        //                                     participants: newXpParticipants
-        //                                 }) as ClanEvent
-        //                                 // TODO: this doesn't work for non unique event names and dates
-        //                                 const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
-        //                                 const newData: Bot.Database = utils.update(guildData, {
-        //                                     events: newEvents
-        //                                 }) as Bot.Database
-        //                                 // TODO: very inefficient - implement a flag to trigger automatic load or manual
-        //                                 return save$(guild.id, newData)
-        //                             })
-        //                         )
-        //                         .subscribe((data: Bot.Database): void => {
-        //                             utils.logger.debug('updated user that did not have starting xp data')
-        //                         })
-        //                 }
-        //                 /* Incorrect logic, we need to find already ended events instead
-        //                 if (xpComponent.endingXp < 0) {
-        //                     hiscores$(xpParticipant.rsn)
-        //                         .pipe(
-        //                             switchMap((hiscore: hiscores.HiscoreResponse): Observable<Bot.Database> => {
-        //                                 const newXpComponent: XpClanEventParticipantSkillsComponent = utils.update(xpComponent, {
-        //                                     endingXp: hiscore.skills[xpComponent.name].xp
-        //                                 }) as XpClanEventParticipantSkillsComponent
-        //                                 const newXpParticipant: XpClanEventParticipant = utils.update(xpParticipant, {
-        //                                     skills: newXpComponent
-        //                                 }) as XpClanEventParticipant
-        //                                 const newXpParticipants: ClanEventParticipant[] = event.participants.filter((participant: ClanEventParticipant): boolean => participant.rsn !== xpParticipant.rsn).concat([newXpParticipant])
-        //                                 const newEvent: ClanEvent = utils.update(event, {
-        //                                     participants: newXpParticipants
-        //                                 }) as ClanEvent
-        //                                 // TODO: this doesn't work for non unique event names and dates
-        //                                 const newEvents: ClanEvent[] = inFlightEvents.filter((clanEvent: ClanEvent): boolean => clanEvent.name !== event.name && clanEvent.startingDate !== event.startingDate && clanEvent.endingDate !== event.endingDate).concat([newEvent])
-        //                                 const newData: Bot.Database = utils.update(data, {
-        //                                     events: newEvents
-        //                                 }) as Bot.Database
-        //                                 return save$(guild.id, newData)
-        //                             })
-        //                         )
-        //                         .subscribe((guildData: Bot.Database): void => {
-        //                             utils.logger.debug('updated user that did not have ending xp data')
-        //                         })
-        //                 }
-        //                 */
-        //             })
-        //         })
-        //     }
-        // })
         }
     );
 });
@@ -2626,16 +2752,19 @@ saveEvent$.subscribe(
         timers[event.id] = {
             autoUpdate: undefined,
             twoHoursBeforeEventTimer: setTimerTwoHoursBefore(
-                event,
-                newData,
+                data.guildId,
+                event.id,
+                event.startingDate
             ),
             eventStartedTimer: setTimerStart(
-                event,
-                newData,
+                data.guildId,
+                event.id,
+                event.startingDate
             ),
             eventEndedTimer: setTimerEnd(
-                event,
-                newData,
+                data.guildId,
+                event.id,
+                event.endingDate
             ),
         };
 
@@ -2657,7 +2786,7 @@ listUpcomingEvent$.subscribe(
         const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
             oldData.events
         );
-        const eventsStr = upcomingAndInFlightEvents.map(
+        const eventsStr: string[] = upcomingAndInFlightEvents.map(
             (event: runescape.Event, idx: number): string => {
                 const startingDateStr = event.startingDate.toString();
                 const endingDateStr = event.endingDate.toString();
@@ -2740,12 +2869,14 @@ deleteUpcomingEvent$.subscribe(
 signupEvent$.subscribe(
     (inputArr: [
         bot.Data,
+        runescape.Event,
         discord.Message,
-        hiscores.LookupResponse
+        hiscores.LookupResponse,
     ]): void => {
         const data: bot.Data = inputArr[0];
-        const message: discord.Message = inputArr[1];
-        const hiscore: hiscores.LookupResponse = inputArr[2];
+        const event: runescape.Event = inputArr[1]
+        const message: discord.Message = inputArr[2];
+        const hiscore: hiscores.LookupResponse = inputArr[3];
         if (hiscore === null) {
             utils.logger.debug('User entered invalid RSN');
             message.reply('cannot find RSN on hiscores');
@@ -2757,6 +2888,14 @@ signupEvent$.subscribe(
         );
         utils.logger.debug('Signup called');
         message.reply('signed up for event');
+
+        eventParticipantsDidUpdate$.next(
+            {
+                guildId: message.guild.id,
+                eventId: event.id,
+                participants: event.participants,
+            }
+        );
     }
 );
 

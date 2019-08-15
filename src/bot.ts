@@ -88,6 +88,9 @@ export namespace bot {
         FORCESIGNUP_UPCOMING: Command
         FORCEUNSIGNUP_UPCOMING: Command
         SHOWSTATS: Command
+        FINALIZE: Command
+        LIST_CUSTOM: Command
+        UPDATESCORE: Command
     }
 
     /**
@@ -242,6 +245,27 @@ export namespace bot {
             description: 'prints stats for a user',
             accessControl: ANY_USER,
             parameters: ' ?(mention)',
+        },
+
+        FINALIZE: {
+            command: '!f finalize ',
+            description: 'ends and finalizes a long running or custom event',
+            accessControl: ONLY_ADMIN,
+            parameters: '(index, placement order if custom)',
+        },
+
+        LIST_CUSTOM: {
+            command: '!f custom',
+            description: 'lists events that have yet to end or have yet to be finalized',
+            accessControl: ONLY_ADMIN,
+            parameters: '',
+        },
+
+        UPDATESCORE: {
+            command: '!f updatescore ',
+            description: 'updates score of a custom event participant',
+            accessControl: ONLY_ADMIN,
+            parameters: 'index, mention, score to add',
         },
     };
 
