@@ -1826,7 +1826,7 @@ listCustom$.subscribe(
 updateScore$.subscribe(
     (command: Input): void => {
         const data: bot.Data = bot.load(command.guild.id);
-        const newInput = command.input.replace(/\s*<@[0-9]+>/g, '');
+        const newInput = command.input.replace(/<@!?[0-9]+>/g, '');
         const updateScore = {
             score: new RegExp('add\\s*(-?[0-9]+)\\s*', 'gim'),
             event: new RegExp('\\s*([0-9]+).\\s*(?:add)', 'gim'),
@@ -3288,7 +3288,7 @@ const mockMessage = (
 
 forceSignup$.subscribe(
     (command: Input): void => {
-        const newInput = command.input.replace(/\s*<@[0-9]+>/g, '');
+        const newInput = command.input.replace(/<@!?[0-9]+>/g, '');
         const message: discord.Message = mockMessage(
             bot.COMMANDS.SIGNUP_UPCOMING,
             newInput,
@@ -3301,7 +3301,7 @@ forceSignup$.subscribe(
 
 forceUnsignup$.subscribe(
     (command: Input): void => {
-        const newInput = command.input.replace(/\s*<@[0-9]+>/g, '');
+        const newInput = command.input.replace(/<@!?[0-9]+>/g, '');
         const message: discord.Message = mockMessage(
             bot.COMMANDS.UNSIGNUP_UPCOMING,
             newInput,
