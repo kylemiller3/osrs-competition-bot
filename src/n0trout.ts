@@ -1541,6 +1541,13 @@ const signupEvent$: Observable<[
                 participantToAdd,
             );
 
+            // TODO: hackish way?
+            if (newEvent === eventToModify) {
+                utils.logger.debug('User already signed up');
+                command.message.reply('Your discord id or rsn is already signed up');
+                return of(null);
+            }
+
             if (runescape.isTeamEvent(newEvent)) {
                 const teamname: string = parsedRegexes.teamname;
                 if (teamname === null) {
@@ -1583,13 +1590,6 @@ const signupEvent$: Observable<[
                 data,
                 newEvents
             );
-
-            // TODO: hackish way?
-            if (newData === data) {
-                utils.logger.debug('User already signed up');
-                command.message.reply('Your discord id or rsn is already signed up');
-                return of(null);
-            }
 
             return forkJoin(
                 of<bot.Data>(newData),
@@ -1826,7 +1826,7 @@ listCustom$.subscribe(
 updateScore$.subscribe(
     (command: Input): void => {
         const data: bot.Data = bot.load(command.guild.id);
-        const newInput = command.input.replace(/<@[0-9]+>/g, '');
+        const newInput = command.input.replace(/\s*<@[0-9]+>/g, '');
         const updateScore = {
             score: new RegExp('add\\s*(-?[0-9]+)\\s*', 'gim'),
             event: new RegExp('\\s*([0-9]+).\\s*(?:add)', 'gim'),

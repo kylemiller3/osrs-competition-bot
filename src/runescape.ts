@@ -260,7 +260,11 @@ export namespace runescape {
         maxRetryAttempts = 5,
         scalingDuration = 1000,
         excludedStatusCodes = [],
-        excludedMessages = ['Player not found! Check RSN or game mode.']
+        excludedMessages = [
+            'Player not found! Check RSN or game mode.',
+            'RSN must be less or equal to 12 characters',
+            'RSN must be of type string',
+        ],
     }: {
         maxRetryAttempts?: number
         scalingDuration?: number
@@ -296,47 +300,49 @@ export namespace runescape {
 
     /**
     * Fetches the supplied rsn from Jagex hiscores or cache
-    * @param rsn rsn to lookup on hiscores
+    * @param asciiRsn rsn to lookup on hiscores
     * @returns Observable of the API response as [[hiscores.LookupResponse]]
     */
     export const hiscores$ = (
         rsn: string,
         pullNew: boolean
     ): Observable<hiscores.LookupResponse> => {
-        utils.logger.info(`Looking up rsn '${rsn}'`);
-        if (hiscoreCache[rsn] !== undefined) {
-            const date: Date = new Date(hiscoreCache[rsn].date);
+        // eslint-disable-next-line no-control-regex
+        const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
+        utils.logger.info(`Looking up rsn '${asciiRsn}'`);
+        if (hiscoreCache[asciiRsn] !== undefined) {
+            const date: Date = new Date(hiscoreCache[asciiRsn].date);
             date.setMinutes(
                 date.getMinutes() + 20
             );
             if (utils.isInPast(date) || pullNew) {
-                hiscoreCache[rsn] = undefined;
+                hiscoreCache[asciiRsn] = undefined;
             }
         }
 
-        if (hiscoreCache[rsn] === undefined) {
+        if (hiscoreCache[asciiRsn] === undefined) {
             const obs: Observable<hiscores.LookupResponse> = defer(
-                (): Promise<JSON> => hiscores.getPlayer(rsn)
+                (): Promise<JSON> => hiscores.getPlayer(asciiRsn)
             )
                 .pipe(
                     retryWhen(exponentialBackoff()),
                     publishReplay(1),
                     refCount(),
                     catchError((error: Error): Observable<JSON> => {
-                        hiscoreCache[rsn] = undefined;
+                        hiscoreCache[asciiRsn] = undefined;
                         utils.logError(error);
-                        utils.logger.error(`Could not find rsn '${rsn}'`);
+                        utils.logger.error(`Could not find rsn '${asciiRsn}'`);
                         return of(null);
                     })
                 ) as unknown as Observable<hiscores.LookupResponse>;
 
-            hiscoreCache[rsn] = {
+            hiscoreCache[asciiRsn] = {
                 observable: obs,
                 date: new Date(),
             };
         }
 
-        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[rsn].observable;
+        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[asciiRsn].observable;
         const keys = Object.keys(hiscoreCache);
         if (keys.length >= CACHE_SIZE) {
             const idxToRemove: number = Math.floor(
