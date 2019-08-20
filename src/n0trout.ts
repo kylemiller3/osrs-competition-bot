@@ -1826,10 +1826,10 @@ listCustom$.subscribe(
 updateScore$.subscribe(
     (command: Input): void => {
         const data: bot.Data = bot.load(command.guild.id);
-        const newInput = command.input.replace(/\s*<@[0-9]+>/g, '');
+        const newInput = command.input.replace(/<@[0-9]+>/g, '');
         const updateScore = {
-            score: new RegExp('(?<!event)[0-9]+.*?(-?[0-9]+)', 'gim'),
-            event: new RegExp('event\\s*([0-9]+)', 'gim'),
+            score: new RegExp('add\\s*(-?[0-9]+)\\s*', 'gim'),
+            event: new RegExp('\\s*([0-9]+).\\s*(?:add)', 'gim'),
         };
         const parsedRegexes = findFirstRegexesMatch(updateScore, newInput);
         if (parsedRegexes.score === null) {
