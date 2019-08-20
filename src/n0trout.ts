@@ -1,7 +1,6 @@
 // TODO:
 // 20 min ending warning
 // all time hiscores
-// teams
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -348,7 +347,7 @@ const unsignupParticipant = (
  * @returns The user's display name
  * @category Helper
  */
-const discordIdToDisplayName = (guildId: string, discordId: string):
+const getDisplayNameFromDiscordId = (guildId: string, discordId: string):
 string => {
     const guild: discord.Guild = client.guilds.get(
         guildId
@@ -485,7 +484,9 @@ const notifyParticipantsInEvent = (
  * @category Helper
  */
 const getEventTracking = (event: runescape.Event):
-runescape.TrackingEnum => runescape.TrackingEnum[event.type.toLocaleUpperCase()];
+runescape.TrackingEnum => runescape.TrackingEnum[
+    event.type.toLocaleUpperCase()
+];
 
 /**
  * See [[runescape.Tracking]] structure
@@ -495,7 +496,7 @@ runescape.TrackingEnum => runescape.TrackingEnum[event.type.toLocaleUpperCase()]
  * @returns Total gain (in xp, clues, etc.)
  * @category Calculation
  */
-const getTotalEventGain = (
+const getParticipantScore = (
     participant: runescape.Participant,
     event: runescape.Event,
     tracking: runescape.TrackingEnum,
@@ -742,11 +743,11 @@ const getStatsStr = (
             );
             const sortedParticipants: runescape.Participant[] = event.participants.sort(
                 (a: runescape.Participant, b: runescape.Participant):
-                number => getTotalEventGain(
+                number => getParticipantScore(
                     b,
                     event,
                     tracking
-                ) - getTotalEventGain(
+                ) - getParticipantScore(
                     a,
                     event,
                     tracking
@@ -790,22 +791,22 @@ const getStatsStr = (
                 totalCompetitiveParticipants: event.participants.length,
                 totalCompetitiveEvents: 1,
                 totalCasualEvents: 0,
-                totalCluesGain: getTotalEventGain(
+                totalCluesGain: getParticipantScore(
                     foundParticipant,
                     event,
                     runescape.TrackingEnum.CLUES
                 ),
-                totalXpGain: getTotalEventGain(
+                totalXpGain: getParticipantScore(
                     foundParticipant,
                     event,
                     runescape.TrackingEnum.SKILLS
                 ),
-                totalLmsGain: getTotalEventGain(
+                totalLmsGain: getParticipantScore(
                     foundParticipant,
                     event,
                     runescape.TrackingEnum.LMS
                 ),
-                totalBhGain: getTotalEventGain(
+                totalBhGain: getParticipantScore(
                     foundParticipant,
                     event,
                     runescape.TrackingEnum.BH
@@ -855,7 +856,7 @@ const getStatsStr = (
         }
     );
 
-    const displayName: string = discordIdToDisplayName(
+    const displayName: string = getDisplayNameFromDiscordId(
         data.guildId,
         discordId
     );
@@ -1137,10 +1138,11 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                 }
 
                 const regexes: Record<string, RegExp> = {
-                    name: new RegExp('(?<=name)\\s*(.+?)\\s*(?:starting|ending|type|$)', 'gim'),
-                    starting: new RegExp('(?<=starting)\\s*(.+?)\\s*(?:name|ending|type|$)', 'gim'),
-                    ending: new RegExp('(?<=ending)\\s*(.+?)\\s*(?:name|starting|type|$)', 'gim'),
-                    type: new RegExp('(?<=type)\\s*(\\w+).*(?:name|starting|ending|type|$)', 'gim'),
+                    name: new RegExp('(?<=name)\\s*(.+?)\\s*(?:starting|ending|type|team|$)', 'gim'),
+                    starting: new RegExp('(?<=starting)\\s*(.+?)\\s*(?:name|ending|type|team|$)', 'gim'),
+                    ending: new RegExp('(?<=ending)\\s*(.+?)\\s*(?:name|starting|type|team|$)', 'gim'),
+                    type: new RegExp('(?<=type)\\s*(\\w+).*(?:name|starting|ending|type|team|$)', 'gim'),
+                    team: new RegExp('(team)\\s*(?:name|starting|ending|type|team|$)', 'gim'),
                 };
                 const parsedRegexes = findFirstRegexesMatch(
                     regexes,
@@ -1195,6 +1197,11 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     hasStarted: false,
                     hasEnded: false,
                 };
+
+                if (parsedRegexes.team !== null) {
+                    event.teams = [];
+                }
+
                 if (!utils.isValidDate(dateA) || !utils.isValidDate(dateB)) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid date`);
                     command.message.reply('starting date or ending date is invalid use IS0 8601 standard');
@@ -1418,7 +1425,6 @@ Observable<[Input, runescape.Event]> = addUpcoming$
             }
 
             // custom
-            // TODO: figure out what to do with custom events
             if (event.type === runescape.EVENT_TYPE.CUSTOM) {
                 event.isFinalized = false;
                 return [
@@ -1478,7 +1484,8 @@ const signupEvent$: Observable<[
         Observable<[bot.Data, runescape.Event, discord.Message, hiscores.LookupResponse]> => {
             const signupRegex = {
                 eventIdx: new RegExp('.*?([0-9]+).*?$', 'gim'),
-                rsn: new RegExp('\\s*[0-9]+\\s*(.+?)\\s*$', 'gim'),
+                rsn: new RegExp('(?<=rsn)\\s*(.*?)\\s*(?:rsn|teamname|$)', 'gim'),
+                teamname: new RegExp('(?<=teamname)\\s*(.*?)\\s*(?:rsn|teamname|$)', 'gim'),
             };
             const parsedRegexes = findFirstRegexesMatch(signupRegex, command.input);
             if (parsedRegexes.eventIdx === null) {
@@ -1534,6 +1541,39 @@ const signupEvent$: Observable<[
                 participantToAdd,
             );
 
+            if (runescape.isTeamEvent(newEvent)) {
+                const teamname: string = parsedRegexes.teamname;
+                if (teamname === null) {
+                    utils.logger.debug(`${command.author.id} entered invalid teamname`);
+                    command.message.reply(`invalid teamname\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+                    return of(null);
+                }
+
+                const team: runescape.TeamInfo = newEvent.teams.find(
+                    (teamInfo: runescape.TeamInfo):
+                    boolean => teamInfo.name.toLowerCase() === teamname.toLowerCase()
+                );
+                if (team === undefined) {
+                    // create new team
+                    const newTeam: runescape.TeamInfo = {
+                        name: teamname,
+                        linkedDiscordIds: [
+                            command.author.id,
+                        ],
+                    };
+                    const newTeams: runescape.TeamInfo[] = newEvent.teams.concat(newTeam);
+                    newEvent.teams = newTeams;
+                } else {
+                    const newTeam: runescape.TeamInfo = { ...team, };
+                    const newLinkedDiscordIds: string[] = newTeam.linkedDiscordIds.concat(
+                        command.author.id
+                    );
+                    newTeam.linkedDiscordIds = newLinkedDiscordIds;
+                    const idx: number = newEvent.teams.indexOf(team);
+                    newEvent.teams[idx] = newTeam;
+                }
+            }
+
             const newEvents: runescape.Event[] = modifyEventArray(
                 data,
                 newEvent
@@ -1558,8 +1598,15 @@ const signupEvent$: Observable<[
                 runescape.hiscores$(rsnToAdd, false)
             );
         }),
-        filter((dataMsgHiArr: [bot.Data, runescape.Event, discord.Message, hiscores.LookupResponse]):
-        boolean => dataMsgHiArr !== null),
+        filter(
+            (dataMsgHiArr: [
+                bot.Data,
+                runescape.Event,
+                discord.Message,
+                hiscores.LookupResponse
+            ]):
+            boolean => dataMsgHiArr !== null
+        ),
     );
 
 /**
@@ -1990,72 +2037,142 @@ eventDidStart$.subscribe(
 );
 
 const getLeaderboardStr = (
-    guildIdToPrint: string,
-    event: runescape.Event,
-    updatedEvent: runescape.Event
+    guildId: string,
+    previousEvent: runescape.Event,
+    event: runescape.Event
 ): string => {
-    const tracking: runescape.TrackingEnum = getEventTracking(updatedEvent);
-    const sortedParticipants: runescape.Participant[] = updatedEvent.participants.sort(
-        (a: runescape.Participant, b: runescape.Participant):
-        number => getTotalEventGain(
-            b,
-            updatedEvent,
-            tracking
-        ) - getTotalEventGain(
-            a,
-            updatedEvent,
-            tracking
-        )
+    // handle teams and singles as pseudo teams
+    const tracking: runescape.TrackingEnum = getEventTracking(event);
+
+    interface TeamAdHoc {
+        name: string
+        participants: runescape.Participant[]
+        score: number
+        scoreDiff: number
+    }
+
+    // make pseudo teams to simplify code
+    const previousEventCopy: runescape.Event = { ...previousEvent, };
+    const eventCopy: runescape.Event = { ...event, };
+
+    if (!runescape.isTeamEvent(eventCopy)) {
+        const MakePseudoTeam = (
+            gid: string,
+            participant: runescape.Participant
+        ): runescape.TeamInfo => {
+            const name: string = getDisplayNameFromDiscordId(
+                gid,
+                participant.discordId,
+            );
+            const info: runescape.TeamInfo = {
+                name,
+                linkedDiscordIds: [
+                    participant.discordId,
+                ],
+            };
+            return info;
+        };
+        const pseudoTeams: runescape.TeamInfo[] = eventCopy.participants.map(
+            (participant: runescape.Participant):
+            runescape.TeamInfo => MakePseudoTeam(
+                guildId,
+                participant
+            )
+        );
+        const previousPseudoTeams: runescape.TeamInfo[] = previousEventCopy.participants.map(
+            (participant: runescape.Participant):
+            runescape.TeamInfo => MakePseudoTeam(
+                guildId,
+                participant,
+            )
+        );
+        eventCopy.teams = pseudoTeams;
+        previousEventCopy.teams = previousPseudoTeams;
+    }
+
+    const teamNames:
+    string[] = eventCopy.teams.map(
+        (info: runescape.TeamInfo):
+        string => info.name
     );
 
-    const diff: number[] = updatedEvent.participants.map(
-        (updatedParticipant: runescape.Participant): number => {
-            const foundParticipant = event.participants.find(
+    const teams:
+    TeamAdHoc[] = teamNames.map(
+        (name: string):
+        TeamAdHoc => {
+            const participants:
+            runescape.Participant[] = runescape.getTeamParticipants(
+                eventCopy,
+                name,
+            );
+            const scores: number[] = participants.map(
                 (participant: runescape.Participant):
-                boolean => participant.discordId === updatedParticipant.discordId
+                number => getParticipantScore(
+                    participant,
+                    eventCopy,
+                    tracking
+                )
             );
-            if (foundParticipant === undefined) return 0;
-            const d: number = getTotalEventGain(
-                updatedParticipant,
-                updatedEvent,
-                tracking
-            ) - getTotalEventGain(
-                foundParticipant,
-                event,
-                tracking
+            const score: number = scores.reduce(
+                (a: number, b: number):
+                number => a + b,
+                0,
             );
-            return d;
+
+            const previousParticipants:
+            runescape.Participant[] = runescape.getTeamParticipants(
+                previousEventCopy,
+                name,
+            );
+            const previousScores: number[] = previousParticipants.map(
+                (participant: runescape.Participant):
+                number => getParticipantScore(
+                    participant,
+                    previousEventCopy,
+                    tracking
+                )
+            );
+            const previousScore: number = previousScores.reduce(
+                (a: number, b: number):
+                number => a + b,
+                0,
+            );
+            const scoreDiff: number = score - previousScore;
+            const team: TeamAdHoc = {
+                name,
+                participants,
+                score,
+                scoreDiff,
+            };
+            return team;
         }
+    );
+    const sortedTeams: TeamAdHoc[] = teams.sort(
+        (a: TeamAdHoc, b: TeamAdHoc):
+        number => b.score - a.score
     );
 
     const namePadding = 8;
     const plusPadding = 0;
     const diffPadding = 4;
-    const nameMaxDisplayLength: number = Math.max(...sortedParticipants.map(
-        (participant: runescape.Participant):
-        number => discordIdToDisplayName(
-            guildIdToPrint,
-            participant.discordId
-        ).length + getTotalEventGain(
-            participant,
-            updatedEvent,
-            tracking
-        ).toLocaleString('en-US').length
-    )) + namePadding;
 
-    const strToPrint: string = sortedParticipants.map(
-        (participant: runescape.Participant, idx: number): string => {
-            const displayName: string = discordIdToDisplayName(
-                guildIdToPrint,
-                participant.discordId
+    const nameMaxDisplayLength: number = Math.max(
+        ...sortedTeams.map(
+            (team: TeamAdHoc):
+            number => team.name.length + team.score.toLocaleString(
+                'en-US'
+            ).length
+        )
+    ) + namePadding;
+
+    const strToPrint: string = sortedTeams.map(
+        (team: TeamAdHoc, idx: number):
+        string => {
+            const displayName: string = team.name;
+            const eventGain: string = team.score.toLocaleString(
+                'en-US'
             );
-            const eventGain: string = getTotalEventGain(
-                participant,
-                updatedEvent,
-                tracking
-            ).toLocaleString('en-US');
-            const xpDiffStr = diff[idx].toLocaleString('en-US');
-
+            const xpDiffStr = team.scoreDiff.toLocaleString('en-US');
             const numNameSpacesToInsert:
             number = nameMaxDisplayLength - displayName.length - eventGain.length;
 
@@ -2076,7 +2193,7 @@ const getLeaderboardStr = (
             }
         }
     ).join('\n');
-    const titleAndPrint = event.name.concat('\n\n').concat(strToPrint);
+    const titleAndPrint = previousEventCopy.name.concat('\n\n').concat(strToPrint);
     return titleAndPrint;
 };
 
@@ -2109,7 +2226,7 @@ eventParticipantsDidUpdate$.subscribe(
 
         // update leaderboard
         const strToPrint: string = getLeaderboardStr(
-            updatedData.guildId,
+            guildId,
             fetchedEvent,
             updatedEvent,
         );
@@ -2357,11 +2474,11 @@ eventDidEnd$.subscribe(
         );
         const sortedParticipants: runescape.Participant[] = updatedEvent.participants.sort(
             (a: runescape.Participant, b: runescape.Participant):
-            number => getTotalEventGain(
+            number => getParticipantScore(
                 b,
                 updatedEvent,
                 tracking
-            ) - getTotalEventGain(
+            ) - getParticipantScore(
                 a,
                 updatedEvent,
                 tracking
@@ -2946,6 +3063,32 @@ unsignupUpcomingEvent$.subscribe(
             boolean => participant.discordId === command.author.id
         );
         if (participantToRemove === undefined) return;
+        if (runescape.isTeamEvent(eventToModify)) {
+            // gotta remove them from the team event
+            const teamToModify: runescape.TeamInfo = eventToModify.teams.find(
+                (team: runescape.TeamInfo):
+                boolean => team.linkedDiscordIds.find(
+                    (discordId: string):
+                    boolean => discordId === participantToRemove.discordId
+                ) !== undefined
+            );
+            if (teamToModify === undefined) return;
+            const newLinkedDiscordIds: string[] = teamToModify.linkedDiscordIds.filter(
+                (discordId: string):
+                boolean => participantToRemove.discordId !== discordId
+            );
+            teamToModify.linkedDiscordIds = newLinkedDiscordIds;
+            const filteredTeams: runescape.TeamInfo[] = eventToModify.teams.filter(
+                (teamInfo: runescape.TeamInfo):
+                boolean => teamInfo.name !== teamToModify.name
+            );
+            if (newLinkedDiscordIds.length === 0) {
+                eventToModify.teams = filteredTeams;
+            } else {
+                const newTeams: runescape.TeamInfo[] = filteredTeams.concat(teamToModify);
+                eventToModify.teams = newTeams;
+            }
+        }
         const newEvent: runescape.Event = unsignupParticipant(
             eventToModify,
             participantToRemove,
@@ -3025,7 +3168,7 @@ listParticipant$.subscribe(
         const eventToList: runescape.Event = upcomingAndInFlightEvents[idxToCheck];
         const formattedStr: string = eventToList.participants.map(
             (participant: runescape.Participant, idx: number): string => {
-                const displayName: string = discordIdToDisplayName(
+                const displayName: string = getDisplayNameFromDiscordId(
                     command.guild.id,
                     participant.discordId
                 );

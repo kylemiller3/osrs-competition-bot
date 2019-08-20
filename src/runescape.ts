@@ -5,7 +5,7 @@ import {
     Observable, of, timer, defer,
 } from 'rxjs';
 import {
-    publishReplay, refCount, catchError, retryWhen, mergeMap,
+    publishReplay, refCount, catchError, retryWhen, mergeMap, filter,
 } from 'rxjs/operators';
 import { utils, } from './utils';
 
@@ -16,7 +16,10 @@ export namespace runescape {
      */
     const hiscoreCache: Record<
     string,
-    { observable: Observable<hiscores.LookupResponse>; date: Date }
+    {
+        observable: Observable<hiscores.LookupResponse>
+        date: Date
+    }
     > = {};
 
     /**
@@ -92,7 +95,7 @@ export namespace runescape {
     }
 
     /**
-     * @description Interface containing information about a Participant's Runescape account
+     * Interface containing information about a Participant's Runescape account
      * @category Event
      */
     export interface AccountInfo extends Record<string, unknown> {
@@ -110,7 +113,7 @@ export namespace runescape {
     }
 
     /**
-     * @description Interface of all possible things to track
+     * Interface of all possible things to track
      * @category Tracking
      */
     export interface Tracking extends Record<string, unknown> {
@@ -121,18 +124,28 @@ export namespace runescape {
     }
 
     /**
+     * Interface for information on a team
+     * @category Event
+     */
+    export interface TeamInfo extends Record<string, unknown> {
+        name: string
+        linkedDiscordIds: string[]
+    }
+
+    /**
      * Interface containing information about a Runescape event
      * @category Event
      */
     export interface Event extends Record<string, unknown> {
         id: string
         scoreboardMessageId?: string
+        statusMessageId?: string
         name: string
         startingDate: Date
         endingDate: Date
         type: EVENT_TYPE
         tracking?: Tracking
-        teams?: string[][]
+        teams?: TeamInfo[]
         participants: Participant[]
         hasPassedTwoHourWarning: boolean
         hasStarted: boolean
@@ -152,6 +165,45 @@ export namespace runescape {
         CUSTOM = 'custom',
         CASUAL = 'casual'
     }
+
+    /**
+     * Finds a participant by their Discord id
+     * @param event The participants to search
+     * @returns found participant
+     */
+    export const getParticipantByDiscordId = (participants: Participant[], discordId: string):
+    Participant => participants.find(
+        (participant: Participant): boolean => participant.discordId === discordId
+    );
+
+    /**
+     * Gets all participants in a team
+     * @param event The event get participants from
+     * @param teamName The name to find
+     * @returns A list of valid participants
+     * @category Team Helper
+     */
+    export const getTeamParticipants = (event: Event, teamName: string):
+    Participant[] => {
+        if (event.teams === undefined) return undefined;
+        const foundTeam: TeamInfo = event.teams.find(
+            (info: TeamInfo):
+            boolean => info.name === teamName
+        );
+        if (foundTeam === undefined) return undefined;
+        const teamParticipants: Participant[] = foundTeam.linkedDiscordIds.map(
+            (discordId: string):
+            Participant => getParticipantByDiscordId(
+                event.participants,
+                discordId
+            )
+        );
+        const filteredParticipants: Participant[] = teamParticipants.filter(
+            (participant: Participant):
+            boolean => participant !== undefined
+        );
+        return filteredParticipants;
+    };
 
     /**
      * Checks an event to see if it is a team event
@@ -205,13 +257,15 @@ export namespace runescape {
      * @param excludedStatusCodes HTTP error codes to abort on
      */
     const exponentialBackoff = ({
-        maxRetryAttempts = 10,
+        maxRetryAttempts = 5,
         scalingDuration = 1000,
         excludedStatusCodes = [],
+        excludedMessages = ['Player not found! Check RSN or game mode.']
     }: {
         maxRetryAttempts?: number
         scalingDuration?: number
         excludedStatusCodes?: number[]
+        excludedMessages?: string[]
     } = {}):
         (errors: Observable<HTTPError>) => Observable<number> => (attempts: Observable<HTTPError>):
     Observable<number> => attempts.pipe(
@@ -220,7 +274,14 @@ export namespace runescape {
             // if maximum number of retries have been met
             // or response is a status code we don't wish to retry, throw error
             if (retryAttempt > maxRetryAttempts
-                || excludedStatusCodes.find((e: number): boolean => e === error.status)) {
+                || excludedStatusCodes.find(
+                    (e: number):
+                    boolean => e === error.status
+                )
+                || excludedMessages.find(
+                    (e: string):
+                    boolean => e.toLowerCase() === error.message.toLowerCase()
+                )) {
                 throw error;
             }
             const jitter = Math.floor(
