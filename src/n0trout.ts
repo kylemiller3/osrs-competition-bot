@@ -1801,6 +1801,7 @@ finalize$.subscribe(
             newEvent
         );
         utils.logger.debug('saved finalized event');
+        command.message.reply(`finalized event ${newEvent.name}`);
     }
 );
 
@@ -1812,10 +1813,12 @@ listCustom$.subscribe(
         const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(
             data.events
         );
-        const eventsStr: string = unfinalizedEvents.map(
-            (event: runescape.Event, idx: number):
-            string => `\n${idx}: unfinalized event ${event.name}`
-        ).join('');
+        const eventsStr: string = unfinalizedEvents.length > 0
+            ? unfinalizedEvents.map(
+                (event: runescape.Event, idx: number):
+                string => `\n${idx}: unfinalized event ${event.name}`
+            ).join('')
+            : 'no unfinalized events';
         command.message.reply(eventsStr);
     }
 );
