@@ -1,6 +1,12 @@
 // TODO:
 // 20 min ending warning
 // all time hiscores
+// list users in a team
+// show individual contribution to a team
+// refactor out helpers
+// update documentation
+// move to sql
+// fix help and parameters
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -731,9 +737,17 @@ const getStatsStr = (
     }
 
     const participatedEvents = data.events.filter(
-        (event: runescape.Event): boolean => event.participants.some(
-            (participant: runescape.Participant): boolean => participant.discordId === discordId
-        )
+        (event: runescape.Event): boolean => {
+            const didParticipate: boolean = event.participants.some(
+                (participant: runescape.Participant): boolean => participant.discordId === discordId
+            );
+            return runescape.isEventCustom(event)
+                ? event.hasEnded
+                && event.isFinalized
+                && didParticipate
+                : event.hasEnded
+                && didParticipate;
+        }
     );
     const mappedStats = participatedEvents.map(
         (event: runescape.Event):
@@ -1876,6 +1890,7 @@ updateScore$.subscribe(
             eventToModify,
             newParticipant,
         );
+        command.message.reply(`${mention} now has ${newParticipant.customScore} points`);
         eventParticipantsDidUpdate$.next(
             {
                 guildId: command.guild.id,
