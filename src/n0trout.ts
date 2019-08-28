@@ -389,7 +389,7 @@ const sendChannelMessageHelper = (
     message: string,
     options?: discord.MessageOptions,
 ): Promise<discord.Message | discord.Message[]> => {
-    if (message.length > 1990) {
+    if (message.length > 1989) {
         if (concat) {
             const messagesToSend: string[] = message.match(/[\s\S]{1,1989}/g) || [];
             const messagesSize: number = messagesToSend.length;
