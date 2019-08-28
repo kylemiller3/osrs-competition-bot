@@ -5,7 +5,7 @@ import {
     Observable, of, timer, defer,
 } from 'rxjs';
 import {
-    publishReplay, refCount, catchError, retryWhen, mergeMap, filter,
+    publishReplay, refCount, catchError, retryWhen, mergeMap,
 } from 'rxjs/operators';
 import { utils, } from './utils';
 

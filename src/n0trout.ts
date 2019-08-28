@@ -241,8 +241,23 @@ const getUpcomingEvents = (
 ): runescape.Event[] => events.filter(
     (event: runescape.Event):
     boolean => !event.hasStarted
-    && !event.hasEnded
 );
+
+
+/**
+ * @param events The list of all Events to filter
+ * @returns A new array of unfinalized custom events
+ * @category Event
+ */
+const getUnfinalizedEvents = (events: runescape.Event[]):
+runescape.Event[] => {
+    const filteredEvents: runescape.Event[] = events.filter(
+        (event: runescape.Event):
+        boolean => runescape.isEventCustom(event)
+        && !event.isFinalized
+    );
+    return filteredEvents;
+};
 
 /**
  * @param data The source Data object
@@ -742,11 +757,10 @@ const getStatsStr = (
                 (participant: runescape.Participant): boolean => participant.discordId === discordId
             );
             return runescape.isEventCustom(event)
-                ? event.hasEnded
-                && event.isFinalized
-                && didParticipate
+                ? event.isFinalized
+                    && didParticipate
                 : event.hasEnded
-                && didParticipate;
+                    && didParticipate;
         }
     );
     const mappedStats = participatedEvents.map(
@@ -1156,34 +1170,70 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                     starting: new RegExp('(?<=starting)\\s*(.+?)\\s*(?:name|ending|type|team|$)', 'gim'),
                     ending: new RegExp('(?<=ending)\\s*(.+?)\\s*(?:name|starting|type|team|$)', 'gim'),
                     type: new RegExp('(?<=type)\\s*(\\w+).*(?:name|starting|ending|type|team|$)', 'gim'),
-                    team: new RegExp('(team)\\s*(?:name|starting|ending|type|team|$)', 'gim'),
+                    team: new RegExp('(teams?)\\s*(?:name|starting|ending|type|team|$)', 'gim'),
                 };
                 const parsedRegexes = findFirstRegexesMatch(
                     regexes,
                     command.input
                 );
+                const eventName: string = parsedRegexes.name;
+                const startingDateStr = parsedRegexes.starting;
+                const endingDateStr = parsedRegexes.ending;
+                const inputType: string = parsedRegexes.type;
+
                 // require all inputs to be valid
-                if (parsedRegexes.name === null) {
+                if (eventName === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid event name`);
                     command.message.reply(`invalid event name\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                if (parsedRegexes.starting === null) {
+                if (startingDateStr === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid starting date`);
                     command.message.reply(`invalid starting date\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                if (parsedRegexes.ending === null) {
+                if (endingDateStr === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid ending date`);
                     command.message.reply(`invalid ending date\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
-                if (parsedRegexes.type === null) {
+                if (inputType === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid type`);
                     command.message.reply(`invalid type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    return null;
+                }
+
+                // make sure our event name is unique for ongoing events
+                const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
+                    oldData.events
+                );
+                const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(
+                    oldData.events
+                );
+                const upcomingOrInFlightOrUnfinalizedEventWithSameName = [
+                    ...upcomingAndInFlightEvents,
+                    ...unfinalizedEvents,
+                ].find(
+                    (event: runescape.Event):
+                    boolean => event.name.toLowerCase() === eventName.toLowerCase()
+                );
+
+                // no duplicate names
+                if (upcomingOrInFlightOrUnfinalizedEventWithSameName !== undefined) {
+                    utils.logger.debug(`Admin ${command.author.username} entered event with same name`);
+                    command.message.reply(`already an event with the same name scheduled\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    return null;
+                }
+
+                const eventType = runescape.EVENT_TYPE[
+                    inputType.toUpperCase()
+                ];
+                if (eventType === undefined) {
+                    utils.logger.debug(`Admin ${command.author.username} entered invalid event type`);
+                    command.message.reply(`invalid event type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
                     return null;
                 }
 
@@ -1191,21 +1241,12 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                 const dateB: Date = new Date(parsedRegexes.ending);
                 const startingDate: Date = dateA <= dateB ? dateA : dateB;
                 const endingDate: Date = dateA > dateB ? dateA : dateB;
-
-                const inputType: string = parsedRegexes.type.toUpperCase();
-                if (runescape.EVENT_TYPE[inputType] === undefined) {
-                    utils.logger.debug(`Admin ${command.author.username} entered invalid event type`);
-                    command.message.reply(`invalid event type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
-                    return null;
-                }
-
-                const type = runescape.EVENT_TYPE[inputType];
                 const event: runescape.Event = {
                     id: uuid(),
-                    name: parsedRegexes.name,
+                    name: eventName,
                     startingDate,
                     endingDate,
-                    type,
+                    type: eventType,
                     participants: [],
                     hasPassedTwoHourWarning: false,
                     hasStarted: false,
@@ -1497,17 +1538,19 @@ const signupEvent$: Observable<[
         switchMap((command: Input):
         Observable<[bot.Data, runescape.Event, discord.Message, hiscores.LookupResponse]> => {
             const signupRegex = {
-                eventIdx: new RegExp('.*?([0-9]+).*?$', 'gim'),
-                rsn: new RegExp('(?<=rsn)\\s*(.*?)\\s*(?:rsn|teamname|$)', 'gim'),
-                teamname: new RegExp('(?<=teamname)\\s*(.*?)\\s*(?:rsn|teamname|$)', 'gim'),
+                eventName: new RegExp('(?<=event)\\s*(.*?)\\s*(?:event|rsn|teamname|$)', 'gim'),
+                rsn: new RegExp('(?<=rsn)\\s*(.*?)\\s*(?:event|rsn|teamname|$)', 'gim'),
+                teamname: new RegExp('(?<=teamname)\\s*(.*?)\\s*(?:event|rsn|teamname|$)', 'gim'),
             };
             const parsedRegexes = findFirstRegexesMatch(signupRegex, command.input);
-            if (parsedRegexes.eventIdx === null) {
-                utils.logger.debug(`${command.author.id} entered invalid index`);
-                command.message.reply(`invalid index\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+            const eventName: string = parsedRegexes.eventName;
+            const rsnToAdd: string = parsedRegexes.rsn;
+            if (eventName === null) {
+                utils.logger.debug(`${command.author.id} entered invalid event name`);
+                command.message.reply(`invalid event name\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
                 return of(null);
             }
-            if (parsedRegexes.rsn === null) {
+            if (rsnToAdd === null) {
                 utils.logger.debug(`${command.author.id} entered invalid rsn`);
                 command.message.reply(`invalid rsn\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
                 return of(null);
@@ -1519,22 +1562,18 @@ const signupEvent$: Observable<[
             const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
                 data.events
             );
-            const idxToModify: number = Number.parseInt(
-                parsedRegexes.eventIdx,
-                10
+            // get event to modify
+            const eventToModify: runescape.Event = upcomingAndInFlightEvents.find(
+                (event: runescape.Event):
+                boolean => event.name.toLowerCase() === eventName.toLowerCase()
             );
-            if (Number.isNaN(idxToModify) || idxToModify >= upcomingAndInFlightEvents.length) {
-                utils.logger.debug(`User did not specify index (${idxToModify})`);
-                command.message.reply(`invalid index ${idxToModify}\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+            if (eventToModify === undefined) {
+                utils.logger.debug(`Did not find name (${eventName})`);
+                command.message.reply(`Did not find upcoming event with name '${eventName}'\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
                 return of(null);
             }
 
             const discordIdToAdd: string = command.author.id;
-            const rsnToAdd: string = parsedRegexes.rsn;
-
-            // get event to modify and its type
-            const eventToModify: runescape.Event = upcomingAndInFlightEvents[idxToModify];
-
             const newRsAccount: runescape.AccountInfo = {
                 rsn: rsnToAdd,
             };
@@ -1775,34 +1814,23 @@ Subject<GuildDataAndEvent> = new Subject();
 //
 //------------------------
 
-const getUnfinalizedEvents = (events: runescape.Event[]):
-runescape.Event[] => {
-    const filteredEvents: runescape.Event[] = events.filter(
-        (event: runescape.Event):
-        boolean => runescape.isEventCustom(event)
-        && !event.isFinalized
-    );
-    return filteredEvents;
-};
-
 finalize$.subscribe(
     (command: Input): void => {
         const data: bot.Data = bot.load(command.guild.id);
         const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(
             data.events
         );
-        const idxToFinalize: number = parseInt(
-            command.input,
-            10
+
+        const eventName: string = command.input.trim();
+        const eventToFinalize: runescape.Event = unfinalizedEvents.find(
+            (event: runescape.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
         );
-        if (Number.isNaN(idxToFinalize)
-        || idxToFinalize >= unfinalizedEvents.length) {
-            utils.logger.debug(`Admin did not specify index (${idxToFinalize})`);
-            command.message.reply(`invalid index ${idxToFinalize}\n${bot.COMMANDS.FINALIZE.parameters}`);
+        if (eventToFinalize === undefined) {
+            utils.logger.debug(`Did not find name (${eventName})`);
+            command.message.reply(`Did not find upcoming event with name '${eventName}'\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
             return;
         }
-
-        const eventToFinalize: runescape.Event = unfinalizedEvents[idxToFinalize];
         if (!eventToFinalize.hasEnded) {
             command.message.reply('cannot finalize an event that has not ended yet');
             return;
@@ -1842,33 +1870,24 @@ updateScore$.subscribe(
         const data: bot.Data = bot.load(command.guild.id);
         const newInput = command.input.replace(/<@!?[0-9]+>/g, '');
         const updateScore = {
-            score: new RegExp('add\\s*(-?[0-9]+)\\s*', 'gim'),
-            event: new RegExp('\\s*([0-9]+).\\s*(?:add)', 'gim'),
+            score: new RegExp('(?<=score)\\s*([\\+|-]?[0-9]+)\\s*(?:event|score|$)', 'gim'),
+            event: new RegExp('(?<=event)\\s*(.*?)\\s*(?:event|score|$)', 'gim'),
         };
         const parsedRegexes = findFirstRegexesMatch(updateScore, newInput);
-        if (parsedRegexes.score === null) {
+        const scoreStr: string = parsedRegexes.score;
+        const eventName: string = parsedRegexes.event;
+        if (scoreStr === null) {
             utils.logger.debug(`${command.author.id} entered invalid score`);
             command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.parameters}`);
             return;
         }
-        if (parsedRegexes.event === null) {
+        if (eventName === null) {
             utils.logger.debug(`${command.author.id} entered invalid event`);
             command.message.reply(`invalid event\n${bot.COMMANDS.UPDATESCORE.parameters}`);
             return;
         }
-        const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(data.events);
-        const idxToModify: number = parseInt(
-            parsedRegexes.event,
-            10,
-        );
-        if (Number.isNaN(idxToModify)
-        || idxToModify >= unfinalizedEvents.length) {
-            utils.logger.debug(`Admin did not specify index (${idxToModify})`);
-            command.message.reply(`invalid index ${idxToModify}\n${bot.COMMANDS.FINALIZE.parameters}`);
-            return;
-        }
         const numToAdd: number = parseInt(
-            parsedRegexes.score,
+            scoreStr,
             10,
         );
         if (Number.isNaN(numToAdd)) {
@@ -1876,9 +1895,18 @@ updateScore$.subscribe(
             command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.parameters}`);
             return;
         }
+        const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(data.events);
+        const eventToModify: runescape.Event = unfinalizedEvents.find(
+            (event: runescape.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
+        );
+        if (eventToModify === undefined) {
+            utils.logger.debug(`Did not find event '${eventName}'`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            return;
+        }
         const mention: discord.User = command.message.mentions.users.array()[0];
         const mentionId: string = mention.id;
-        const eventToModify: runescape.Event = unfinalizedEvents[idxToModify];
         const foundParticipant: runescape.Participant = eventToModify.participants.find(
             (participant: runescape.Participant):
             boolean => participant.discordId === mentionId
@@ -2962,18 +2990,16 @@ deleteUpcomingEvent$.subscribe(
         const upcomingAndInFlightEvents: runescape.Event[] = getUpcomingAndInFlightEvents(
             oldData.events
         );
-        const idxToRemove: number = parseInt(
-            command.input,
-            10
+        const eventName: string = command.input.trim();
+        const eventToDelete: runescape.Event = upcomingAndInFlightEvents.find(
+            (event: runescape.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
         );
-        if (Number.isNaN(idxToRemove)
-        || idxToRemove >= upcomingAndInFlightEvents.length) {
-            utils.logger.debug(`Admin did not specify index (${idxToRemove})`);
-            command.message.reply(`invalid index ${idxToRemove}\n${bot.COMMANDS.DELETE_UPCOMING.parameters}`);
+        if (eventToDelete === undefined) {
+            utils.logger.debug(`Did not find event '${eventName}'`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.DELETE_UPCOMING.parameters}`);
             return;
         }
-
-        const eventToDelete: runescape.Event = upcomingAndInFlightEvents[idxToRemove];
         const newEvents: runescape.Event[] = deleteEvent(
             oldData,
             eventToDelete
@@ -3062,19 +3088,18 @@ unsignupUpcomingEvent$.subscribe(
         const data: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(data.events);
-        const idxToModify: number = Number.parseInt(
-            command.input,
-            10
-        );
-        if (Number.isNaN(idxToModify)
-        || idxToModify >= upcomingAndInFlightEvents.length) {
-            utils.logger.debug(`User did not specify index (${idxToModify})`);
-            command.message.reply(`invalid index ${idxToModify}\n${bot.COMMANDS.UNSIGNUP_UPCOMING.parameters}`);
-            return;
-        }
 
         // does the event to modify contain our user?
-        const eventToModify: runescape.Event = upcomingAndInFlightEvents[idxToModify];
+        const eventName: string = command.input.trim();
+        const eventToModify: runescape.Event = upcomingAndInFlightEvents.find(
+            (event: runescape.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
+        );
+        if (eventToModify === undefined) {
+            utils.logger.debug(`Did not find event '${eventName}'`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.UNSIGNUP_UPCOMING.parameters}`);
+            return;
+        }
         const participantToRemove:
         runescape.Participant = eventToModify.participants.find(
             (participant: runescape.Participant):
@@ -3134,21 +3159,18 @@ amISignedUp$.subscribe(
         const oldData: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(oldData.events);
-        const idxToCheck: number = Number.parseInt(
-            command.input,
-            10
-        );
-        if (Number.isNaN(idxToCheck)
-        || idxToCheck >= upcomingAndInFlightEvents.length) {
-            utils.logger.debug(`User did not specify index (${idxToCheck})`);
-            command.message.reply(`invalid index ${idxToCheck}\n${bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`);
-            return;
-        }
 
         const discordIdToCheck: string = command.author.id;
-
-        // does the event to modify contain our user?
-        const eventToCheck: runescape.Event = upcomingAndInFlightEvents[idxToCheck];
+        const eventName: string = command.input.trim();
+        const eventToCheck: runescape.Event = upcomingAndInFlightEvents.find(
+            (event: runescape.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
+        );
+        if (eventToCheck === undefined) {
+            utils.logger.debug(`Did not find event '${eventName}'`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`);
+            return;
+        }
         const foundEventParticipant: runescape.Participant = eventToCheck
             .participants.find(
                 (participant: runescape.Participant):
@@ -3172,18 +3194,24 @@ listParticipant$.subscribe(
         const oldData: bot.Data = bot.load(command.guild.id);
         const upcomingAndInFlightEvents:
         runescape.Event[] = getUpcomingAndInFlightEvents(oldData.events);
-        const idxToCheck: number = Number.parseInt(
-            command.input,
-            10
+        const unfinalizedEvents:
+        runescape.Event[] = getUnfinalizedEvents(oldData.events);
+
+        const upcomingAndInflightAndUnfinalizedEvents:
+        runescape.Event[] = [
+            ...upcomingAndInFlightEvents,
+            ...unfinalizedEvents,
+        ];
+        const eventName: string = command.input.trim();
+        const eventToList: runescape.Event = upcomingAndInflightAndUnfinalizedEvents.find(
+            (event: runescape.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
         );
-        if (Number.isNaN(idxToCheck)
-        || idxToCheck >= upcomingAndInFlightEvents.length) {
-            utils.logger.debug(`User did not specify index (${idxToCheck})`);
-            command.message.reply(`invalid index ${idxToCheck}\n${bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`);
+        if (eventToList === undefined) {
+            utils.logger.debug(`Did not find event '${eventName}'`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.LIST_PARTICIPANTS_UPCOMING.parameters}`);
             return;
         }
-
-        const eventToList: runescape.Event = upcomingAndInFlightEvents[idxToCheck];
         const formattedStr: string = eventToList.participants.map(
             (participant: runescape.Participant, idx: number): string => {
                 const displayName: string = getDisplayNameFromDiscordId(
