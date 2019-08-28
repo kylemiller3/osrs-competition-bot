@@ -6,7 +6,7 @@
 // refactor out helpers
 // update documentation
 // move to sql
-// fix help and parameters
+// allow guild admins to use admin commands
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -30,6 +30,7 @@ import { runescape, } from './runescape';
 import { bot, } from './bot';
 import { utils, } from './utils';
 import auth from './auth.json';
+import { log } from 'util';
 
 //----------
 // Constants
@@ -382,18 +383,59 @@ string => {
     return member.displayName;
 };
 
+const sendChannelMessageHelper = (
+    textChannel: discord.TextChannel,
+    concat: boolean,
+    message: string,
+    options?: discord.MessageOptions,
+): Promise<discord.Message | discord.Message[]> => {
+    if (message.length > 1990) {
+        if (concat) {
+            const messagesToSend: string[] = message.match(/[\s\S]{1,1989}/g) || [];
+            const messagesSize: number = messagesToSend.length;
+            messagesToSend.forEach(
+                (msg: string, idx: number):
+                void => {
+                    utils.logger.debug(msg.length);
+                    if (idx === messagesSize - 1) {
+                        textChannel.send(
+                            msg,
+                            options,
+                        );
+                    } else {
+                        textChannel.send(
+                            msg.concat('...'),
+                            options,
+                        );
+                    }
+                }
+            );
+            return null;
+        }
+        const msg: string = message.slice(0, 1989);
+        return textChannel.send(
+            msg.concat('...'),
+            options,
+        );
+    }
+    return textChannel.send(
+        message,
+        options,
+    );
+};
+
 /**
  * @param guildId The Guild id to send the attachment to
  * @param channelId The channel id to send the message to
- * @param attachmentToSend The attachment path to send
  * @param text The attachment text to send
+ * @param attachmentToSend The attachment path to send
  * @category Send Guild Message
  */
 const sendChannelAttachment = (
     guildId: string,
     channelId: string,
+    text: string,
     attachmentToSend: string,
-    text?: string
 ): void => {
     const guild: discord.Guild = client.guilds.get(
         guildId
@@ -406,13 +448,12 @@ const sendChannelAttachment = (
     utils.logger.debug('Sending message to Guild');
 
     if (attachmentToSend !== null) {
-        channel.send(text, {
-            files: [
-                {
-                    attachment: attachmentToSend,
-                },
-            ],
-        });
+        channel.send(
+            text,
+            {
+                file: attachmentToSend,
+            }
+        );
     }
 };
 
@@ -429,6 +470,7 @@ const sendChannelMessage = async (
     channelId: string,
     content: string,
     options: discord.MessageOptions = null,
+    concat: boolean = false,
 ): Promise<discord.Message> => {
     if (content === undefined) return Promise.reject();
     if (guildId === undefined) return Promise.reject();
@@ -441,7 +483,9 @@ const sendChannelMessage = async (
     ) as discord.TextChannel;
     if (channel === undefined || channel.type !== 'text') return Promise.reject();
     utils.logger.debug('Sending message to Guild');
-    const message: discord.Message = await channel.send(
+    const message: discord.Message = await sendChannelMessageHelper(
+        channel,
+        concat,
         content,
         options
     ) as discord.Message;
@@ -1184,25 +1228,25 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                 // require all inputs to be valid
                 if (eventName === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid event name`);
-                    command.message.reply(`invalid event name\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    command.message.reply(`invalid event name\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
                     return null;
                 }
 
                 if (startingDateStr === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid starting date`);
-                    command.message.reply(`invalid starting date\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    command.message.reply(`invalid starting date\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
                     return null;
                 }
 
                 if (endingDateStr === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid ending date`);
-                    command.message.reply(`invalid ending date\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    command.message.reply(`invalid ending date\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
                     return null;
                 }
 
                 if (inputType === null) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid type`);
-                    command.message.reply(`invalid type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    command.message.reply(`invalid type\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
                     return null;
                 }
 
@@ -1224,7 +1268,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                 // no duplicate names
                 if (upcomingOrInFlightOrUnfinalizedEventWithSameName !== undefined) {
                     utils.logger.debug(`Admin ${command.author.username} entered event with same name`);
-                    command.message.reply(`already an event with the same name scheduled\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    command.message.reply(`already an event with the same name scheduled\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
                     return null;
                 }
 
@@ -1233,7 +1277,7 @@ const addUpcoming$: Observable<[Input, runescape.Event]> = filteredMessage$(
                 ];
                 if (eventType === undefined) {
                     utils.logger.debug(`Admin ${command.author.username} entered invalid event type`);
-                    command.message.reply(`invalid event type\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+                    command.message.reply(`invalid event type\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
                     return null;
                 }
 
@@ -1460,7 +1504,7 @@ Observable<[Input, runescape.Event]> = addUpcoming$
                         && allRunescapeLmsModes.includes(lmsMode)
                 );
                 if (inputLmsModeNames.length !== filteredLmsModes.length) {
-                    utils.logger.debug(`Admin ${inputCommand.author.id} entered some invalid clue names`);
+                    utils.logger.debug(`Admin ${inputCommand.author.id} entered some invalid lms options`);
                     inputCommand.message.reply(`some lms settings entered are invalid\nchoices are: ${allRunescapeLmsModes.toString()}`);
                     return null;
                 }
@@ -1489,7 +1533,7 @@ Observable<[Input, runescape.Event]> = addUpcoming$
             }
 
             utils.logger.debug(`Admin ${inputCommand.author.id} entered invalid competition data`);
-            inputCommand.message.reply(`some competition settings entered are invalid\n${bot.COMMANDS.ADD_UPCOMING.parameters}`);
+            inputCommand.message.reply(`some competition settings entered are invalid\n${bot.COMMANDS.ADD_UPCOMING.usage}`);
             return null;
         }),
         filter((commandEventArr: [Input, runescape.Event]): boolean => commandEventArr !== null)
@@ -1547,12 +1591,12 @@ const signupEvent$: Observable<[
             const rsnToAdd: string = parsedRegexes.rsn;
             if (eventName === null) {
                 utils.logger.debug(`${command.author.id} entered invalid event name`);
-                command.message.reply(`invalid event name\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+                command.message.reply(`invalid event name\n${bot.COMMANDS.SIGNUP_UPCOMING.usage}`);
                 return of(null);
             }
             if (rsnToAdd === null) {
                 utils.logger.debug(`${command.author.id} entered invalid rsn`);
-                command.message.reply(`invalid rsn\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+                command.message.reply(`invalid rsn\n${bot.COMMANDS.SIGNUP_UPCOMING.usage}`);
                 return of(null);
             }
 
@@ -1569,7 +1613,7 @@ const signupEvent$: Observable<[
             );
             if (eventToModify === undefined) {
                 utils.logger.debug(`Did not find name (${eventName})`);
-                command.message.reply(`Did not find upcoming event with name '${eventName}'\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+                command.message.reply(`Did not find upcoming event with name '${eventName}'\n${bot.COMMANDS.SIGNUP_UPCOMING.usage}`);
                 return of(null);
             }
 
@@ -1605,7 +1649,7 @@ const signupEvent$: Observable<[
                 const teamname: string = parsedRegexes.teamname;
                 if (teamname === null) {
                     utils.logger.debug(`${command.author.id} entered invalid teamname`);
-                    command.message.reply(`invalid teamname\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+                    command.message.reply(`invalid teamname\n${bot.COMMANDS.SIGNUP_UPCOMING.usage}`);
                     return of(null);
                 }
 
@@ -1828,7 +1872,7 @@ finalize$.subscribe(
         );
         if (eventToFinalize === undefined) {
             utils.logger.debug(`Did not find name (${eventName})`);
-            command.message.reply(`Did not find upcoming event with name '${eventName}'\n${bot.COMMANDS.SIGNUP_UPCOMING.parameters}`);
+            command.message.reply(`Did not find upcoming event with name '${eventName}'\n${bot.COMMANDS.SIGNUP_UPCOMING.usage}`);
             return;
         }
         if (!eventToFinalize.hasEnded) {
@@ -1878,12 +1922,12 @@ updateScore$.subscribe(
         const eventName: string = parsedRegexes.event;
         if (scoreStr === null) {
             utils.logger.debug(`${command.author.id} entered invalid score`);
-            command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.usage}`);
             return;
         }
         if (eventName === null) {
             utils.logger.debug(`${command.author.id} entered invalid event`);
-            command.message.reply(`invalid event\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            command.message.reply(`invalid event\n${bot.COMMANDS.UPDATESCORE.usage}`);
             return;
         }
         const numToAdd: number = parseInt(
@@ -1892,7 +1936,7 @@ updateScore$.subscribe(
         );
         if (Number.isNaN(numToAdd)) {
             utils.logger.debug(`${command.author.id} entered invalid score`);
-            command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            command.message.reply(`invalid score\n${bot.COMMANDS.UPDATESCORE.usage}`);
             return;
         }
         const unfinalizedEvents: runescape.Event[] = getUnfinalizedEvents(data.events);
@@ -1902,7 +1946,12 @@ updateScore$.subscribe(
         );
         if (eventToModify === undefined) {
             utils.logger.debug(`Did not find event '${eventName}'`);
-            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.UPDATESCORE.parameters}`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.UPDATESCORE.usage}`);
+            return;
+        }
+        if (!eventToModify.hasStarted) {
+            utils.logger.debug(`Event '${eventName}' has not started`);
+            command.message.reply(`event ${eventName} has not started yet\n${bot.COMMANDS.UPDATESCORE.usage}`);
             return;
         }
         const mention: discord.User = command.message.mentions.users.array()[0];
@@ -1911,7 +1960,11 @@ updateScore$.subscribe(
             (participant: runescape.Participant):
             boolean => participant.discordId === mentionId
         );
-        if (foundParticipant === undefined) return;
+        if (foundParticipant === undefined) {
+            utils.logger.debug(`Did not find participant '${getDisplayNameFromDiscordId(data.guildId, mentionId)}'`);
+            command.message.reply(`${getDisplayNameFromDiscordId(data.guildId, mentionId)} is not signed up\n${bot.COMMANDS.UPDATESCORE.usage}`);
+            return;
+        }
         const newParticipant: runescape.Participant = { ...foundParticipant, };
         newParticipant.customScore += numToAdd;
         const newEvent: runescape.Event = updateParticipant(
@@ -2536,8 +2589,8 @@ eventDidEnd$.subscribe(
             sendChannelAttachment(
                 updatedData.guildId,
                 updatedData.settings.notificationChannelId,
+                `<@${sortedParticipants[0].discordId}>`,
                 attachment,
-                `<@${sortedParticipants[0].discordId}>`
             );
         }
     }
@@ -2997,7 +3050,7 @@ deleteUpcomingEvent$.subscribe(
         );
         if (eventToDelete === undefined) {
             utils.logger.debug(`Did not find event '${eventName}'`);
-            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.DELETE_UPCOMING.parameters}`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.DELETE_UPCOMING.usage}`);
             return;
         }
         const newEvents: runescape.Event[] = deleteEvent(
@@ -3097,7 +3150,7 @@ unsignupUpcomingEvent$.subscribe(
         );
         if (eventToModify === undefined) {
             utils.logger.debug(`Did not find event '${eventName}'`);
-            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.UNSIGNUP_UPCOMING.parameters}`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.UNSIGNUP_UPCOMING.usage}`);
             return;
         }
         const participantToRemove:
@@ -3141,13 +3194,16 @@ unsignupUpcomingEvent$.subscribe(
             newEvent,
         );
 
-        eventParticipantsDidUpdate$.next(
-            {
-                guildId: data.guildId,
-                eventId: newEvent.id,
-                participants: newEvent.participants,
-            }
-        );
+        if (newEvent.hasStarted
+            && !newEvent.hasEnded) {
+            eventParticipantsDidUpdate$.next(
+                {
+                    guildId: data.guildId,
+                    eventId: newEvent.id,
+                    participants: newEvent.participants,
+                }
+            );
+        }
 
         utils.logger.debug('Unsignup called');
         command.message.reply('removed from event');
@@ -3168,7 +3224,7 @@ amISignedUp$.subscribe(
         );
         if (eventToCheck === undefined) {
             utils.logger.debug(`Did not find event '${eventName}'`);
-            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.AMISIGNEDUP_UPCOMING.parameters}`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.AMISIGNEDUP_UPCOMING.usage}`);
             return;
         }
         const foundEventParticipant: runescape.Participant = eventToCheck
@@ -3209,7 +3265,7 @@ listParticipant$.subscribe(
         );
         if (eventToList === undefined) {
             utils.logger.debug(`Did not find event '${eventName}'`);
-            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.LIST_PARTICIPANTS_UPCOMING.parameters}`);
+            command.message.reply(`can't find name ${eventName}\n${bot.COMMANDS.LIST_PARTICIPANTS_UPCOMING.usage}`);
             return;
         }
         const formattedStr: string = eventToList.participants.map(
@@ -3273,16 +3329,20 @@ help$.subscribe(
         );
         const outerStr: string[] = commandValues.map((commandInfo: bot.Command): string => {
             const innerStr: string[] = [
-                `\n'${commandInfo.command}${commandInfo.parameters}'`,
+                `\n'${commandInfo.command}'`,
                 `\ndescription: ${commandInfo.description}`,
+                `\nusage: ${commandInfo.usage}`,
             ];
             return innerStr.join('');
         });
         const formattedStr = outerStr.join('\n');
         utils.logger.debug(formattedStr);
-        command.message.reply(
+        sendChannelMessage(
+            command.guild.id,
+            command.message.channel.id,
             formattedStr,
-            { code: true, }
+            { code: true, },
+            true,
         );
         utils.logger.debug('Help called');
     }

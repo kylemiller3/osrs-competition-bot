@@ -65,7 +65,7 @@ export namespace bot {
     export interface Command extends Record<string, unknown> {
         description: string
         accessControl: AccessControl
-        parameters: string
+        usage: string
         command: string
     }
 
@@ -154,118 +154,121 @@ export namespace bot {
             command: '!f debug',
             description: 'logs debug info to console',
             accessControl: ONLY_ADMIN,
-            parameters: '',
+            usage: '!f debug',
         },
         ADD_ADMIN: {
             command: '!f add admin ',
             description: 'adds administration for this guild',
             accessControl: ONLY_UNSET_ADMINS_OR_ADMIN,
-            parameters: '(mentions)',
+            usage: '!f add admin @admin1 @admin2',
         },
 
         ADD_UPCOMING: {
             command: '!f add event ',
             description: 'schedules a new event',
             accessControl: ONLY_ADMIN,
-            parameters: '(name, starting, ending, type (competition (skills (list of skills) | bh (bounty hunter mode) | clues (clue difficulties)) | regular ))',
+            usage: '!f add event name (unique name) starting (start date) ending (end date) type skills (skill list)\n'
+            + 'OR !f add event name (unique name) starting (start date) ending (end date) type bh (hunter OR rogue)\n'
+            + 'OR !f add event name (unique name) starting (start date) ending (end date) type lms lms\n'
+            + 'OR !f add event name (unique name) starting (start date) ending (end date) type clues (clue difficulty list)',
         },
 
         LIST_UPCOMING: {
             command: '!f events',
-            description: 'lists scheduled events along and event number',
+            description: 'lists scheduled events along with event name',
             accessControl: ANY_USER,
-            parameters: '',
+            usage: '!f events',
         },
 
         DELETE_UPCOMING: {
             command: '!f delete ',
-            description: 'deletes an event by event number (use with \'!f events\')',
+            description: 'deletes an event by event name',
             accessControl: ONLY_ADMIN,
-            parameters: '(event number)',
+            usage: '!f delete (event name)',
         },
 
         SIGNUP_UPCOMING: {
             command: '!f signup ',
-            description: 'signs up for a scheduled event number with RuneScape name (use with \'!f events\')',
+            description: 'signs up for an event with event name and RuneScape name',
             accessControl: ANY_USER,
-            parameters: '(RSN, event number)',
+            usage: '!f signup event (event name) rsn (RuneScape name)',
         },
 
         UNSIGNUP_UPCOMING: {
             command: '!f unsignup ',
-            description: 'un-signs up for a scheduled event number (use with \'!f events\')',
+            description: 'un-signs up for an event with event name',
             accessControl: ANY_USER,
-            parameters: '(event number)',
+            usage: '!f unsignup (event name)',
         },
 
         AMISIGNEDUP_UPCOMING: {
             command: '!f amisignedup ',
-            description: 'checks to see if you are signed up for a scheduled event number (use with \'!f events\')',
+            description: 'checks to see if you are signed up for an event with event name',
             accessControl: ANY_USER,
-            parameters: '(event number)',
+            usage: '!f amisignedup (event name)',
         },
 
         LIST_PARTICIPANTS_UPCOMING: {
             command: '!f list ',
-            description: 'lists all participants in an event number (use with \'!f events\')',
+            description: 'lists all participants in an event with event name)',
             accessControl: ANY_USER,
-            parameters: '(event number)',
+            usage: '!f list (event name)',
         },
 
         HELP: {
             command: '!f help',
             description: 'prints this help',
             accessControl: ANY_USER,
-            parameters: '',
+            usage: '!f help',
         },
 
         SET_CHANNEL: {
             command: '!f set channel ',
             description: 'sets the channel for notifications - must be set or there will be no notifications',
             accessControl: ONLY_ADMIN,
-            parameters: '(channel mention)',
+            usage: '!f set channel #channel',
         },
 
         FORCESIGNUP_UPCOMING: {
             command: '!f forcesignup ',
             description: 'forces signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
             accessControl: ONLY_ADMIN,
-            parameters: '(index rsn mention)',
+            usage: '!f forcesignup event (event name) @mention rsn (RuneScape name)',
         },
 
         FORCEUNSIGNUP_UPCOMING: {
             command: '!f forceunsignup ',
             description: 'forces un-signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
             accessControl: ONLY_ADMIN,
-            parameters: '(index mention)',
+            usage: '!f forceunsignup (event name) @mention',
         },
 
         SHOWSTATS: {
             command: '!f stats',
             description: 'prints stats for a user',
             accessControl: ANY_USER,
-            parameters: ' ?(mention)',
+            usage: '!f stats\nOR !f stats @mention',
         },
 
         FINALIZE: {
             command: '!f finalize ',
             description: 'ends and finalizes a long running or custom event',
             accessControl: ONLY_ADMIN,
-            parameters: '(index, placement order if custom)',
+            usage: '!f finalize (event name)',
         },
 
         LIST_CUSTOM: {
             command: '!f custom',
-            description: 'lists events that have yet to end or have yet to be finalized',
+            description: 'lists custom events that have yet to end or have yet to be finalized',
             accessControl: ONLY_ADMIN,
-            parameters: '',
+            usage: '!f custom',
         },
 
         UPDATESCORE: {
             command: '!f updatescore ',
             description: 'updates score of a custom event participant',
             accessControl: ONLY_ADMIN,
-            parameters: 'index, mention, score to add',
+            usage: 'index, mention, score to add',
         },
     };
 
