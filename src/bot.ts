@@ -1,22 +1,31 @@
 
 import * as jsonfile from 'jsonfile';
 import {
-    runescape,
-} from './runescape';
-import { utils, } from './utils';
+    Observable, timer, defer, of,
+} from 'rxjs';
+import { hiscores, } from 'osrs-json-api';
+import {
+    mergeMap, retryWhen, publishReplay, refCount, catchError,
+} from 'rxjs/operators';
+import {
+    Event,
+} from './event';
+import { Utils, } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace bot {
+export namespace Bot {
     /**
+     * Blank cache
      * @ignore
      */
-    const loadCache: Record<string, bot.Data> = {};
+    const loadCache:
+    Record<string, GuildContext> = {};
 
     /**
-     * Default blank [[bot.Data]]
-     * @category Configuration
+     * Default blank [[GuildContext]]
+     * @category Context
      */
-    const DATA_DEFAULT: bot.Data = {
+    const DATA_DEFAULT: GuildContext = {
         guildId: undefined,
         settings: {
             admins: [],
@@ -27,39 +36,7 @@ export namespace bot {
     };
 
     /**
-     * Checks the Guild configuration for any administrators
-     * @param data Guild data to check
-     * @returns If the Guild has one or more administrator
-     * @category Helper
-     */
-    export const hasAdmin = (
-        data: bot.Data
-    ): boolean => data.settings.admins.length > 0;
-
-    /**
-     * Checks if the author of a discord message is on
-     * the administrator list for that Guild
-     * @param authorId The Discord Author id of the message
-     * @param data The Data to check
-     * @returns True if the author is an administrator
-     * @category Helper
-     */
-    export const isAdmin = (
-        authorId: string,
-        data: bot.Data
-    ): boolean => data.settings.admins.includes(authorId);
-
-    /**
-     * Interface describing access controls for each bot Command
-     * @category Access Control
-     */
-    export interface AccessControl {
-        controlFunction: (authorId: string, data: Data) => boolean
-        description: string
-    }
-
-    /**
-     * Interface describing each Command
+     * Contract describing each Command
      * @category Command
      */
     export interface Command extends Record<string, unknown> {
@@ -70,10 +47,22 @@ export namespace bot {
     }
 
     /**
-     * Contract containing all known bot Commands
+     * Contract describing Access Controls of each bot [[Command]]
      * @category Command
      */
-    export interface Commands extends Record<string, Command> {
+    export interface AccessControl {
+        controlFunction: (
+            data: GuildContext,
+            authorId: string,
+        ) => boolean
+        description: string
+    }
+
+    /**
+     * Contract of all known bot [[Command]]s
+     * @category Command
+     */
+    export interface AllCommands extends Record<string, Command> {
         DEBUG: Command
         ADD_ADMIN: Command
         ADD_UPCOMING: Command
@@ -94,8 +83,8 @@ export namespace bot {
     }
 
     /**
-     * Interface for a Guild's Settings
-     * @category Configuration
+     * Contract for a Guild's Settings
+     * @category Context
      */
     export interface Settings extends Record<string, unknown> {
         admins: string[]
@@ -104,52 +93,86 @@ export namespace bot {
 
     /**
      * Top level contract for each Guild's configuration
-     * @category Configuration
+     * @category Context
      */
-    export interface Data extends Record<string, unknown> {
+    export interface GuildContext extends Record<string, unknown> {
         guildId: string
         settings: Settings
-        events: runescape.Event[]
+        events: Event.Event[]
     }
 
     /**
-     * Implementation of [[bot.AccessControl]] for unset
-     * Guild configuration or admin users only access
-     * @category Access Control
+     * Checks a [[GuildContext]] for any administrators
+     * @param context The context to check
+     * @returns True if the context has one or more administrator
+     * @category Context Property
      */
-    export const ONLY_UNSET_ADMINS_OR_ADMIN: bot.AccessControl = {
+    export const hasAdmin = (
+        context: GuildContext,
+    ): boolean => context.settings.admins.length > 0;
+
+    /**
+     * Checks if the author id of a Discord message is an administrator
+     * for a given [[GuildContext]]
+     * @param context The context to check
+     * @param authorId The Discord author id of the message
+     * @returns If the author is an administrator
+     * @category Context Property
+     */
+    export const isAdmin = (
+        context: GuildContext,
+        authorId: string,
+    ): boolean => context.settings.admins.includes(
+        authorId
+    );
+
+    /**
+     * Implementation of [[AccessControl]] for unset
+     * [[GuildContext]] or admin users only access
+     * @category Command
+     */
+    export const ONLY_UNSET_ADMINS_OR_ADMIN: AccessControl = {
         controlFunction: (
-            authorId: string, guildData: bot.Data
-        ): boolean => !hasAdmin(guildData) || isAdmin(authorId, guildData),
+            guildData: GuildContext,
+            authorId: string,
+        ): boolean => !hasAdmin(guildData) || isAdmin(
+            guildData,
+            authorId,
+        ),
         description: 'unset guild configuration or have admin privileges',
     };
 
     /**
-     * Implementation of [[bot.AccessControl]] for
+     * Implementation of [[AccessControl]] for
      * admin users only access
-     * @category Access Control
+     * @category Command
      */
-    export const ONLY_ADMIN: bot.AccessControl = {
+    export const ONLY_ADMIN: AccessControl = {
         controlFunction: (
-            authorId: string, guildData: bot.Data
-        ): boolean => isAdmin(authorId, guildData),
+            guildData: GuildContext,
+            authorId: string,
+        ): boolean => isAdmin(
+            guildData,
+            authorId
+        ),
         description: 'have admin privileges',
     };
 
     /**
-     * Implementation of [[bot.AccessControl]] for any user access
-     * @category Access Control
+     * Implementation of [[AccessControl]] for any user access
+     * @category Command
      */
-    export const ANY_USER: bot.AccessControl = {
+    export const ANY_USER: AccessControl = {
         controlFunction: (): boolean => true,
         description: 'any user',
     };
 
     /**
-     * Implementation of all recognized [[bot.Commands]]
+     * Implementation of [[AllCommands]]
      * @category Command
+     * @ignore
      */
-    export const COMMANDS: bot.Commands = {
+    export const ALL_COMMANDS: AllCommands = {
         DEBUG: {
             command: '!f debug',
             description: 'logs debug info to console',
@@ -273,17 +296,16 @@ export namespace bot {
     };
 
     /**
-     * Loads the Guild configuration using cache or [[bot.DATA_DEFAULT]] if none
-     * @param id Guild id configuration to load
-     * @param dirty Loads configuration from disk if set
-     * @returns The Data on disk
-     * @throws OS rejection load Error
-     * @category Database
+     * Loads the [[GuildContext]] using cache or [[DATA_DEFAULT]] if none or dirty
+     * @param id Guild id of context to load
+     * @param dirty Loads context from disk if set
+     * @returns The loaded context in storage
+     * @category Context
      */
     export const load = (
         id: string,
         dirty: boolean = false
-    ): bot.Data => {
+    ): GuildContext => {
         if (dirty || loadCache[id] === undefined) {
             try {
                 loadCache[id] = jsonfile.readFileSync(
@@ -297,16 +319,16 @@ export namespace bot {
                 );
             } catch (error) {
                 if (error.errno === -2) {
-                    utils.logger.info('Guild has no configuration');
+                    Utils.logger.info('Guild has no configuration');
                     return DATA_DEFAULT;
                 }
-                utils.logError(error);
-                utils.logger.error(`Error loading ${id} from disk`);
+                Utils.logError(error);
+                Utils.logger.error(`Error loading ${id} from disk`);
                 throw error;
             }
         }
 
-        const cached: bot.Data = loadCache[id];
+        const cached: GuildContext = loadCache[id];
         const keys = Object.keys(loadCache);
         if (keys.length >= 1000) {
             const idxToRemove: number = Math.floor((Math.random() * 10));
@@ -317,25 +339,166 @@ export namespace bot {
     };
 
     /**
-     * Saves the Guild configuration and then triggers a dirty [[bot.load]]
-     * @param id Guild id configuration to save
-     * @param data The Bot.Database to save to disk
-     * @returns The saved and loaded Data
-     * @throws OS rejection load Error or save Error
-     * @category Database
+     * Saves the [[GuildContext]] and then triggers a dirty [[load]]
+     * @param id Guild id context to save
+     * @param data The context to save to disk
+     * @returns The loaded context in storage
+     * @category Context
      */
     export const save = (
-        id: string,
-        data: bot.Data
-    ): bot.Data => {
+        context: GuildContext
+    ): GuildContext => {
         try {
-            jsonfile.writeFileSync(`./guilds/${id}.json`, data);
-            utils.logger.debug(`Wrote settings to ${id}`);
-            return load(id, true);
+            jsonfile.writeFileSync(`./guilds/${context.guildId}.json`, context);
+            Utils.logger.debug(`Wrote settings to ${context.guildId}`);
+            return load(context.guildId, true);
         } catch (error) {
-            utils.logError(error);
-            utils.logger.error(`Error writing ${id} to disk`);
+            Utils.logError(error);
+            Utils.logger.error(`Error writing ${context.guildId} to disk`);
             throw error;
         }
+    };
+
+    /**
+     * Interface describing the Hiscore Cache
+     * @category Hiscore Cache
+     * @ignore
+     */
+    interface HiscoreCache {
+        observable: Observable<hiscores.LookupResponse>
+        date: Date
+    }
+
+    /**
+     * Implementation of the [[HiscoreCache]]
+     * @category Hiscore Cache
+     * @ignore
+     */
+    const hiscoreCache: Record<string, HiscoreCache> = {};
+
+    /**
+     * Default cache size
+     * @category Hiscore Cache
+     * @ignore
+     */
+    const CACHE_SIZE = 1000;
+
+    /**
+     * Custom HTTP Error class
+     * @category Error
+     */
+    class HTTPError extends Error {
+        status: number
+    }
+
+    /**
+     * Retries a RuneScape API request exponentially backing-off on failure
+     * @param maxRetryAttempts How many retries to attempt
+     * @param scalingDuration Exponential backoff factor
+     * @param excludedStatusCodes HTTP error codes to abort on
+     * @param excludedMessages Error messages to abort on
+     * @category RuneScape API
+     * @ignore
+     */
+    const exponentialBackoff = ({
+        maxRetryAttempts = 5,
+        scalingDuration = 1000,
+        excludedStatusCodes = [],
+        excludedMessages = [
+            'Player not found! Check RSN or game mode.',
+            'RSN must be less or equal to 12 characters',
+            'RSN must be of type string',
+        ],
+    }: {
+        maxRetryAttempts?: number
+        scalingDuration?: number
+        excludedStatusCodes?: number[]
+        excludedMessages?: string[]
+    } = {}):
+        (errors: Observable<HTTPError>) => Observable<number> => (attempts: Observable<HTTPError>):
+    Observable<number> => attempts.pipe(
+        mergeMap((error: HTTPError, i: number): Observable<number> => {
+            const retryAttempt = i + 1;
+            // if maximum number of retries have been met
+            // or response is a status code we don't wish to retry, throw error
+            if (retryAttempt > maxRetryAttempts
+                || excludedStatusCodes.find(
+                    (e: number):
+                    boolean => e === error.status
+                )
+                || excludedMessages.find(
+                    (e: string):
+                    boolean => e.toLowerCase() === error.message.toLowerCase()
+                )) {
+                throw error;
+            }
+            const jitter = Math.floor(
+                (Math.random() * 300) - 150
+            );
+            Utils.logger.debug(
+                `Attempt ${retryAttempt}: retrying in ${retryAttempt * scalingDuration + jitter}ms`
+            );
+            return timer(retryAttempt * scalingDuration + jitter);
+        })
+    );
+
+    /**
+    * Fetches the supplied rsn from RuneScape API hiscores or cache.
+    * Cache invalidates every 20 minutes.
+    * @param rsn The rsn to lookup on hiscores
+    * @param pullNew Forces a cache miss
+    * @returns Observable of the RuneScape web API response as [[hiscores.LookupResponse]]
+    * @category RuneScape API
+    */
+    export const hiscores$ = (
+        rsn: string,
+        pullNew: boolean
+    ): Observable<hiscores.LookupResponse> => {
+        // eslint-disable-next-line no-control-regex
+        const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
+        Utils.logger.info(`Looking up rsn '${asciiRsn}'`);
+        if (hiscoreCache[asciiRsn] !== undefined) {
+            const date: Date = new Date(hiscoreCache[asciiRsn].date);
+            date.setMinutes(
+                date.getMinutes() + 20
+            );
+            if (Utils.isInPast(date) || pullNew) {
+                hiscoreCache[asciiRsn] = undefined;
+            }
+        }
+
+        if (hiscoreCache[asciiRsn] === undefined) {
+            const obs: Observable<hiscores.LookupResponse> = defer(
+                (): Promise<JSON> => hiscores.getPlayer(asciiRsn)
+            )
+                .pipe(
+                    retryWhen(exponentialBackoff()),
+                    publishReplay(1),
+                    refCount(),
+                    catchError((error: Error): Observable<JSON> => {
+                        hiscoreCache[asciiRsn] = undefined;
+                        Utils.logError(error);
+                        Utils.logger.error(`Could not find rsn '${asciiRsn}'`);
+                        return of(null);
+                    })
+                ) as unknown as Observable<hiscores.LookupResponse>;
+
+            hiscoreCache[asciiRsn] = {
+                observable: obs,
+                date: new Date(),
+            };
+        }
+
+        const cached: Observable<hiscores.LookupResponse> = hiscoreCache[asciiRsn].observable;
+        const keys = Object.keys(hiscoreCache);
+        if (keys.length >= CACHE_SIZE) {
+            const idxToRemove: number = Math.floor(
+                (Math.random() * CACHE_SIZE)
+            );
+            const keyToRemove: string = keys[idxToRemove];
+            hiscoreCache[keyToRemove] = undefined;
+            return cached;
+        }
+        return cached;
     };
 }

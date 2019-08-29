@@ -1,28 +1,11 @@
 import * as log4js from 'log4js';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace utils {
-    /**
-     * Returns a new Record with an updated entry
-     * @typeparam T The entry type to update
-     * @param record The source Record
-     * @param entry The new entry
-     * @returns The new Record object
-     */
-    export const update = <T>(
-        dictionaryA: T,
-        dictionaryB: {}
-    ): T => {
-        const copy = {
-            ...dictionaryA,
-            ...dictionaryB,
-        };
-        return copy;
-    };
-
+export namespace Utils {
     /**
      * Checks to see if a date is in the future
      * @param date The date to check
+     * @category Date
      */
     export const isInFuture = (
         date: Date
@@ -31,6 +14,7 @@ export namespace utils {
     /**
      * Checks to see if a date is in the past
      * @param date The date to check
+     * @category Date
      */
     export const isInPast = (
         date: Date
@@ -40,6 +24,7 @@ export namespace utils {
      * Checks to see if now is between two dates
      * @param dateStart The starting date to check
      * @param dateEnd The ending date to check
+     * @category Date
      */
     export const isNowBetween = (
         dateStart: Date,
@@ -53,6 +38,7 @@ export namespace utils {
      * Checks to see if a Date is valid
      * @param date The date to check
      * @returns Whether the date is valid
+     * @category Date
      */
     export const isValidDate = (
         date: Date
@@ -61,38 +47,53 @@ export namespace utils {
             date.getTime()
         );
 
-    /**
-     * Instance of global log4js logger
-     */
-    log4js.configure({
-        appenders: {
-            out: {
-                type: 'stdout',
-                layout: { type: 'colored', },
-            },
-            file: {
-                type: 'file',
-                filename: 'n0trout.log',
-                maxLogSize: 10485760,
-                backups: 3,
-                compress: true,
-                layout: {
-                    type: 'pattern', pattern: '%d %p %c %f:%l %m%n',
+    log4js.configure(
+        {
+            appenders: {
+                out: {
+                    type: 'stdout',
+                    layout: { type: 'colored', },
+                },
+                file: {
+                    type: 'file',
+                    filename: 'n0trout.log',
+                    maxLogSize: 10485760,
+                    backups: 3,
+                    compress: true,
+                    layout: {
+                        type: 'pattern', pattern: '%d %p %c %f:%l %m%n',
+                    },
                 },
             },
-        },
-        categories: {
-            default: {
-                appenders: [
-                    'file',
-                    'out',
-                ],
-                level: 'debug',
-                enableCallStack: true,
+            categories: {
+                default: {
+                    appenders: [
+                        'file',
+                        'out',
+                    ],
+                    level: 'debug',
+                    enableCallStack: true,
+                },
             },
-        },
-    });
+        }
+    );
+
+    /**
+     * Global instance of log4js logger configured to log to disk and console
+     * @category Log
+     */
     export const logger = log4js.getLogger();
+
+    /**
+    * Error logger helper function
+    * @param error The error to log
+    */
+    export const logError = (
+        error: Error
+    ): void => {
+        logger.error('Unexpected error');
+        logger.error(error.message);
+    };
 
     process.on(
         'beforeExit',
@@ -115,14 +116,4 @@ export namespace utils {
             );
         }
     );
-
-    /**
-    * @function
-    * @description Error logger helper function
-    * @param {Error} error The error
-    */
-    export const logError = (error: Error): void => {
-        logger.error('Unexpected error');
-        logger.error(error.message);
-    };
 }
