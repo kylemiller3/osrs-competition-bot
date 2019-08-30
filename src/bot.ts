@@ -190,10 +190,10 @@ export namespace Bot {
             command: '!f add event ',
             description: 'schedules a new event',
             accessControl: ONLY_ADMIN,
-            usage: '!f add event name (unique name) starting (start date) ending (end date) type skills (skill list)\n'
-            + 'OR !f add event name (unique name) starting (start date) ending (end date) type bh (hunter OR rogue)\n'
-            + 'OR !f add event name (unique name) starting (start date) ending (end date) type lms lms\n'
-            + 'OR !f add event name (unique name) starting (start date) ending (end date) type clues (clue difficulty list)',
+            usage: '!f add event name (unique name) starting (start date) ending (end date) teams? type skills (skill list)\n'
+            + 'OR !f add event name (unique name) starting (start date) ending (end date) teams? type bh\n'
+            + 'OR !f add event name (unique name) starting (start date) ending (end date) teams? type lms\n'
+            + 'OR !f add event name (unique name) starting (start date) ending (end date) teams? type clues (clue difficulty list)',
         },
 
         LIST_UPCOMING: {
@@ -254,14 +254,14 @@ export namespace Bot {
 
         FORCESIGNUP_UPCOMING: {
             command: '!f forcesignup ',
-            description: 'forces signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
+            description: 'forces signup for a scheduled event name with RuneScape name and mention',
             accessControl: ONLY_ADMIN,
             usage: '!f forcesignup event (event name) @mention rsn (RuneScape name)',
         },
 
         FORCEUNSIGNUP_UPCOMING: {
             command: '!f forceunsignup ',
-            description: 'forces un-signup for a scheduled event number with RuneScape name and mention (use with \'!f events\')',
+            description: 'forces un-signup for a scheduled event name with RuneScape name and mention',
             accessControl: ONLY_ADMIN,
             usage: '!f forceunsignup (event name) @mention',
         },
@@ -291,7 +291,7 @@ export namespace Bot {
             command: '!f updatescore ',
             description: 'updates score of a custom event participant',
             accessControl: ONLY_ADMIN,
-            usage: 'index, mention, score to add',
+            usage: '!f updatescore event (event name) @mention score (score to add)',
         },
     };
 
@@ -444,10 +444,10 @@ export namespace Bot {
 
     /**
     * Fetches the supplied rsn from RuneScape API hiscores or cache.
-    * Cache invalidates every 20 minutes.
+    * Cache invalidates every 20 minutes. See [[hiscores.LookupResponse]]
     * @param rsn The rsn to lookup on hiscores
     * @param pullNew Forces a cache miss
-    * @returns Observable of the RuneScape web API response as [[hiscores.LookupResponse]]
+    * @returns Observable of the RuneScape web API response
     * @category RuneScape API
     */
     export const hiscores$ = (

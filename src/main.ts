@@ -3,10 +3,11 @@
 // all time hiscores
 // list users in a team
 // show individual contribution to a team
-// refactor out helpers
-// update documentation
 // move to sql
 // allow guild admins to use admin commands
+// exponential backoff for messages?
+// implement long running events
+// unit tests
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -116,7 +117,7 @@ const timers: Record<string, TimerInfo> = {};
  * @param context The Guild Context to update
  * @param newEvent The updated Event
  * @returns The new Guild Context
- * @category Context Helper
+ * @category Helper
  */
 const saveModifiedEvent = (
     context: Bot.GuildContext,
@@ -355,7 +356,7 @@ const notifyParticipantsInEvent = (
  * @param event The Event to calculate gains
  * @param tracking The tracking enum
  * @returns Total gain (in xp, clues, etc.)
- * @category Calculation
+ * @category Stats
  */
 const getParticipantScore = (
     participant: Event.Participant,
@@ -551,21 +552,8 @@ const updateParticipantsHiscores$ = (
     return forkJoin(update$);
 };
 
-
 /**
- * @param data The Data to check
- * @returns A new array of events that have not been marked as notified
- * @category Event
- */
-const getUnnotifiedEvents = (
-    data: Bot.GuildContext
-): Event.Event[] => data.events.filter(
-    (event: Event.Event): boolean => !event.hasPassedTwoHourWarning
-    || !event.hasStarted
-    || !event.hasEnded
-);
-
-/**
+ * Finds the first regex match for a given regex and string.
  * @param regexes The array of input Regexes
  * @param search The input string to search for
  * @returns The array of matched strings entries or null entries
@@ -594,6 +582,11 @@ const findFirstRegexesMatch = (
     return mapped;
 };
 
+/**
+ * A contract describing a Team for purposes of calculation.
+ * See [[Event.Team]]
+ * @category Helper
+ */
 interface PseudoTeam {
     name: string
     participants: Event.Participant[]
@@ -601,6 +594,16 @@ interface PseudoTeam {
     scoreDiff: number
 }
 
+/**
+ * Sorts PseudoTeams by score.
+ * See [[Event.Tracking]] [[Event.Teams]]
+ * @param previousEvent The previous version of the Event to calculate score difference
+ * @param event The new Event source
+ * @param guildId The Guild associated with the Event
+ * @param tracking What Tracking types we use to score Teams
+ * @returns A sorted list of PseudoTeams by score
+ * @category Stats
+ */
 const getSortedPseudoTeams = (
     previousEvent: Event.Event,
     event: Event.Event,
@@ -702,7 +705,7 @@ const getSortedPseudoTeams = (
  * @param data The Data input to process
  * @param discordId The Discord id to display stats for
  * @returns A string describing a players statistics
- * @category Helper
+ * @category Stats
  */
 const getStatsStr = (
     data: Bot.GuildContext,
@@ -991,8 +994,8 @@ const getStatsStr = (
 //----------------------
 
 /**
- * Observable of discord message events
- * @category Base Discord Observable
+ * Observable of Discord message events
+ * @category Base Observable
  */
 const eventMessage$: Observable<discord.Message> = fromEvent(gClient as unknown as EventEmitter, 'message');
 
@@ -1004,7 +1007,7 @@ const eventMessage$: Observable<discord.Message> = fromEvent(gClient as unknown 
 const injectedMessages$: Subject<discord.Message> = new Subject();
 
 /**
- * Merged observable of eventMessage$ and injectedMessage$
+ * A merged Observable of [[eventMessage$]] and [[injectedMessage$]]
  * @category Command Observable
  */
 const message$: Observable<discord.Message> = merge(
@@ -1013,14 +1016,14 @@ const message$: Observable<discord.Message> = merge(
 );
 
 /**
- * Observable of discord ready events
- * @category Base Discord Observable
+ * Observable of Discord ready events
+ * @category Base Observable
  */
 const ready$: Observable<void> = fromEvent(gClient as unknown as EventEmitter, 'ready');
 
 /**
  * Observable of ready events other than the first
- * @category Base Discord Observable
+ * @category Base Observable
  */
 const reconnect$: Observable<void> = ready$
     .pipe(
@@ -1028,8 +1031,8 @@ const reconnect$: Observable<void> = ready$
     );
 
 /**
- * Observable of the ready event that bootstraps the bot
- * @category Base Discord Observable
+ * Observable of the bootstrap event
+ * @category Base Observable
  */
 const connect$: Observable<void> = ready$
     .pipe(
@@ -1037,15 +1040,15 @@ const connect$: Observable<void> = ready$
     );
 
 /**
- * Observable of discord error events
- * @category Base Discord Observable
+ * Observable of Discord error events
+ * @category Base Observable
  */
 const error$: Observable<Error> = fromEvent(gClient as unknown as EventEmitter, 'error');
 
 /**
  * @param find The string to filter for
  * @returns Observable of the transformed Input object
- * @category Read Message
+ * @category Base Observable
  */
 const filteredMessage$ = (
     botCommand: Bot.Command
@@ -1100,7 +1103,8 @@ const filteredMessage$ = (
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.DEBUG]] command
+ * An Observable that handles the Debug Command.
+ * See [[Bot.AllCommands.DEBUG]]
  * @category Command Observable
  */
 const debug$: Observable<Input> = filteredMessage$(
@@ -1108,7 +1112,8 @@ const debug$: Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.ADD_ADMIN]] command
+ * An Observable that handles the Add Admin Command.
+ * See [[Bot.AllCommands.ADD_ADMIN]]
  * @category Command Observable
  */
 const addAdmin$: Observable<Input> = filteredMessage$(
@@ -1123,7 +1128,8 @@ const addAdmin$: Observable<Input> = filteredMessage$(
 
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.ADD_UPCOMING]] command
+ * An Observable that handles the Add Upcoming Command.
+ * See [[Bot.AllCommands.ADD_UPCOMING]]
  * @category Command Observable
  */
 const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
@@ -1247,6 +1253,7 @@ const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
                             event.tracking[tracking as string] = true;
                             break;
                         default:
+                            Utils.logger.error('Tracking is not undefined but also unknown');
                             break;
                     }
                 }
@@ -1296,10 +1303,9 @@ const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.ADD_UPCOMING]] command for
- * [[Event.EVENT_TYPE.CASUAL]] events
- * @category Command Observable
- * @ignore
+ * An Observable that handles the Add Upcoming Command for Casual Events.
+ * See [[Bot.AllCommands.ADD_UPCOMING]] [[Event.Tracking.NONE]]
+ * @category Command Observable Intermediate
  */
 const filterUpcomingGenericEvent$:
 Observable<[Input, Event.Event]> = addUpcoming$
@@ -1311,12 +1317,10 @@ Observable<[Input, Event.Event]> = addUpcoming$
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.ADD_UPCOMING]] command for
- * [[Event.EVENT_TYPE.SKILLS_COMPETITIVE]] [[Event.EVENT_TYPE.CLUES_COMPETITIVE]]
- * [[Event.EVENT_TYPE.BH_COMPETITIVE]] [[Event.EVENT_TYPE.LMS_COMPETITIVE]]
- * [[Event.EVENT_TYPE.CUSTOM_COMPETITIVE]] events
- * @category Command Observable
- * @ignore
+ * An Observable that handles the Add Upcoming Command for Competitive Events.
+ * See [[Bot.AllCommands.ADD_UPCOMING]] [[Event.Tracking.SKILLS]] [[Event.Tracking.BH]]
+ * [[Event.Tracking.LMS]] [[Event.Tracking.CLUES]] [[Event.Tracking.CUSTOM]]
+ * @category Command Observable Intermediate
  */
 const filterAndPrepareUpcomingCompetitiveEvent$:
 Observable<[Input, Event.Event]> = addUpcoming$
@@ -1438,7 +1442,8 @@ Observable<[Input, Event.Event]> = addUpcoming$
     );
 
 /**
- * A merged Observable of Regular and Competitive events
+ * A merged Observable of Regular and Competitive Events.
+ * See [[Event.Event]]
  * @category Command Observable
  * @ignore
  */
@@ -1448,7 +1453,8 @@ const saveEvent$ = merge(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.LIST_UPCOMING]] command
+ * An Observable that handles the List Upcoming Command.
+ * See [[Bot.AllCommands.LIST_UPCOMING]]
  * @category Command Observable
  */
 const listUpcomingEvent$: Observable<Input> = filteredMessage$(
@@ -1456,7 +1462,8 @@ const listUpcomingEvent$: Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.DELETE_UPCOMING]] command
+ * An Observable that handles the Delete Upcoming Command.
+ * See [[Bot.AllCommands.DELETE_UPCOMING]]
  * @category Command Observable
  */
 const deleteUpcomingEvent$:
@@ -1465,7 +1472,8 @@ Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.SIGNUP_UPCOMING]] command
+ * An Observable that handles the Signup Upcoming Command.
+ * See [[Bot.AllCommands.SIGNUP_UPCOMING]]
  * @category Command Observable
  */
 const signupEvent$: Observable<[
@@ -1608,7 +1616,8 @@ const signupEvent$: Observable<[
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.UNSIGNUP_UPCOMING]] command
+ * An Observable that handles the Unsignup Upcoming Command.
+ * See [[Bot.AllCommands.UNSIGNUP_UPCOMING]]
  * @category Command Observable
  */
 const unsignupUpcomingEvent$: Observable<Input> = filteredMessage$(
@@ -1616,7 +1625,8 @@ const unsignupUpcomingEvent$: Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.AMISIGNEDUP_UPCOMING]] command
+ * An Observable that handles the Am I Signed Up Command.
+ * See [[Bot.AllCommands.AMISIGNEDUP_UPCOMING]]
  * @category Command Observable
  */
 const amISignedUp$: Observable<Input> = filteredMessage$(
@@ -1624,7 +1634,8 @@ const amISignedUp$: Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.LIST_PARTICIPANTS_UPCOMING]] command
+ * An Observable that handles the List Participants Command.
+ * See [[Bot.AllCommands.LIST_PARTICIPANTS_UPCOMING]]
  * @category Command Observable
  */
 const listParticipant$: Observable<Input> = filteredMessage$(
@@ -1632,7 +1643,8 @@ const listParticipant$: Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.SET_CHANNEL]] command
+ * An Observable that handles the Set Channel Command.
+ * See [[Bot.AllCommands.SET_CHANNEL]]
  * @category Command Observable
  */
 const setChannel$: Observable<Input> = filteredMessage$(
@@ -1648,13 +1660,15 @@ const setChannel$: Observable<Input> = filteredMessage$(
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.HELP]] command
+ * An Observable that handles the Help Command.
+ * See [[Bot.AllCommands.HELP]]
  * @category Command Observable
  */
 const help$: Observable<Input> = filteredMessage$(Bot.ALL_COMMANDS.HELP);
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.FORCESIGNUP_UPCOMING]] command
+ * An Observable that handles the Force Signup Command.
+ * See [[Bot.AllCommands.FORCESIGNUP_UPCOMING]]
  * @category Command Observable
  */
 const forceSignup$: Observable<Input> = filteredMessage$(Bot.ALL_COMMANDS.FORCESIGNUP_UPCOMING)
@@ -1666,7 +1680,8 @@ const forceSignup$: Observable<Input> = filteredMessage$(Bot.ALL_COMMANDS.FORCES
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.FORCEUNSIGNUP_UPCOMING]] command
+ * An Observable that handles the Force Unsignup Command.
+ * See [[Bot.AllCommands.FORCEUNSIGNUP_UPCOMING]]
  * @category Command Observable
  */
 const forceUnsignup$: Observable<Input> = filteredMessage$(Bot.ALL_COMMANDS.FORCEUNSIGNUP_UPCOMING)
@@ -1678,7 +1693,8 @@ const forceUnsignup$: Observable<Input> = filteredMessage$(Bot.ALL_COMMANDS.FORC
     );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.SHOWSTATS]] command
+ * An Observable that handles the Show Stats Command.
+ * See [[Bot.AllCommands.SHOWSTATS]]
  * @category Command Observable
  */
 const showStats$: Observable<Input> = filteredMessage$(
@@ -1686,21 +1702,27 @@ const showStats$: Observable<Input> = filteredMessage$(
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.FINALIZE]] command
+ * An Observable that handles the Finalize Command.
+ * See [[Bot.AllCommands.FINALIZE]]
+ * @category Command Observable
  */
 const finalize$: Observable<Input> = filteredMessage$(
     Bot.ALL_COMMANDS.FINALIZE
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.LIST_CUSTOM]] command
+ * An Observable that handles the List Custom Command.
+ * See [[Bot.AllCommands.LIST_CUSTOM]]
+ * @category Command Observable
  */
 const listCustom$: Observable<Input> = filteredMessage$(
     Bot.ALL_COMMANDS.LIST_CUSTOM
 );
 
 /**
- * An Observable that handles the [[Bot.COMMANDS.UPDATESCORE]] command
+ * An Observable that handles the Update Score Command.
+ * See [[Bot.AllCommands.UPDATESCORE]]
+ * @category Command Observable
  */
 const updateScore$: Observable<Input> = filteredMessage$(
     Bot.ALL_COMMANDS.UPDATESCORE
@@ -1713,43 +1735,57 @@ const updateScore$: Observable<Input> = filteredMessage$(
     );
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an Event's Participants updates
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventParticipantsDidUpdate$:
 Subject<GuildDataIdEventIdAndParticipants> = new Subject();
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an event will warn about its upcoming start
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventWillWarnStart$:
 Subject<GuildDataAndEvent> = new Subject();
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an event did warn about its upcoming start
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventDidWarnStart$:
 Subject<GuildDataAndEvent> = new Subject();
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an event will start
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventWillStart$:
 Subject<GuildDataAndEvent> = new Subject();
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an event did start
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventDidStart$:
 Subject<GuildDataAndEvent> = new Subject();
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an event will end
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventWillEnd$:
 Subject<GuildDataAndEvent> = new Subject();
 
 /**
- * Subject helper that helps an event lifecycle
+ * Subject helper that fires when an event did end
+ * See [[Event.Event]]
+ * @category Event Lifecycle
  */
 const eventDidEnd$:
 Subject<GuildDataAndEvent> = new Subject();
@@ -1881,9 +1917,12 @@ updateScore$.subscribe(
 );
 
 /**
- * @param eventToSetTimers The Event to set timers for
- * @param guildData The Guild Data to process on timer completion
- * @returns The global timer handle for potential cancellation
+ * Sets the starting timer for an Event
+ * See [[Event.Event]]
+ * @param guildId The Guild associated with the timer
+ * @param eventId The Event associated with the timer
+ * @param startDate The Date the Event starts
+ * @returns A global timer handle
  * @category Timer
  */
 const setTimerStart = (
@@ -1911,10 +1950,6 @@ const setTimerStart = (
     );
 };
 
-/**
- * @param obj Object containing the Guild Data and Event that will start
- * @category Event Lifecycle
- */
 eventWillStart$.subscribe(
     (obj: GuildDataAndEvent): void => {
         const guildData: Bot.GuildContext = obj.guildData;
@@ -1936,13 +1971,16 @@ eventWillStart$.subscribe(
 );
 
 /**
- *
- * @param eventId The event to set the timer for
- * @param guildId The source input data
+ * Sets the auto updating timer for an auto tracking Event
+ * See [[Event.Event]]
+ * @param guildId The Guild associated with the timer
+ * @param eventId The Event associated with the timer
+ * @returns A global timer handle
+ * @category Timer
  */
 const setTimerAutoUpdate = (
-    eventId: string,
     guildId: string,
+    eventId: string,
 ): NodeJS.Timeout => setInterval(
     (): void => {
         const data: Bot.GuildContext = Bot.load(
@@ -2026,13 +2064,21 @@ eventDidStart$.subscribe(
         if (!Event.isEventCasual(newEvent)
         && !Event.isEventCustom(newEvent)) {
             timers[newEvent.id].autoUpdate = setTimerAutoUpdate(
+                guildData.guildId,
                 newEvent.id,
-                guildData.guildId
             );
         }
     }
 );
 
+/**
+ * Gets the formatted string representing placement for a Competitive Event.
+ * @param guildId The Guild associated with the Event
+ * @param previousEvent The previous version of the Event to calculate score difference
+ * @param event The new updated version of the Event source
+ * @returns The formatted leaderboard string
+ * @category Stats
+ */
 const getLeaderboardStr = (
     guildId: string,
     previousEvent: Event.Event,
@@ -2095,10 +2141,6 @@ const getLeaderboardStr = (
     return titleAndPrint;
 };
 
-/**
- * @param obj Object containing the Guild Data, Event and Participants that updated participants
- * @category Event Lifecycle
- */
 eventParticipantsDidUpdate$.subscribe(
     (obj: GuildDataIdEventIdAndParticipants): void => {
         const eventId: string = obj.eventId;
@@ -2196,9 +2238,12 @@ eventParticipantsDidUpdate$.subscribe(
 );
 
 /**
- * @param eventToSetTimers The Event to set timers for
- * @param guildData The Guild Data to update on timer completion
- * @returns The global timer handle for potential cancellation
+ * Sets the ending timer for an Event
+ * See [[Event.Event]]
+ * @param guildId The Guild associated with the timer
+ * @param eventId The Event associated with the timer
+ * @param endDate The Date the Event ends
+ * @returns A global timer handle
  * @category Timer
  */
 const setTimerEnd = (
@@ -2227,9 +2272,12 @@ const setTimerEnd = (
 };
 
 /**
- * @param eventToSetTimers The Event to set timers for
- * @param guildData The Guild Data to notify on timer completion
- * @returns The global timer handle for potential cancellation
+ * Sets the warning timer for an Event
+ * See [[Event.Event]]
+ * @param guildId The Guild associated with the timer
+ * @param eventId The Event associated with the timer
+ * @param startDate The Date the Event starts
+ * @returns A global timer handle
  * @category Timer
  */
 const setTimerTwoHoursBefore = (
@@ -2402,22 +2450,6 @@ eventDidEnd$.subscribe(
     }
 );
 
-/**
- * @param eventToSetTimers The Event to initialize
- * @param guild The guild associated with the event
- * @category Event Lifecycle
- */
-// const initializeEvent = (
-//     eventToInitialize: runescape.Event,
-//     guild: discord.Guild,
-// ): void => {
-//     const startTimer: NodeJS.Timeout = setTimerStart(
-//         eventToInitialize,
-//         guild
-//     );
-//     const autoUpdateTimer: NodeJS.Timeout =
-// }
-
 connect$.subscribe((): void => {
     Utils.logger.info('Connected');
     Utils.logger.info('Logged in as:');
@@ -2442,7 +2474,7 @@ connect$.subscribe((): void => {
             // startup tasks
             // handle generic events here
 
-            const unnotifiedEvents = getUnnotifiedEvents(data);
+            const unnotifiedEvents = Event.getUnnotifiedEvents(data.events);
             unnotifiedEvents.forEach(
                 (event: Event.Event): void => {
                     const newData: Bot.GuildContext = Bot.load(
@@ -2561,8 +2593,8 @@ connect$.subscribe((): void => {
                             autoUpdate: Event.isEventCustom(event)
                                 ? undefined
                                 : setTimerAutoUpdate(
-                                    event.id,
                                     newData.guildId,
+                                    event.id,
                                 ),
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: undefined,
@@ -2599,8 +2631,8 @@ connect$.subscribe((): void => {
                             autoUpdate: Event.isEventCustom(event)
                                 ? undefined
                                 : setTimerAutoUpdate(
-                                    event.id,
                                     newData.guildId,
+                                    event.id,
                                 ),
                             twoHoursBeforeEventTimer: undefined,
                             eventStartedTimer: undefined,
@@ -2770,7 +2802,7 @@ saveEvent$.subscribe(
         sendChannelMessage(
             guild.id,
             newData.settings.notificationChannelId,
-            `@everyone clan event '${event.name}' has just been scheduled for ${event.startingDate.toString()}\nto sign-up type: '${Bot.ALL_COMMANDS.SIGNUP_UPCOMING.command}${idx} (your RuneScape name here)'`,
+            `@everyone clan event '${event.name}' has just been scheduled for ${event.startingDate.toString()}\nto sign-up type: '${Bot.ALL_COMMANDS.SIGNUP_UPCOMING.command}${event.name} rsn (your RuneScape name here)'`,
             null,
         );
     }
@@ -3123,12 +3155,13 @@ help$.subscribe(
 );
 
 /**
- *
+ * Creates a Discord Message fake to send on behalf of a user to our bot for processing.
+ * See [[discord.Message]]
  * @param newCommand The new command to swap to
  * @param newContent The new content string
  * @param oldMessage The old message source
  * @param newAuthor The new author
- * @category Send Message
+ * @category Send Guild Message
  */
 const mockMessage = (
     newCommand: Bot.Command,

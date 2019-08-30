@@ -426,4 +426,17 @@ export namespace Event {
         );
         return filteredParticipants;
     };
+
+    /**
+     * Gets all [[Event]]s that have yet to be warned about
+     * @param events The source Events to filter
+     * @returns A new array of events that have not been marked as notified
+     * @category Event
+     */
+    export const getUnnotifiedEvents = (
+        events: Event[]
+    ): Event[] => events.filter(
+        (event: Event):
+        boolean => !event.hasPassedTwoHourWarning || !event.hasStarted || !event.hasEnded
+    );
 }

@@ -52,16 +52,18 @@ export namespace Utils {
             appenders: {
                 out: {
                     type: 'stdout',
-                    layout: { type: 'colored', },
+                    layout: {
+                        type: 'pattern', pattern: '%[[%d] [%p] %f{1}:%l -%] %m',
+                    },
                 },
                 file: {
                     type: 'file',
-                    filename: 'n0trout.log',
+                    filename: 'debug.log',
                     maxLogSize: 10485760,
                     backups: 3,
                     compress: true,
                     layout: {
-                        type: 'pattern', pattern: '%d %p %c %f:%l %m%n',
+                        type: 'pattern', pattern: '[%d] [%p] %f{1}:%l - %m',
                     },
                 },
             },
