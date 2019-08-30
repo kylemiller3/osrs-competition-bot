@@ -48,10 +48,6 @@ declare module 'osrs-json-api' {
             rogue: RankAndScoreComponent
         }
 
-        export interface LastManStandingInfo extends Record<string, RankAndScoreComponent> {
-            lms: RankAndScoreComponent
-        }
-
         export interface CluesInfo extends Record<string, RankAndScoreComponent> {
             all: RankAndScoreComponent
             beginner: RankAndScoreComponent
@@ -63,10 +59,10 @@ declare module 'osrs-json-api' {
         }
 
         export interface LookupResponse extends
-            Record<string, CluesInfo | BountyHunterInfo | LastManStandingInfo | SkillsInfo> {
+            Record<string, CluesInfo | BountyHunterInfo | RankAndScoreComponent | SkillsInfo> {
             skills: SkillsInfo
             bh: BountyHunterInfo
-            lms: LastManStandingInfo
+            lms: RankAndScoreComponent
             clues: CluesInfo
         }
     }
