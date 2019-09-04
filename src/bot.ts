@@ -80,6 +80,7 @@ export namespace Bot {
         FINALIZE: Command
         LIST_CUSTOM: Command
         UPDATESCORE: Command
+        END: Command
     }
 
     /**
@@ -293,6 +294,13 @@ export namespace Bot {
             accessControl: ONLY_ADMIN,
             usage: '!f updatescore event (event name) @mention score (score to add)',
         },
+
+        END: {
+            command: '!f end ',
+            description: 'ends a long running event',
+            accessControl: ONLY_ADMIN,
+            usage: '!f end (event name)',
+        },
     };
 
     /**
@@ -312,7 +320,9 @@ export namespace Bot {
                     (`./guilds/${id}.json`), {
                         // this is very fragile but works for our data structures
                         reviver: ((key: string, value: unknown): unknown => {
-                            if (key.toLowerCase().includes('date')) { return new Date(value as string); }
+                            if (key.toLowerCase().includes('date')) {
+                                return value !== null ? new Date(value as string) : null;
+                            }
                             return value;
                         }),
                     }

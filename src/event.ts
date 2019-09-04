@@ -167,6 +167,14 @@ export namespace Event {
     };
 
     /**
+     * Checks an event to see if it is long running
+     * @param event The event to check
+     */
+    export const isLongRunningEvent = (
+        event: Event,
+    ): boolean => event.endingDate === null;
+
+    /**
      * Checks an event to see if [[Event.Team]] is defined
      * @param event The event to check
      * @returns True if the event is a team event

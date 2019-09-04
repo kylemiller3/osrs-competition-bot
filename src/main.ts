@@ -8,6 +8,7 @@
 // exponential backoff for messages?
 // implement long running events
 // unit tests
+// update debug logging
 
 // ------------------------------//
 // OSRS discord bot by n0trout   //
@@ -1180,11 +1181,12 @@ const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
                     return null;
                 }
 
-                if (endingDateStr === null) {
-                    Utils.logger.debug(`Admin ${command.author.username} entered invalid ending date`);
-                    command.message.reply(`invalid ending date\n${Bot.ALL_COMMANDS.ADD_UPCOMING.usage}`);
-                    return null;
-                }
+                // comment out for long running events
+                // if (endingDateStr === null) {
+                //     Utils.logger.debug(`Admin ${command.author.username} entered invalid ending date`);
+                //     command.message.reply(`invalid ending date\n${Bot.ALL_COMMANDS.ADD_UPCOMING.usage}`);
+                //     return null;
+                // }
 
                 if (inputType === null) {
                     Utils.logger.debug(`Admin ${command.author.username} entered invalid type`);
@@ -1221,10 +1223,46 @@ const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
                     (value: string): boolean => inputType.toUpperCase() === value.toUpperCase()
                 );
 
-                const dateA: Date = new Date(parsedRegexes.starting);
-                const dateB: Date = new Date(parsedRegexes.ending);
-                const startingDate: Date = dateA <= dateB ? dateA : dateB;
-                const endingDate: Date = dateA > dateB ? dateA : dateB;
+                const startingDate: Date = new Date(
+                    startingDateStr
+                );
+                const endingDate: Date = endingDateStr !== null
+                    ? new Date(endingDateStr)
+                    : null;
+                if (endingDate !== null && startingDate > endingDate) {
+                    Utils.logger.debug(`Admin ${command.author.username} entered starting date after ending date`);
+                    command.message.reply(`cannot end an event before it started\n${Bot.ALL_COMMANDS.ADD_UPCOMING.usage}`);
+                    return null;
+                }
+
+                if (!Utils.isValidDate(startingDate)
+                    || (endingDate !== null && !Utils.isValidDate(endingDate))) {
+                    Utils.logger.debug(`Admin ${command.author.username} entered invalid date`);
+                    command.message.reply('starting date or ending date is invalid use IS0 8601 standard');
+                    return null;
+                }
+                const now: Date = new Date();
+                if (startingDate <= now) {
+                    Utils.logger.debug(`Admin ${command.author.username} entered a start date in the past`);
+                    command.message.reply('cannot start an event in the past');
+                    return null;
+                }
+
+                const threeWeeksFromNow: Date = new Date();
+                threeWeeksFromNow.setDate(
+                    threeWeeksFromNow.getDate() + 21
+                );
+                if (Utils.isValidDate(endingDate) && endingDate > threeWeeksFromNow) {
+                    Utils.logger.debug(`Admin ${command.author.username} entered a end date too far in the future`);
+                    command.message.reply('event must end within 3 weeks of now. Consider using a long running event by not specifying the ending date');
+                    return null;
+                }
+                if (Utils.isValidDate(endingDate) && endingDate.getTime() - startingDate.getTime() < 30 * 60 * 1000) {
+                    Utils.logger.debug(`Admin ${command.author.username} entered a start date and end date too close together`);
+                    command.message.reply('events must be at least 30 minutes long');
+                    return null;
+                }
+
                 const event: Event.Event = {
                     id: uuid(),
                     name: eventName,
@@ -1257,32 +1295,6 @@ const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
                             break;
                     }
                 }
-
-                if (!Utils.isValidDate(dateA) || !Utils.isValidDate(dateB)) {
-                    Utils.logger.debug(`Admin ${command.author.username} entered invalid date`);
-                    command.message.reply('starting date or ending date is invalid use IS0 8601 standard');
-                    return null;
-                }
-                const now: Date = new Date();
-                if (startingDate <= now) {
-                    Utils.logger.debug(`Admin ${command.author.username} entered a start date in the past`);
-                    command.message.reply('cannot start an event in the past');
-                    return null;
-                }
-                const threeWeeksFromNow: Date = new Date();
-                threeWeeksFromNow.setDate(
-                    threeWeeksFromNow.getDate() + 21
-                );
-                if (endingDate > threeWeeksFromNow) {
-                    Utils.logger.debug(`Admin ${command.author.username} entered a end date too far in the future`);
-                    command.message.reply('event must end within 3 weeks of now');
-                    return null;
-                }
-                if (endingDate.getTime() - startingDate.getTime() < 30 * 60 * 1000) {
-                    Utils.logger.debug(`Admin ${command.author.username} entered a start date and end date too close together`);
-                    command.message.reply('events must be at least 30 minutes long');
-                    return null;
-                }
                 return [
                     command,
                     event,
@@ -1296,7 +1308,9 @@ const addUpcoming$: Observable<[Input, Event.Event]> = filteredMessage$(
             Utils.logger.debug('Runescape.Event properties: ');
             Utils.logger.debug(`* ${commandEventArr[1].name}`);
             Utils.logger.debug(`* ${commandEventArr[1].startingDate.toDateString()}`);
-            Utils.logger.debug(`* ${commandEventArr[1].endingDate.toDateString()}`);
+            if (!Event.isLongRunningEvent(commandEventArr[1])) {
+                Utils.logger.debug(`* ${commandEventArr[1].endingDate.toDateString()}`);
+            }
             Utils.logger.debug(`* ${commandEventArr[1].tracking}`);
         }),
         share()
@@ -1735,6 +1749,15 @@ const updateScore$: Observable<Input> = filteredMessage$(
     );
 
 /**
+ * An Observable that handles the Force End Command.
+ * See [[Bot.AllCommands.END]]
+ * @category Command Observable
+ */
+const end$: Observable<Input> = filteredMessage$(
+    Bot.ALL_COMMANDS.END
+);
+
+/**
  * Subject helper that fires when an Event's Participants updates
  * See [[Event.Event]]
  * @category Event Lifecycle
@@ -1820,6 +1843,8 @@ finalize$.subscribe(
         const newEvent: Event.Event = { ...eventToFinalize, };
         newEvent.isFinalized = true;
         saveModifiedEvent(data, newEvent);
+
+        // TODO: event will finalize event did
         Utils.logger.debug('saved finalized event');
         command.message.reply(`finalized event ${newEvent.name}`);
     }
@@ -1913,6 +1938,43 @@ updateScore$.subscribe(
                 participants: newEvent.participants,
             }
         );
+    }
+);
+
+end$.subscribe(
+    (command: Input): void => {
+        const data: Bot.GuildContext = Bot.load(command.guild.id);
+        const upcomingAndInFlightEvents: Event.Event[] = Event.getUpcomingAndInFlightEvents(
+            data.events
+        );
+
+        const eventName: string = command.input.trim();
+        const eventToEnd: Event.Event = upcomingAndInFlightEvents.find(
+            (event: Event.Event):
+            boolean => event.name.toLowerCase() === eventName.toLowerCase()
+        );
+        if (eventToEnd === undefined) {
+            Utils.logger.debug(`Did not find name (${eventName})`);
+            command.message.reply(`did not find upcoming event with name '${eventName}'\n${Bot.ALL_COMMANDS.SIGNUP_UPCOMING.usage}`);
+            return;
+        }
+        if (!eventToEnd.hasStarted) {
+            command.message.reply('cannot end an event that has not started yet');
+            return;
+        }
+        if (!Event.isLongRunningEvent(eventToEnd)) {
+            command.message.reply('event is not a long running event');
+            return;
+        }
+
+        eventWillEnd$.next(
+            {
+                guildData: data,
+                event: eventToEnd,
+            }
+        );
+        Utils.logger.debug('saved ended event');
+        command.message.reply(`ended event ${eventToEnd.name}`);
     }
 );
 
@@ -2252,6 +2314,9 @@ const setTimerEnd = (
     endDate: Date,
 ): NodeJS.Timeout => {
     const now: Date = new Date();
+    if (endDate === null) {
+        return undefined;
+    }
     return setTimeout(
         (): void => {
             const data: Bot.GuildContext = Bot.load(
@@ -2356,6 +2421,26 @@ eventDidWarnStart$.subscribe(
     }
 );
 
+const cancelEventTimers = (
+    eventToDelete: Event.Event,
+): void => {
+    Object.keys(
+        timers[eventToDelete.id]
+    ).forEach(
+        (key: string):
+        void => {
+            const timer: NodeJS.Timeout = timers[eventToDelete.id][key];
+            if (timer === undefined) { return; }
+            if (timer === timers[eventToDelete.id].autoUpdate) {
+                clearInterval(timer);
+            } else {
+                clearTimeout(timer);
+            }
+        }
+    );
+    timers[eventToDelete.id] = undefined;
+};
+
 eventWillEnd$.subscribe(
     (obj: GuildDataAndEvent): void => {
         const guildData: Bot.GuildContext = obj.guildData;
@@ -2366,6 +2451,9 @@ eventWillEnd$.subscribe(
             event,
             END_STR
         );
+
+        // make sure the timers are off
+        cancelEventTimers(event);
 
         if (!Event.isEventCasual(event)
         && !Event.isEventCustom(event)) {
@@ -2495,20 +2583,6 @@ connect$.subscribe((): void => {
                         toleranceAfterStart.getMinutes() + 30
                     );
 
-                    const toleranceAfterEnd: Date = new Date(
-                        event.endingDate.getTime()
-                    );
-                    toleranceAfterEnd.setMinutes(
-                        toleranceAfterEnd.getMinutes() + 30
-                    );
-
-                    const toleranceAfterEndTolerance: Date = new Date(
-                        event.endingDate.getTime()
-                    );
-                    toleranceAfterEndTolerance.setHours(
-                        toleranceAfterEndTolerance.getHours() + 2
-                    );
-
                     // if we are before 2 hour warning, schedule warnings
                     if (now < twoHoursBeforeStart) {
                         Utils.logger.debug('before 2 hour warning');
@@ -2605,7 +2679,7 @@ connect$.subscribe((): void => {
                             ),
                         };
                     } else if (now >= toleranceAfterStart
-                        && now < event.endingDate) {
+                        && (Event.isLongRunningEvent(event) || now < event.endingDate)) {
                         Utils.logger.debug('after 30 min start tolerance');
                         if (!event.hasStarted) {
                             Utils.logger.error('notification had not fired');
@@ -2642,8 +2716,7 @@ connect$.subscribe((): void => {
                                 event.endingDate
                             ),
                         };
-                    } else if (now >= event.endingDate
-                        && now < toleranceAfterEnd) {
+                    } else if (!Event.isLongRunningEvent(event) && now >= event.endingDate) {
                         Utils.logger.debug('after ended');
                         if (!event.hasEnded) {
                             Utils.logger.error('notification had not fired');
@@ -2665,40 +2738,6 @@ connect$.subscribe((): void => {
                                 newEvent,
                             );
                         }
-                    } else if (now >= toleranceAfterEnd && now < toleranceAfterEndTolerance) {
-                        Utils.logger.debug('after 2 hour end tolerance');
-                        if (!event.hasEnded) {
-                            Utils.logger.error('notification had not fired');
-                            // fire end notification
-                            // apologize
-                            // mark 2 hour warning as complete (unnecessary)
-                            // mark start notification as complete (unnecessary)
-                            // mark end notification as complete
-                            notifyParticipantsInEvent(
-                                newData,
-                                event,
-                                'had ended more than 2 hours ago, yell at n0trout'
-                            );
-                            const newEvent: Event.Event = { ...event, };
-                            newEvent.hasPassedTwoHourWarning = true;
-                            newEvent.hasStarted = true;
-                            newEvent.hasEnded = true;
-                            saveModifiedEvent(
-                                newData,
-                                newEvent,
-                            );
-                        }
-                    } else {
-                        // too late to do anything
-                        // just mark it as fired
-                        const newEvent: Event.Event = { ...event, };
-                        newEvent.hasPassedTwoHourWarning = true;
-                        newEvent.hasStarted = true;
-                        newEvent.hasEnded = true;
-                        saveModifiedEvent(
-                            newData,
-                            newEvent,
-                        );
                     }
                 }
             );
@@ -2767,8 +2806,6 @@ saveEvent$.subscribe(
 
         const data: Bot.GuildContext = Bot.load(command.guild.id);
         const events: Event.Event[] = data.events.concat(event);
-        const upcoming: Event.Event[] = Event.getUpcomingAndInFlightEvents(events);
-        const idx: number = upcoming.indexOf(event);
 
         const guild: discord.Guild = command.guild;
         const newData: Bot.GuildContext = { ...data, };
@@ -2874,18 +2911,7 @@ deleteUpcomingEvent$.subscribe(
 
         // cancel timers
         // TODO: error here
-        Object.keys(timers[eventToDelete.id]).forEach(
-            (key: string): void => {
-                const timer: NodeJS.Timeout = timers[eventToDelete.id][key];
-                if (timer === undefined) return;
-                if (timer === timers[eventToDelete.id].autoUpdate) {
-                    clearInterval(timer);
-                } else {
-                    clearTimeout(timer);
-                }
-            }
-        );
-        timers[eventToDelete.id] = undefined;
+        cancelEventTimers(eventToDelete);
         Utils.logger.debug('Runescape.Event deleted');
         command.message.reply(`'${eventToDelete.name}' deleted`);
     }
@@ -2944,6 +2970,7 @@ signupEvent$.subscribe(
     }
 );
 
+// TODO: Send a message if user is not signed up and this is called
 unsignupUpcomingEvent$.subscribe(
     (command: Input): void => {
     // get upcoming events
