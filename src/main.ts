@@ -2643,7 +2643,7 @@ connect$.subscribe((): void => {
                             ),
                         };
                     } else if (now >= event.startingDate
-                        && now < toleranceAfterStart) {
+                        && (Event.isLongRunningEvent(event) || now < event.endingDate)) {
                         Utils.logger.debug('after event started');
                         if (!event.hasStarted) {
                             Utils.logger.debug('notification had not fired');
@@ -2663,44 +2663,6 @@ connect$.subscribe((): void => {
                                 newEvent,
                             );
                         }
-                        timers[event.id] = {
-                            autoUpdate: Event.isEventCustom(event)
-                                ? undefined
-                                : setTimerAutoUpdate(
-                                    newData.guildId,
-                                    event.id,
-                                ),
-                            twoHoursBeforeEventTimer: undefined,
-                            eventStartedTimer: undefined,
-                            eventEndedTimer: setTimerEnd(
-                                newData.guildId,
-                                event.id,
-                                event.endingDate
-                            ),
-                        };
-                    } else if (now >= toleranceAfterStart
-                        && (Event.isLongRunningEvent(event) || now < event.endingDate)) {
-                        Utils.logger.debug('after 30 min start tolerance');
-                        if (!event.hasStarted) {
-                            Utils.logger.error('notification had not fired');
-                            // fire start notification
-                            // mark 2 hour warning as completed
-                            // mark start notification as complete
-                            // TODO: apologize lol
-                            notifyParticipantsInEvent(
-                                newData,
-                                event,
-                                'started more than 30 mins ago, yell at n0trout'
-                            );
-                            const newEvent: Event.Event = { ...event, };
-                            newEvent.hasPassedTwoHourWarning = true;
-                            newEvent.hasStarted = true;
-                            saveModifiedEvent(
-                                newData,
-                                newEvent,
-                            );
-                        }
-                        // schedule end date notification
                         timers[event.id] = {
                             autoUpdate: Event.isEventCustom(event)
                                 ? undefined
@@ -2854,7 +2816,9 @@ listUpcomingEvent$.subscribe(
         const eventsStr: string[] = upcomingAndInFlightEvents.map(
             (event: Event.Event, idx: number): string => {
                 const startingDateStr = event.startingDate.toString();
-                const endingDateStr = event.endingDate.toString();
+                const endingDateStr = Event.isLongRunningEvent(event)
+                    ? 'undefined'
+                    : event.endingDate.toString();
                 const retStr = event.startingDate > new Date()
                     ? `\n${idx}: upcoming event ${event.name} starting: ${startingDateStr} ending: ${endingDateStr} type: ${Event.getEventTracking(event)}`
                     : `\n${idx}: in-flight event ${event.name} ending: ${endingDateStr} type: ${Event.getEventTracking(event)}`;
@@ -3105,6 +3069,43 @@ listParticipant$.subscribe(
             command.message.reply(`can't find name ${eventName}\n${Bot.ALL_COMMANDS.LIST_PARTICIPANTS_UPCOMING.usage}`);
             return;
         }
+        if (Event.isTeamEvent(eventToList)) {
+            const formattedStr: string = eventToList.teams.map(
+                (team: Event.Team, idx: number): string => {
+                    const teamStr: string[] = team.linkedDiscordIds.map(
+                        (discordId: string, idy: number): string => {
+                            const displayName: string = getDisplayNameFromDiscordId(
+                                command.guild.id,
+                                discordId
+                            );
+                            const participant: Event.Participant = Event.getParticipantByDiscordId(
+                                eventToList.participants,
+                                discordId,
+                            );
+                            const accounts: string = participant.runescapeAccounts.map(
+                                (account: Event.Account): string => account.rsn
+                            ).join(', ');
+                            return `\n\t${idy}: ${displayName} signed up ${accounts}`;
+                        }
+                    );
+                    return `\n${idx}: team "${team.name}"${teamStr}`;
+                }
+            ).join('');
+
+            const reply: string = eventToList.participants.length > 0
+                ? formattedStr
+                : 'no participants';
+            sendChannelMessage(
+                command.guild.id,
+                command.message.channel.id,
+                reply,
+                undefined,
+                true,
+            );
+            Utils.logger.debug('ListParticipants called');
+            return;
+        }
+
         const formattedStr: string = eventToList.participants.map(
             (participant: Event.Participant, idx: number): string => {
                 const displayName: string = getDisplayNameFromDiscordId(
@@ -3119,9 +3120,15 @@ listParticipant$.subscribe(
         ).join('');
 
         const reply: string = eventToList.participants.length > 0
-            ? `participants:${formattedStr}`
+            ? formattedStr
             : 'no participants';
-        command.message.reply(reply);
+        sendChannelMessage(
+            command.guild.id,
+            command.message.channel.id,
+            reply,
+            undefined,
+            true,
+        );
         Utils.logger.debug('ListParticipants called');
     }
 );
