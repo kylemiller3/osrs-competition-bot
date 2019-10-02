@@ -2798,12 +2798,13 @@ saveEvent$.subscribe(
         Utils.logger.debug('event added');
         command.message.reply(`event '${event.name}' added`);
 
+        /* Leave this to admins to announce
         sendChannelMessage(
             guild.id,
             newData.settings.notificationChannelId,
-            `@everyone clan event '${event.name}' has just been scheduled for ${event.startingDate.toString()}\nto sign-up type: '${Bot.ALL_COMMANDS.SIGNUP_UPCOMING.command}${event.name} rsn (your RuneScape name here)'`,
+            `@everyone clan event '${event.name}' has just been scheduled for ${event.startingDate.toString()}\nto sign-up type: '${Bot.ALL_COMMANDS.SIGNUP_UPCOMING.command}event ${event.name} rsn (your RuneScape name here)'`,
             null,
-        );
+        ); */
     }
 );
 
