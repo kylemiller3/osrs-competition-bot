@@ -1,11 +1,12 @@
 {
   "name": "osrs-discord-competition-bot",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "Runs competitions for osrs on Discord.",
   "main": "n0trout.js",
   "scripts": {
-    "build": "tsc --project ./ && typedoc --excludeExternals --out ./docs ./src",
-    "test": "mocha -r ts-node/register src/tests/tests.ts",
+    "build": "find ./out -type f -name '*.js' -exec rm {} + && tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",
+    "pretest": "find ./out -type f -name '*.js' -exec rm {} + && tsc --project ./tsconfig.json",
+    "test": "mocha --project ./tsconfig.json --require esm ./**/*.spec.js",
     "start": "node ./out/n0trout.js"
   },
   "author": "https://github.com/kylemiller3",
@@ -15,26 +16,26 @@
     "url": "https://github.com/kylemiller3/osrs-competition-bot.git"
   },
   "dependencies": {
-    "@types/chai": "^4.2.0",
+    "@types/better-sqlite3": "^5.4.0",
+    "@types/chai": "^4.2.3",
+    "@types/chai-spies": "^1.0.1",
     "@types/mocha": "^5.2.7",
-    "@types/node": "^12.7.2",
+    "@types/node": "^12.7.12",
+    "better-sqlite3": "^5.4.3",
     "chai": "^4.2.0",
+    "chai-spies": "^1.0.0",
     "discord.js": "^11.5.1",
     "esm": "^3.2.25",
     "jsonfile": "^5.0.0",
-    "log4js": "^5.1.0",
-    "mocha": "^6.2.0",
+    "log4js": "^5.2.1",
+    "mocha": "^6.2.1",
     "osrs-json-api": "^1.1.1",
-    "rxjs": "^6.5.2",
-    "rxjs-marbles": "^5.0.2",
-    "ts-node": "^8.3.0",
-    "typescript": "^3.6.2",
-    "uuid": "^3.3.3",
-    "uuidv4": "^4.0.0"
+    "rxjs": "^6.5.3",
+    "rxjs-marbles": "^5.0.3",
+    "typescript": "^3.6.3",
+    "uuid": "^3.3.3"
   },
   "devDependencies": {
-    "@types/jsonfile": "^5.0.0",
-    "@types/uuidv4": "^2.0.0",
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.2.0",
     "eslint-plugin-import": "^2.18.2"
