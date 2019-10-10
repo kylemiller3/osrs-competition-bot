@@ -1,9 +1,15 @@
 
 import Database, * as sqlite3 from 'better-sqlite3';
 import { Utils, } from './utils';
+import { Command, } from './commands/command';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
+    export interface Input {
+        command: Command.ALL
+        data: any
+    }
+
     export const tempDb = new Database('foobar.db', { verbose: Utils.logger.log, memory: true, });
     export const permDb = new Database('foobar.db', { verbose: Utils.logger.log, memory: true, });
 
@@ -19,5 +25,32 @@ export namespace Db {
             return true;
         }
         return false;
+    };
+
+
+    export const handleCommand = (
+        dict: Record<string, any>
+    ): void => {
+        /*
+        example:
+        {
+            command: Command.ALL.ADMIN_SET_CHANNEL,
+            data: channel.id,
+        }
+        another:
+        {
+            command: Command.ALL.EVENTS_SIGNUP
+            data: {
+                uid: 10,
+                user: 235897234027937,
+                rsn: somename,
+            }
+        }
+        */
+        if (dict.command === Command.ALL.ADMIN_SET_CHANNEL) {
+            // do code here to save to database
+            // your code call some func
+            Utils.logger.debug(dict.data);
+        }
     };
 }

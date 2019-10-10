@@ -78,9 +78,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events add',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -143,9 +143,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events delete',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -161,9 +161,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events edit',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -179,9 +179,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events end',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -197,9 +197,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events force signup',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -228,9 +228,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events force unsignup',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -253,9 +253,9 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events update score',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -277,9 +277,9 @@ export namespace Command {
         accessControl: anyUser,
         command: '!f users signup',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -302,9 +302,9 @@ export namespace Command {
         accessControl: anyUser,
         command: '!f users unsignup',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -320,9 +320,9 @@ export namespace Command {
         accessControl: anyUser,
         command: '!f users list participants',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -338,9 +338,9 @@ export namespace Command {
         accessControl: anyUser,
         command: '!f users amisignedup',
         params: {
-            name: {
-                description: 'The event\'s name.',
-                usage: 'event name',
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -375,7 +375,7 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f admin set channel',
         params: {
-            name: {
+            channel: {
                 description: 'Mention of the channel to use.',
                 usage: '#channel',
                 expectedType: ParamType.STRING,
@@ -553,7 +553,7 @@ export namespace Command {
      */
     export const parseParameters = (
         command: Command.ALL,
-        str: string
+        str: string,
     ): Record<string, string | number | boolean> => {
         const cDescription: Description = lookup[command];
         const params: Record<string, ParamDescription> = cDescription.params;

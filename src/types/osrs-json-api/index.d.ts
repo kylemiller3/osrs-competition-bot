@@ -7,12 +7,12 @@ declare module 'osrs-json-api' {
     namespace hiscores {
         export function getPlayer(name: string): Promise<JSON>
 
-        export interface SkillComponent extends Record<string, string | number> {
+        export interface SkillComponent {
             rank: string
             level: number
             xp: number
         }
-        export interface SkillsInfo extends Record<string, SkillComponent> {
+        export interface SkillsInfo {
             overall: SkillComponent
             attack: SkillComponent
             defence: SkillComponent
@@ -39,16 +39,16 @@ declare module 'osrs-json-api' {
             construction: SkillComponent
         }
 
-        export interface RankAndScoreComponent extends Record<string, number> {
+        export interface RankAndScoreComponent {
             rank: number
             score: number
         }
-        export interface BountyHunterInfo extends Record<string, RankAndScoreComponent> {
+        export interface BountyHunterInfo {
             hunter: RankAndScoreComponent
             rogue: RankAndScoreComponent
         }
 
-        export interface CluesInfo extends Record<string, RankAndScoreComponent> {
+        export interface CluesInfo {
             all: RankAndScoreComponent
             beginner: RankAndScoreComponent
             easy: RankAndScoreComponent
@@ -58,8 +58,7 @@ declare module 'osrs-json-api' {
             master: RankAndScoreComponent
         }
 
-        export interface LookupResponse extends
-            Record<string, CluesInfo | BountyHunterInfo | RankAndScoreComponent | SkillsInfo> {
+        export interface LookupResponse {
             skills: SkillsInfo
             bh: BountyHunterInfo
             lms: RankAndScoreComponent

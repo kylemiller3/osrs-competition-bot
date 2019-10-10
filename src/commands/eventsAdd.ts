@@ -8,6 +8,31 @@ void => {
         msg.content,
     );
 
+    const required: string[] = [
+        'name',
+        'type',
+    ];
+
+    const error: string = required
+        .map(
+            (key: string):
+            string => {
+                if (params[key] === null) {
+                    return `'${key}' is required but got null.`;
+                }
+                return '';
+            }
+        )
+        .join('\n')
+        .trim();
+
+    if (error !== '') {
+        msg.reply(error);
+        return;
+    }
+
+    
+
     /*
     {
         ending:null
@@ -17,7 +42,6 @@ void => {
         type:null
     }
     */
-
 };
 
 export default eventsAdd;

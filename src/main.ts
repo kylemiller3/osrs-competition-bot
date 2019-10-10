@@ -9,6 +9,7 @@ import {
 } from 'rxjs/operators';
 import auth from './auth.json';
 import { Command, } from './commands/command';
+import { Db, } from './database';
 import { Utils, } from './utils';
 import adminSetChannel from './commands/adminSetChannel';
 import eventsAdd from './commands/eventsAdd';
@@ -26,6 +27,7 @@ import eventsSignup from './commands/eventsSignup';
 import eventsUnsignup from './commands/eventsUnsignup';
 import usersStats from './commands/usersStats';
 import help from './commands/help';
+import { willSaveToDb$, } from './botEvent';
 
 /**
  * Global discord client
@@ -147,3 +149,5 @@ commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
 commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
 commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
 commandReceived$(Command.ALL.HELP).subscribe(help);
+
+willSaveToDb$.subscribe(Db.handleCommand);

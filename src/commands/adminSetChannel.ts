@@ -9,7 +9,8 @@ const adminSetChannel = (
     if (channel === undefined) return false;
     if (msg.guild.channels.get(channel.id) === undefined) return false;
     willSaveToDb$.next({
-        [Command.ALL.ADMIN_SET_CHANNEL]: channel.id,
+        command: Command.ALL.ADMIN_SET_CHANNEL,
+        data: channel.id,
     });
     return true;
 };
