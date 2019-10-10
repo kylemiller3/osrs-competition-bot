@@ -1,7 +1,7 @@
 
 import Database, * as sqlite3 from 'better-sqlite3';
 import { Utils, } from './utils';
-import { Command, } from './commands/command';
+import { Command, } from './command';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -35,7 +35,9 @@ export namespace Db {
         example:
         {
             command: Command.ALL.ADMIN_SET_CHANNEL,
-            data: channel.id,
+            data: {
+                channelId: channel.id,
+            }
         }
         another:
         {
@@ -49,7 +51,11 @@ export namespace Db {
         */
         if (dict.command === Command.ALL.ADMIN_SET_CHANNEL) {
             // do code here to save to database
-            // your code call some func
+            Utils.logger.debug(dict.data);
+        }
+
+        if (dict.command === Command.ALL.EVENTS_ADD) {
+            // do code here to save to database
             Utils.logger.debug(dict.data);
         }
     };

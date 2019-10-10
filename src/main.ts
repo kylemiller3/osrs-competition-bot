@@ -8,7 +8,7 @@ import {
     filter, tap,
 } from 'rxjs/operators';
 import auth from './auth.json';
-import { Command, } from './commands/command';
+import { Command, } from './command';
 import { Db, } from './database';
 import { Utils, } from './utils';
 import adminSetChannel from './commands/adminSetChannel';

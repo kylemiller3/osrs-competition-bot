@@ -1,5 +1,5 @@
 import * as discord from 'discord.js';
-import { Command, } from './command';
+import { Command, } from '../command';
 
 const eventsSignup = (msg: discord.Message):
 void => {

@@ -1,4 +1,3 @@
-
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Command {
 
@@ -70,6 +69,18 @@ export namespace Command {
     };
 
     /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_ADD]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsAddParsed {
+        name: string
+        starting: string
+        ending: string
+        type: string
+        teams: boolean
+    }
+
+    /**
      * Implementation of the add event command description
      * @category Event Implementations
      */
@@ -78,8 +89,8 @@ export namespace Command {
         accessControl: onlyAdmin,
         command: '!f events add',
         params: {
-            id: {
-                description: 'The event\'s unique id.',
+            name: {
+                description: 'The event\'s name.',
                 usage: 'event id',
                 expectedType: ParamType.STRING,
                 required: true,
@@ -89,14 +100,14 @@ export namespace Command {
                 usage: 'start date',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: null,
+                default: undefined,
             },
             ending: {
                 description: 'A date in ISO 8601 format of when to end.',
                 usage: 'end date',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: null,
+                default: undefined,
             },
             type: {
                 description: 'The type of event to schedule.',
@@ -239,7 +250,7 @@ export namespace Command {
                 usage: '@mention',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: null,
+                default: undefined,
             },
         },
     };
@@ -288,7 +299,7 @@ export namespace Command {
                 usage: 'your RSN',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: null,
+                default: undefined,
             },
         },
     };
@@ -361,7 +372,7 @@ export namespace Command {
                 usage: '@mention',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: null,
+                default: undefined,
             },
         },
     };
@@ -380,7 +391,7 @@ export namespace Command {
                 usage: '#channel',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: null,
+                default: undefined,
             },
         },
     };
@@ -551,13 +562,13 @@ export namespace Command {
      * @returns A object with keys of the command's
      * parameters and values from the regex execution results
      */
-    export const parseParameters = (
+    export const parseParameters = <T>(
         command: Command.ALL,
         str: string,
-    ): Record<string, string | number | boolean> => {
+    ): T => {
         const cDescription: Description = lookup[command];
         const params: Record<string, ParamDescription> = cDescription.params;
-        if (params === undefined) return {};
+        if (params === undefined) return {} as unknown as T;
 
         const reduceRecord = (
             acc: Record<string, any>,
@@ -593,7 +604,7 @@ export namespace Command {
                         };
                     }
                     return {
-                        [key]: null,
+                        [key]: undefined,
                     };
                 }
                 return {
@@ -621,7 +632,7 @@ export namespace Command {
                         return {
                             [key]: (
                                 Number.isNaN(num)
-                                    ? null
+                                    ? undefined
                                     : num
                             ),
                         };
@@ -635,7 +646,7 @@ export namespace Command {
             }
         ).reduce(reduceRecord);
 
-        return parsed;
+        return parsed as unknown as T;
     };
 
 }
