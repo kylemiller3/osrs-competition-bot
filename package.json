@@ -2,10 +2,10 @@
   "name": "osrs-discord-competition-bot",
   "version": "2.0.0",
   "description": "Runs competitions for osrs on Discord.",
-  "main": "n0trout.js",
+  "main": "main.js",
   "scripts": {
-    "build": "find ./out -type f -name '*.js' -exec rm {} + && tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",
-    "pretest": "find ./out -type f -name '*.js' -exec rm {} + && tsc --project ./tsconfig.json",
+    "build": "tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",
+    "pretest": "tsc --project ./tsconfig.json",
     "test": "mocha --project ./tsconfig.json --require esm ./**/*.spec.js",
     "start": "node ./out/n0trout.js"
   },
@@ -32,6 +32,7 @@
     "osrs-json-api": "^1.1.1",
     "rxjs": "^6.5.3",
     "rxjs-marbles": "^5.0.3",
+    "typedoc": "^0.15.0",
     "typescript": "^3.6.3",
     "uuid": "^3.3.3"
   },
