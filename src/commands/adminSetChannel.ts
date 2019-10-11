@@ -1,6 +1,6 @@
 import * as discord from 'discord.js';
 import { willSaveToDb$, } from '../botEvent';
-import { Command, } from '../command';
+import { Db, } from '../database';
 
 /**
  * Validates and executes set channel function
@@ -12,12 +12,19 @@ const adminSetChannel = (
     const channel = msg.mentions.channels.first();
     if (channel === undefined) return;
     if (msg.guild.channels.get(channel.id) === undefined) return;
+
+    /*
     willSaveToDb$.next({
-        command: Command.ALL.ADMIN_SET_CHANNEL,
+        command: Db.MUTATE.NOTIFICATION_CHANNEL_SET,
+        guildId: msg.guild.id,
         data: {
             channelId: channel.id,
         },
     });
+    */
+    willSaveToDb$.next();
+    //save to db
+    
 };
 
 export default adminSetChannel;

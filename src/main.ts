@@ -36,13 +36,32 @@ import { willSaveToDb$, } from './botEvent';
 const gClient: discord.Client = new discord.Client();
 
 /**
+ * Observable of all Discord message events
+ * @category Observable
+ */
+const messageReceived$: Observable<discord.Message> = fromEvent(
+    gClient as unknown as EventEmitter,
+    'message'
+);
+
+/**
+ * Subject of injected Discord message events
+ * @category Observable
+ */
+const messageInjector$: Subject<discord.Message> = new Subject();
+
+const mergedMessage$: Observable<discord.Message> = merge(
+    messageReceived$,
+    messageInjector$,
+);
+
+/**
  * Helper function to determine if a user has access to the command
- * @param guild the Guild to use
- * @param author the Author to check
- * @returns true if the Author has admin access to the bot
+ * @param guild The Guild to use
+ * @param author The Author to check
+ * @returns True if the Author has admin access to the bot
  * @category Helper
  */
-// eslint-disable-next-line import/prefer-default-export
 export const isAdmin = (
     guild: discord.Guild,
     author: discord.User,
@@ -62,27 +81,6 @@ export const isAdmin = (
         boolean => role.name.toLowerCase() === 'osrs event manager'
     );
 };
-
-
-/**
- * Observable of all Discord message events
- * @category Observable
- */
-const messageReceived$: Observable<discord.Message> = fromEvent(
-    gClient as unknown as EventEmitter,
-    'message'
-);
-
-/**
- * Subject of injected Discord message events
- * @category Observable
- */
-const messageInjector$: Subject<discord.Message> = new Subject();
-
-const mergedMessage$: Observable<discord.Message> = merge(
-    messageReceived$,
-    messageInjector$,
-);
 
 /**
  * Function that filters all Discord commands messages
@@ -125,6 +123,51 @@ const commandReceived$ = (
         ),
     );
 
+/**
+ * Creates a spoofed Discord Message to process
+ * See [[discord.Message]]
+ * @param newCommand The new command to swap to
+ * @param sourceMessage The old message source
+ * @param spoofedAuthor The new author
+ * @category Helper
+ */
+export const spoofMessage = (
+    newCommand: Command.ALL,
+    sourceMessage: discord.Message,
+    spoofedAuthor: discord.User
+): void => {
+    const content = `${Command.getCommandString(newCommand)}${sourceMessage.content.replace(/<@!?[0-9]+>/gi, '')}`;
+    const newMessage: discord.Message = new discord.Message(
+        sourceMessage.channel,
+        {
+            id: sourceMessage.id,
+            type: sourceMessage.type,
+            content,
+            author: spoofedAuthor,
+            pinned: sourceMessage.pinned,
+            tts: sourceMessage.tts,
+            nonce: sourceMessage.nonce,
+            embeds: sourceMessage.embeds,
+            attachments: sourceMessage.attachments,
+            timestamp: sourceMessage.createdTimestamp,
+            // eslint-disable-next-line @typescript-eslint/camelcase
+            edited_timestamp: sourceMessage.editedTimestamp,
+            reactions: sourceMessage.reactions,
+            mentions: sourceMessage.mentions.users.array(),
+            // eslint-disable-next-line @typescript-eslint/camelcase
+            webhook_id: sourceMessage.webhookID,
+            hit: sourceMessage.hit,
+        },
+        gClient
+    );
+
+    Utils.logger.info('Injecting new spoofed message.');
+    Utils.logger.debug(newMessage);
+    messageInjector$.next(
+        newMessage,
+    );
+};
+
 //--------------
 // Global script
 //
@@ -136,7 +179,7 @@ gClient.login(auth.token);
 commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
 commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
 commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
-commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
+// commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
 commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
 commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
 commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);
@@ -150,4 +193,4 @@ commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
 commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
 commandReceived$(Command.ALL.HELP).subscribe(help);
 
-willSaveToDb$.subscribe(Db.handleCommand);
+// willSaveToDb$.subscribe(Db.willHandleSave);

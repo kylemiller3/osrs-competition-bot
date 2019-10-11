@@ -72,7 +72,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_ADD]]
      * @category Parsing Interfaces
      */
-    export interface EventsAddParsed {
+    export interface EventsAdd {
         name: string
         starting: string
         ending: string
@@ -146,6 +146,14 @@ export namespace Command {
     };
 
     /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_DELETE]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsDelete {
+        id: number
+    }
+
+    /**
      * Implementation of the delete event command description
      * @category Event Implementations
      */
@@ -157,7 +165,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
         },
@@ -175,11 +183,19 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
         },
     };
+
+    /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_END_EVENT]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsEndEvent {
+        id: number
+    }
 
     /**
      * Implementation of the end event command description
@@ -193,7 +209,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
         },
@@ -211,7 +227,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
             rsn: {
@@ -225,7 +241,7 @@ export namespace Command {
                 usage: '@mention',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: false,
+                default: '',
             },
         },
     };
@@ -242,7 +258,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
             user: {
@@ -267,7 +283,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
             score: {
@@ -291,7 +307,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
             rsn: {
@@ -316,11 +332,19 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
         },
     };
+
+    /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_END_EVENT]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsEndEvent {
+        id: number
+    }
 
     /**
      * Implementation of the list participants command description
@@ -334,11 +358,19 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
         },
     };
+
+    /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_AMISIGNEDUP]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsAmISignedUp {
+        id: number
+    }
 
     /**
      * Implementation of the amisignedup command description
@@ -352,7 +384,7 @@ export namespace Command {
             id: {
                 description: 'The event\'s unique id.',
                 usage: 'event id',
-                expectedType: ParamType.STRING,
+                expectedType: ParamType.NUMBER,
                 required: true,
             },
         },
@@ -445,11 +477,21 @@ export namespace Command {
     };
 
     /**
+     * Helper function used in spoofing messages
+     * @param command The command to use
+     * @returns The command string
+     * @category API
+     */
+    export const getCommandString = (
+        command: Command.ALL,
+    ): string => lookup[command].command;
+
+    /**
      * Checks to see if the user has access to the command they called
-     * @param command the command to use
-     * @param guild the Discord guild to use
-     * @param author the Discord user to check
-     * @returns true if the Discord user has access
+     * @param command The command to use
+     * @param guild The Discord guild to use
+     * @param author The Discord user to check
+     * @returns True if the Discord user has access
      * @category API
      */
     export const hasAccess = (
@@ -465,9 +507,9 @@ export namespace Command {
 
     /**
      * Checks the string to see if the command contains the proper command string
-     * @param command the command to use
-     * @param str the string to check
-     * @returns true if the string contains the command string
+     * @param command The command to use
+     * @param str The string to check
+     * @returns True if the string contains the command string
      * @category API
      */
     export const isValid = (

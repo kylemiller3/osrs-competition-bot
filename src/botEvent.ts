@@ -1,7 +1,8 @@
 import { Subject, } from 'rxjs';
+import { Db, } from './database';
 
-export const willSaveToDb$: Subject<Record<string, any>> = new Subject();
-export const didSaveToDb$: Subject<boolean> = new Subject();
+export const willSaveToDb$: Subject<void> = new Subject();
+export const didSaveToDb$: Subject<Db.Mutate> = new Subject();
 
 export const willAddEvent$: Subject<void> = new Subject();
 export const didAddEvent$: Subject<void> = new Subject();

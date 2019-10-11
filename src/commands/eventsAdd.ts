@@ -2,7 +2,8 @@ import * as discord from 'discord.js';
 import { Command, } from '../command';
 import { Event, } from '../event';
 import { Utils, } from '../utils';
-import { willSaveToDb$ } from '../botEvent';
+import { willSaveToDb$, } from '../botEvent';
+import { Db, } from '../database';
 
 /**
  * Validates and prepares an event
@@ -11,7 +12,7 @@ import { willSaveToDb$ } from '../botEvent';
 const eventsAdd = (
     msg: discord.Message
 ): void => {
-    const params: Command.EventsAddParsed = Command.parseParameters(
+    const params: Command.EventsAdd = Command.parseParameters(
         Command.ALL.EVENTS_ADD,
         msg.content,
     );
@@ -184,12 +185,19 @@ const eventsAdd = (
         tracker,
     };
 
+    /*
     willSaveToDb$.next(
         {
-            command: Command.ALL.EVENTS_ADD,
-            data: newEvent,
+            command: Db.MUTATE.EVENT_NEW,
+            guildId: msg.guild.id,
+            data: {
+                event: newEvent,
+            },
         }
     );
+    */
+    willSaveToDb$.next();
+    // Db.saveNewEvent
 };
 
 export default eventsAdd;

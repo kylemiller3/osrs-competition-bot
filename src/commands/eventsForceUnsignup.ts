@@ -1,11 +1,18 @@
 import * as discord from 'discord.js';
 import { Command, } from '../command';
+import { spoofMessage, } from '../main';
 
-const eventsForceUnsignup = (msg: discord.Message):
-void => {
-    const params: Record<string, string | number | boolean> = Command.parseParameters(
-        Command.ALL.EVENTS_FORCE_UNSIGNUP,
-        msg.content,
+const eventsForceUnsignup = (
+    msg: discord.Message
+): void => {
+    if (msg.mentions.members.array().length === 0) {
+        return;
+    }
+
+    spoofMessage(
+        Command.ALL.EVENTS_UNSIGNUP,
+        msg,
+        msg.mentions.users.array()[0],
     );
 };
 

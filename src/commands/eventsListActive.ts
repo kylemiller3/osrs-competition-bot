@@ -1,12 +1,10 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
+import { Utils, } from '../utils';
+import { Event, } from '../event';
 
-const eventsListActive = (msg: discord.Message):
-void => {
-    const params: Record<string, string | number | boolean> = Command.parseParameters(
-        Command.ALL.EVENTS_LIST_ACTIVE,
-        msg.content,
-    );
+const eventsListActive = (
+): void => {
+    // events = fetch active events
 };
 
 export default eventsListActive;
