@@ -3,7 +3,7 @@ import { Command, } from '../command';
 
 const eventsUnsignup = (msg: discord.Message):
 void => {
-    const params: Record<string, string | number | boolean> = Command.parseParameters(
+    const params: Command.EventsUnsignup = Command.parseParameters(
         Command.ALL.EVENTS_UNSIGNUP,
         msg.content,
     );

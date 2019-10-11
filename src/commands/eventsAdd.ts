@@ -2,8 +2,6 @@ import * as discord from 'discord.js';
 import { Command, } from '../command';
 import { Event, } from '../event';
 import { Utils, } from '../utils';
-import { willSaveToDb$, } from '../botEvent';
-import { Db, } from '../database';
 
 /**
  * Validates and prepares an event
@@ -41,7 +39,7 @@ const eventsAdd = (
         ? new Date(
             params.ending
         )
-        : new Date('9999-12-31T23:59:59Z');
+        : new Date('9999-12-31Z');
 
     if (!Utils.isValidDate(start)) {
         errors = [
@@ -72,15 +70,7 @@ const eventsAdd = (
         }
     }
 
-
-    if (errors.length > 0) {
-        Utils.logger.info(
-            errors.join(' ')
-        );
-        return;
-    }
-
-    let tracking: Event.Tracking = Object.values(
+    const tracking: Event.Tracking = Object.values(
         Event.Tracking
     ).find(
         (value: string):
@@ -150,7 +140,10 @@ const eventsAdd = (
                     );
                 // default undefined
                 if (what.length === 0) {
-                    tracking = undefined;
+                    errors = [
+                        ...errors,
+                        `This event type '${tracking}' must track something.`,
+                    ];
                 }
                 break;
             }
@@ -160,15 +153,23 @@ const eventsAdd = (
     }
 
     let tracker: Event.Tracker;
-    if (tracking !== Event.Tracking.NONE && tracking !== undefined) {
+    if (tracking !== Event.Tracking.NONE) {
         tracker = {
             tracking,
             what,
         };
     }
 
+    if (errors.length > 0) {
+        Utils.logger.info(
+            errors.join(' ')
+        );
+        return;
+    }
+
     const newEvent: Event.Event = {
-        uid: undefined,
+        id: undefined,
+        guildId: msg.guild.id,
         name: params.name,
         when: {
             start,
@@ -178,26 +179,17 @@ const eventsAdd = (
         messages: {},
         state: {
             hasStarted: false,
-            hasWarned: false,
             hasEnded: false,
         },
         teams: params.teams ? [] : undefined,
         tracker,
     };
+    Utils.logger.debug(newEvent);
 
-    /*
-    willSaveToDb$.next(
-        {
-            command: Db.MUTATE.EVENT_NEW,
-            guildId: msg.guild.id,
-            data: {
-                event: newEvent,
-            },
-        }
-    );
-    */
-    willSaveToDb$.next();
+    // confirmation here
+
     // Db.saveNewEvent
+    msg.reply('event added.');
 };
 
 export default eventsAdd;

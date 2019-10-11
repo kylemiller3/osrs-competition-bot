@@ -4,42 +4,27 @@ import { Utils, } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
-    export const tempDb = new Database('foobar.db', { verbose: Utils.logger.log, memory: true, });
-    export const permDb = new Database('foobar.db', { verbose: Utils.logger.log, memory: true, });
+    export const tempDb = new Database('temp.db', { verbose: Utils.logger.log, memory: true, });
+    export const persistentDb = new Database('persistent.db', { verbose: Utils.logger.log, });
 
-    export enum MUTATE {
-        EVENT_NEW,
-        EVENT_DELETE,
-        EVENT_START,
-        EVENT_WARN,
-        EVENT_END,
-        EVENT_SIGNUP,
-        EVENT_UNSIGNUP,
-        NOTIFICATION_CHANNEL_SET,
-    }
-
-    export interface Mutate {
-        command: Db.MUTATE
-        guildId?: string
-        data: unknown
-    }
-
-    export enum FETCH {
-        FETCH_ALL_EVENTS,
-        FETCH_EVENT_FROM_ID,
-        FETCH_EVENT_FROM_NAME,
-        FETCH_EVENTS_STARTING_BEFORE_DATE,
-        FETCH_EVENTS_STARTING_AFTER_DATE,
-        FETCH_EVENTS_ENDING_BEFORE_DATE,
-        FETCH_EVENTS_BETWEEN_DATES,
-        FETCH_EVENTS_ACTIVE,
-        NOTIFICATION_CHANNEL_GET,
-    }
-
-    export interface Fetch {
-        command: Db.FETCH
-        guildId: string
-        data: unknown
+    export enum COMMANDS {
+        MUTATE_EVENT_NEW, // insert a new (event)
+        MUTATE_EVENT_DELETE, // delete an existing (eventId)
+        MUTATE_EVENT_SIGNUP, // add a (participant) to the (guildId) (eventId)
+        MUTATE_EVENT_UNSIGNUP, // remove (participant) from the (guildId) (eventId)
+        MUTATE_NOTIFICATION_CHANNEL_SET, // change the (guildId) (notificationChannel)
+        MUTATE_SCOREBOARD_MESSAGE_ID, // change the (guildId) (scoreboardMessageId)
+        MUTATE_STATUS_MESSAGE_ID, // change the (guildId) (statusMessageId)
+        FETCH_ALL_EVENTS, // get all (guildId) events
+        FETCH_EVENT_FROM_ID, // get event from (guildId) (eventId)
+        FETCH_EVENT_FROM_NAME, // get event from (guildId) (name)
+        FETCH_EVENTS_STARTING_BETWEEN_DATES, // get events from (guildId?) between (date1) (date2)
+        FETCH_EVENTS_ENDING_BETWEEN_DATES, // get events from (guildId?) between (date1) (date2)
+        FETCH_EVENTS_ACTIVE, // get events from (guildId) where now is between starting and ending
+        FETCH_USER_EVENTS, // get all events the (discordId) was active in
+        FETCH_NOTIFICATION_CHANNEL, // get the notification channel of the (guildId)
+        FETCH_SCOREBOARD_MESSAGE_ID, // get the (guildId) (scoreboardMessageId)
+        FETCH_STATUS_MESSAGE_ID, // get the (guildId) (statusMessageId)
     }
 
     const createTablesIfNotExists = (
@@ -55,43 +40,4 @@ export namespace Db {
         }
         return false;
     };
-
-    /*
-    export const willHandleSave = (
-        dict: Mutate
-    ): void => {
-
-        example:
-        {
-            command: Command.ALL.ADMIN_SET_CHANNEL,
-            data: {
-                channelId: channel.id,
-            }
-        }
-        another:
-        {
-            command: Command.ALL.EVENTS_SIGNUP
-            data: {
-                uid: 10,
-                user: 235897234027937,
-                rsn: somename,
-            }
-        }
-
-        if (dict.command === Db.MUTATE.NEW_EVENT) {
-            // do code here to save to database
-            Utils.logger.debug(dict.data);
-        }
-
-        if (dict.command === Db.MUTATE.DELETE_EVENT) {
-            // do code here to save to database
-            Utils.logger.debug(dict.data);
-        }
-
-        if (dict.command === Db.MUTATE.SAVE_NOTIFICATION_CHANNEL) {
-            // do code here to save to database
-            Utils.logger.debug(dict.data);
-        }
-    };
-    */
 }

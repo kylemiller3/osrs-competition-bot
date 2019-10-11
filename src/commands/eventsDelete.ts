@@ -1,7 +1,5 @@
 import * as discord from 'discord.js';
 import { Command, } from '../command';
-import { willSaveToDb$, } from '../botEvent';
-import { Db, } from '../database';
 
 const eventsDelete = (
     msg: discord.Message
@@ -15,16 +13,7 @@ const eventsDelete = (
         return;
     }
 
-    /*
-    willSaveToDb$.next({
-        command: Db.MUTATE.EVENT_DELETE,
-        guildId: msg.guild.id,
-        data: {
-            eventId: params.id,
-        },
-    });
-    */
-    willSaveToDb$.next();
+    msg.reply(`event ${params.id} deleted.`);
 };
 
 export default eventsDelete;

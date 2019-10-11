@@ -11,7 +11,7 @@ const help = (
     );
     const helpStr: string = Command.generateHelpString(admin);
 
-    // reply to user here
+    msg.reply(helpStr);
 };
 
 export default help;

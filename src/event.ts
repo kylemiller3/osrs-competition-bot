@@ -103,7 +103,7 @@ export namespace Event {
         LMS = 'lms',
         CLUES = 'clues',
         CUSTOM = 'custom',
-        NONE = 'none',
+        NONE = 'casual',
     }
 
     /**
@@ -141,7 +141,6 @@ export namespace Event {
     export interface Messages {
         scoreboardId?: string
         statusId?: string
-        congratulationsId?: string
     }
 
     /**
@@ -150,7 +149,6 @@ export namespace Event {
      */
     export interface State {
         hasStarted: boolean
-        hasWarned: boolean
         hasEnded: boolean
     }
 
@@ -159,7 +157,8 @@ export namespace Event {
      * @category Event
      */
     export interface Event {
-        uid: number
+        id: number
+        guildId: string
         name: string
         when: When
         participants: Participant[]
@@ -233,7 +232,7 @@ export namespace Event {
     ): Event => {
         const foundEvent: Event = events.find(
             (event: Event):
-            boolean => event.uid === eventIdToSearch
+            boolean => event.id === eventIdToSearch
         );
         return foundEvent;
     };
@@ -277,7 +276,7 @@ export namespace Event {
     ): Event[] => {
         const newEvents: Event[] = events.filter(
             (event: Event):
-            boolean => event.uid !== eventToDelete.uid
+            boolean => event.id !== eventToDelete.id
         );
         return newEvents;
     };
@@ -381,7 +380,7 @@ export namespace Event {
     ): Event[] => {
         const newEvents: Event[] = events.map(
             (event: Event): Event => {
-                if (event.uid === updatedEvent.uid) return updatedEvent;
+                if (event.id === updatedEvent.id) return updatedEvent;
                 return event;
             }
         );
@@ -433,17 +432,4 @@ export namespace Event {
         );
         return filteredParticipants;
     };
-
-    /**
-     * Gets all [[Event]]s that have yet to be warned about
-     * @param events The source Events to filter
-     * @returns A new array of events that have not been marked as notified
-     * @category Event
-     */
-    export const getUnnotifiedEvents = (
-        events: Event[]
-    ): Event[] => events.filter(
-        (event: Event):
-        boolean => !event.state.hasWarned || !event.state.hasStarted || !event.state.hasEnded
-    );
 }

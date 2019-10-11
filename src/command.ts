@@ -113,7 +113,8 @@ export namespace Command {
                 description: 'The type of event to schedule.',
                 usage: 'skills AND skill1 skill2... OR bh OR lms OR clues AND difficulty1 difficulty2... OR custom',
                 expectedType: ParamType.STRING,
-                required: true,
+                required: false,
+                default: 'casual',
             },
             teams: {
                 description: 'Team enabled event.',
@@ -272,10 +273,19 @@ export namespace Command {
     };
 
     /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_DELETE]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsAddScore {
+        id: number
+        score: number
+    }
+
+    /**
      * Implementation of the update score command description
      * @category Admin Implementations
      */
-    const eventsUpdateScore: Description = {
+    const eventsAddScore: Description = {
         description: 'Adds to a user\'s score.',
         accessControl: onlyAdmin,
         command: '!f events update score',
@@ -294,6 +304,15 @@ export namespace Command {
             },
         },
     };
+
+    /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_SIGNUP]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsSignup {
+        id: number
+        rsn: string
+    }
 
     /**
      * Implementation of the signup command description
@@ -321,6 +340,14 @@ export namespace Command {
     };
 
     /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_UNSIGNUP]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsUnsignup {
+        id: number
+    }
+
+    /**
      * Implementation of the un-signup command description
      * @category User Implementations
      */
@@ -339,10 +366,10 @@ export namespace Command {
     };
 
     /**
-     * The resulting dictionary after parsing [[ALL.EVENTS_END_EVENT]]
+     * The resulting dictionary after parsing [[ALL.EVENTS_LIST_PARTICIPANTS]]
      * @category Parsing Interfaces
      */
-    export interface EventsEndEvent {
+    export interface EventsListParticipants {
         id: number
     }
 
@@ -452,7 +479,7 @@ export namespace Command {
         EVENTS_LIST_PARTICIPANTS,
         EVENTS_SIGNUP,
         EVENTS_UNSIGNUP,
-        EVENTS_UPDATE_SCORE,
+        EVENTS_ADD_SCORE,
         HELP,
         USERS_STATS,
     }
@@ -471,7 +498,7 @@ export namespace Command {
         [Command.ALL.EVENTS_LIST_PARTICIPANTS]: eventsListParticipants,
         [Command.ALL.EVENTS_SIGNUP]: eventsSignup,
         [Command.ALL.EVENTS_UNSIGNUP]: eventsUnsignup,
-        [Command.ALL.EVENTS_UPDATE_SCORE]: eventsUpdateScore,
+        [Command.ALL.EVENTS_ADD_SCORE]: eventsAddScore,
         [Command.ALL.HELP]: help,
         [Command.ALL.USERS_STATS]: usersStats,
     };
@@ -613,8 +640,11 @@ export namespace Command {
         if (params === undefined) return {} as unknown as T;
 
         const reduceRecord = (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             acc: Record<string, any>,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             x: Record<string, any>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ): Record<string, any> => {
             acc[Object.keys(x)[0]] = Object.values(x)[0];
             return acc;
