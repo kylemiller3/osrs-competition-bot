@@ -1,4 +1,5 @@
 import * as discord from 'discord.js';
+import { Utils, } from '../utils';
 
 /**
  * Validates and executes set channel function
@@ -12,7 +13,8 @@ const adminSetChannel = (
     if (msg.guild.channels.get(channel.id) === undefined) return;
 
     // save to db
-    msg.reply('channel set.');
+    Utils.logger.debug(`Channel set to ${channel.id}`);
+    msg.reply(`channel set to <#${channel.id}>.`);
 };
 
 export default adminSetChannel;

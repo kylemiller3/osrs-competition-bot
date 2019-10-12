@@ -81,6 +81,29 @@ export const isAdmin = (
 };
 
 /**
+ * Gets the user's [[discord.Guild]] display name from a Discord id
+ * @param guildId The Guild id to use for display name lookup
+ * @param discordId The Discord id to lookup
+ * @returns The user's display name
+ * @category Helper
+ */
+export const getDisplayNameFromDiscordId = (
+    guildId: string,
+    discordId: string
+): string => {
+    const guild: discord.Guild = gClient.guilds.get(
+        guildId
+    ) as discord.Guild;
+    if (guild === undefined || !guild.available) return '(guild unavailable)';
+    const foundMember: discord.GuildMember = guild.members.find(
+        (member: discord.GuildMember):
+        boolean => member.id === discordId
+    );
+    if (foundMember === null) return '(unknown)';
+    return foundMember.displayName;
+};
+
+/**
  * Function that filters all Discord commands messages
  * @category Observable
  */
@@ -151,7 +174,7 @@ export const spoofMessage = (
             // eslint-disable-next-line @typescript-eslint/camelcase
             edited_timestamp: sourceMessage.editedTimestamp,
             reactions: sourceMessage.reactions,
-            mentions: sourceMessage.mentions.users.array(),
+            // mentions: sourceMessage.mentions.users.array(),
             // eslint-disable-next-line @typescript-eslint/camelcase
             webhook_id: sourceMessage.webhookID,
             hit: sourceMessage.hit,

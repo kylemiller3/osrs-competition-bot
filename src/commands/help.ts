@@ -10,7 +10,6 @@ const help = (
         msg.author,
     );
     const helpStr: string = Command.generateHelpString(admin);
-
     msg.reply(helpStr);
 };
 

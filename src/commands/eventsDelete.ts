@@ -1,5 +1,6 @@
 import * as discord from 'discord.js';
 import { Command, } from '../command';
+import Error from '../strings';
 
 const eventsDelete = (
     msg: discord.Message
@@ -10,6 +11,7 @@ const eventsDelete = (
     );
 
     if (params.id === undefined) {
+        msg.reply(Error.NO_EVENT_SPECIFIED);
         return;
     }
 

@@ -71,7 +71,7 @@ export namespace Event {
      */
     export interface Participant {
         discordId: string
-        customScore?: number
+        customScore: number
         runescapeAccounts: Account[]
     }
 

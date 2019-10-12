@@ -312,6 +312,7 @@ export namespace Command {
     export interface EventsSignup {
         id: number
         rsn: string
+        team: string
     }
 
     /**
@@ -335,6 +336,12 @@ export namespace Command {
                 expectedType: ParamType.STRING,
                 required: false,
                 default: undefined,
+            },
+            team: {
+                description: 'The team name to create or join.',
+                usage: 'team name',
+                expectedType: ParamType.STRING,
+                required: false,
             },
         },
     };
