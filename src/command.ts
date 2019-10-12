@@ -116,12 +116,12 @@ export namespace Command {
                 required: false,
                 default: 'casual',
             },
-            teams: {
-                description: 'Team enabled event.',
+            global: {
+                description: 'Cross guild event.',
                 usage: 'yes or no',
                 expectedType: ParamType.BOOLEAN,
                 required: false,
-                default: 'false',
+                default: 'no',
             },
         },
     };

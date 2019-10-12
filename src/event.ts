@@ -113,7 +113,7 @@ export namespace Event {
      */
     export interface Team {
         name: string
-        linkedDiscordIds: string[]
+        participants: Participant[]
     }
 
     /**
@@ -138,18 +138,27 @@ export namespace Event {
      * Contract to track event messages
      * @category Event
      */
-    export interface Messages {
-        scoreboardId?: string
-        statusId?: string
+    export interface ChannelMessage {
+        channelId: string
+        messageId: string
     }
 
     /**
-     * Contract to track event state
+     * Contract for tracked status messages
      * @category Event
      */
-    export interface State {
-        hasStarted: boolean
-        hasEnded: boolean
+    export interface GuildMessages {
+        scoreboardMessage?: ChannelMessage
+        statusMessage?: ChannelMessage
+    }
+
+    /**
+     * Contract of the information necessary to track a guild
+     * @category Event
+     */
+    export interface CompetingGuild {
+        guildId: string
+        guildMessages: GuildMessages
     }
 
     /**
@@ -157,15 +166,12 @@ export namespace Event {
      * @category Event
      */
     export interface Event {
-        id: number
-        guildId: string
-        name: string
-        when: When
-        participants: Participant[]
-        messages: Messages
-        state: State
-        teams?: Team[]
-        tracker?: Tracker
+        id: number // database id
+        competingGuilds: CompetingGuild[] // info necessary to manage a tracked guild
+        name: string // name of the event
+        when: When // when the event starts and ends
+        teams: Team[] // the team (or participants) of the event (can be cross guild)
+        tracker?: Tracker // what is being tracked if anything
     }
 
     /**

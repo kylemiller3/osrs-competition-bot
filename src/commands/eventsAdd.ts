@@ -2,6 +2,7 @@ import * as discord from 'discord.js';
 import { Command, } from '../command';
 import { Event, } from '../event';
 import { Utils, } from '../utils';
+import Error from '../strings';
 
 /**
  * Validates and prepares an event
@@ -142,7 +143,7 @@ const eventsAdd = (
                 if (what.length === 0) {
                     errors = [
                         ...errors,
-                        `This event type '${tracking}' must track something.`,
+                        Error.NO_TRACKING_SPECIFIED,
                     ];
                 }
                 break;
@@ -169,19 +170,18 @@ const eventsAdd = (
 
     const newEvent: Event.Event = {
         id: undefined,
-        guildId: msg.guild.id,
+        competingGuilds: [
+            {
+                guildId: msg.guild.id,
+                guildMessages: {},
+            },
+        ],
         name: params.name,
         when: {
             start,
             end,
         },
-        participants: [],
-        messages: {},
-        state: {
-            hasStarted: false,
-            hasEnded: false,
-        },
-        teams: params.teams ? [] : undefined,
+        teams: [],
         tracker,
     };
     Utils.logger.debug(newEvent);
