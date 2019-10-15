@@ -172,8 +172,7 @@ const eventsAdd = (
         id: undefined,
         competingGuilds: [
             {
-                guildId: msg.guild.id,
-                guildMessages: {},
+                discordId: msg.guild.id,
             },
         ],
         name: params.name,

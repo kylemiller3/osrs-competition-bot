@@ -12,6 +12,7 @@ const eventsListParticipants = (
         msg.content,
     );
 
+    /*
     if (params.id === undefined) {
         msg.reply('You must specify an event.');
         return;
@@ -45,6 +46,7 @@ const eventsListParticipants = (
             : 'no participants';
         Utils.logger.debug('ListParticipants called');
     }
+    */
 };
 
 export default eventsListParticipants;

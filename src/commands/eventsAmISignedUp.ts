@@ -10,6 +10,7 @@ const eventsAmISignedUp = (
         msg.content,
     );
 
+    /*
     const event: Event.Event = undefined; // get event here (params.id)
     if (event === undefined) {
         msg.reply(`event ${params.id} not found`);
@@ -36,6 +37,7 @@ const eventsAmISignedUp = (
     }
 
     msg.reply(signupStr);
+    */
 };
 
 export default eventsAmISignedUp;

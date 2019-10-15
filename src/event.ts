@@ -70,6 +70,7 @@ export namespace Event {
      * @category Event
      */
     export interface Participant {
+        id?: number
         discordId: string
         customScore: number
         runescapeAccounts: Account[]
@@ -80,6 +81,7 @@ export namespace Event {
      * @category Event
      */
     export interface Account {
+        id?: number
         rsn: string
     }
 
@@ -98,12 +100,12 @@ export namespace Event {
      * @category Tracking
      */
     export enum Tracking {
+        NONE = 'casual',
         SKILLS = 'skills',
         BH = 'bh',
         LMS = 'lms',
         CLUES = 'clues',
         CUSTOM = 'custom',
-        NONE = 'casual',
     }
 
     /**
@@ -112,6 +114,7 @@ export namespace Event {
      * @category Event
      */
     export interface Team {
+        id?: number
         name: string
         participants: Participant[]
     }
@@ -149,7 +152,7 @@ export namespace Event {
      */
     export interface GuildMessages {
         scoreboardMessage?: ChannelMessage
-        statusMessage?: ChannelMessage
+        statusMessage: ChannelMessage
     }
 
     /**
@@ -157,8 +160,9 @@ export namespace Event {
      * @category Event
      */
     export interface CompetingGuild {
-        guildId: string
-        guildMessages: GuildMessages
+        id?: number
+        discordId: string
+        guildMessages?: GuildMessages
     }
 
     /**
@@ -166,10 +170,10 @@ export namespace Event {
      * @category Event
      */
     export interface Event {
-        id: number // database id
+        id?: number // database id
         competingGuilds: CompetingGuild[] // info necessary to manage a tracked guild
         name: string // name of the event
-        when: When // when the event starts and ends
+        when?: When // when the event starts and ends
         teams: Team[] // the team (or participants) of the event (can be cross guild)
         tracker?: Tracker // what is being tracked if anything
     }
@@ -243,199 +247,199 @@ export namespace Event {
         return foundEvent;
     };
 
-    /**
-     * Gets all currently scheduled [[Event]]s that have yet to end
-     * @param events The event array to filter
-     * @returns A new array of upcoming and in-flight events
-     * @category Event Filter
-     */
-    export const getUpcomingAndInFlightEvents = (
-        events: Event[],
-    ): Event[] => events.filter(
-        (event: Event):
-        boolean => !event.state.hasEnded
-    );
+    // /**
+    //  * Gets all currently scheduled [[Event]]s that have yet to end
+    //  * @param events The event array to filter
+    //  * @returns A new array of upcoming and in-flight events
+    //  * @category Event Filter
+    //  */
+    // export const getUpcomingAndInFlightEvents = (
+    //     events: Event[],
+    // ): Event[] => events.filter(
+    //     (event: Event):
+    //     boolean => !event.state.hasEnded
+    // );
 
-    /**
-     * Gets all currently scheduled [[Event]]s that have yet to start
-     * @param events The event array to filter
-     * @returns A new array of upcoming and in-flight events
-     * @category Event Filter
-     */
-    export const getUpcomingEvents = (
-        events: Event[],
-    ): Event[] => events.filter(
-        (event: Event):
-        boolean => !event.state.hasStarted
-    );
+    // /**
+    //  * Gets all currently scheduled [[Event]]s that have yet to start
+    //  * @param events The event array to filter
+    //  * @returns A new array of upcoming and in-flight events
+    //  * @category Event Filter
+    //  */
+    // export const getUpcomingEvents = (
+    //     events: Event[],
+    // ): Event[] => events.filter(
+    //     (event: Event):
+    //     boolean => !event.state.hasStarted
+    // );
 
-    /**
-     * Deletes an upcoming or in-flight [[Event]] by [[Event.name]]
-     * @param events The Events array to search
-     * @param eventToDelete The Event to delete
-     * @returns A new updated Event array
-     * @category Event Operator
-     */
-    export const deleteEvent = (
-        events: Event[],
-        eventToDelete: Event
-    ): Event[] => {
-        const newEvents: Event[] = events.filter(
-            (event: Event):
-            boolean => event.id !== eventToDelete.id
-        );
-        return newEvents;
-    };
+    // /**
+    //  * Deletes an upcoming or in-flight [[Event]] by [[Event.name]]
+    //  * @param events The Events array to search
+    //  * @param eventToDelete The Event to delete
+    //  * @returns A new updated Event array
+    //  * @category Event Operator
+    //  */
+    // export const deleteEvent = (
+    //     events: Event[],
+    //     eventToDelete: Event
+    // ): Event[] => {
+    //     const newEvents: Event[] = events.filter(
+    //         (event: Event):
+    //         boolean => event.id !== eventToDelete.id
+    //     );
+    //     return newEvents;
+    // };
 
-    /**
-     * Updates a [[Participant]] in an [[Event]]
-     * @param event The source event to modify
-     * @param updatedParticipant The updated participant
-     * @returns A new updated event with the updated participant
-     * @category Event Operator
-     */
-    export const updateEventParticipant = (
-        event: Event,
-        updatedParticipant: Participant
-    ): Event => {
-        const newParticipants: Participant[] = event.participants.map(
-            (participant: Participant):
-            Participant => {
-                if (participant.discordId === updatedParticipant.discordId) {
-                    return updatedParticipant;
-                }
-                return participant;
-            }
-        );
-        const newEvent: Event = { ...event, };
-        newEvent.participants = newParticipants;
-        return newEvent;
-    };
+    // /**
+    //  * Updates a [[Participant]] in an [[Event]]
+    //  * @param event The source event to modify
+    //  * @param updatedParticipant The updated participant
+    //  * @returns A new updated event with the updated participant
+    //  * @category Event Operator
+    //  */
+    // export const updateEventParticipant = (
+    //     event: Event,
+    //     updatedParticipant: Participant
+    // ): Event => {
+    //     const newParticipants: Participant[] = event.participants.map(
+    //         (participant: Participant):
+    //         Participant => {
+    //             if (participant.discordId === updatedParticipant.discordId) {
+    //                 return updatedParticipant;
+    //             }
+    //             return participant;
+    //         }
+    //     );
+    //     const newEvent: Event = { ...event, };
+    //     newEvent.participants = newParticipants;
+    //     return newEvent;
+    // };
 
-    /**
-     * Inserts a new [[Participant]] into an [[Event]]
-     * @param event The source event
-     * @param newParticipant The new participant to insert
-     * @returns A new updated event with the new participant
-     * @category Event Operator
-     */
-    export const signupEventParticipant = (
-        event: Event,
-        newParticipant: Participant
-    ): Event => {
-        const foundParticipant: Participant = event.participants.find(
-            (participant: Participant):
-            boolean => participant.discordId === newParticipant.discordId
-        );
-        if (foundParticipant !== undefined) return event;
-        const allRsn: string[] = event.participants.map(
-            (participant: Participant):
-            Account[] => participant.runescapeAccounts
-        ).reduce(
-            (acc: Account[], x: Account[]):
-            Account[] => acc.concat(x), []
-        ).map(
-            (account: Account): string => account.rsn
-        );
-        const newRsn: string[] = newParticipant.runescapeAccounts.map(
-            (account: Account): string => account.rsn
-        );
-        const foundRsn: boolean = allRsn.some(
-            (rsn: string): boolean => newRsn.includes(rsn)
-        );
-        if (foundRsn) return event;
-        const newParticipants:
-        Participant[] = event.participants.concat(
-            newParticipant
-        );
-        const newEvent: Event = { ...event, };
-        newEvent.participants = newParticipants;
-        return newEvent;
-    };
+    // /**
+    //  * Inserts a new [[Participant]] into an [[Event]]
+    //  * @param event The source event
+    //  * @param newParticipant The new participant to insert
+    //  * @returns A new updated event with the new participant
+    //  * @category Event Operator
+    //  */
+    // export const signupEventParticipant = (
+    //     event: Event,
+    //     newParticipant: Participant
+    // ): Event => {
+    //     const foundParticipant: Participant = event.participants.find(
+    //         (participant: Participant):
+    //         boolean => participant.discordId === newParticipant.discordId
+    //     );
+    //     if (foundParticipant !== undefined) return event;
+    //     const allRsn: string[] = event.participants.map(
+    //         (participant: Participant):
+    //         Account[] => participant.runescapeAccounts
+    //     ).reduce(
+    //         (acc: Account[], x: Account[]):
+    //         Account[] => acc.concat(x), []
+    //     ).map(
+    //         (account: Account): string => account.rsn
+    //     );
+    //     const newRsn: string[] = newParticipant.runescapeAccounts.map(
+    //         (account: Account): string => account.rsn
+    //     );
+    //     const foundRsn: boolean = allRsn.some(
+    //         (rsn: string): boolean => newRsn.includes(rsn)
+    //     );
+    //     if (foundRsn) return event;
+    //     const newParticipants:
+    //     Participant[] = event.participants.concat(
+    //         newParticipant
+    //     );
+    //     const newEvent: Event = { ...event, };
+    //     newEvent.participants = newParticipants;
+    //     return newEvent;
+    // };
 
-    /**
-     * Removes a [[Participant]] from an [[Event]]
-     * @param event The source event
-     * @param participantToRemove The participant to remove
-     * @returns A new updated event with the participant removed
-     * @category Event Operator
-     */
-    export const unsignupEventParticipant = (
-        event: Event,
-        participantToRemove: Participant
-    ): Event => {
-        const newParticipants: Participant[] = event.participants.filter(
-            (participant: Participant):
-            boolean => participant.discordId !== participantToRemove.discordId
-        );
-        const newEvent: Event = { ...event, };
-        newEvent.participants = newParticipants;
-        return newEvent;
-    };
+    // /**
+    //  * Removes a [[Participant]] from an [[Event]]
+    //  * @param event The source event
+    //  * @param participantToRemove The participant to remove
+    //  * @returns A new updated event with the participant removed
+    //  * @category Event Operator
+    //  */
+    // export const unsignupEventParticipant = (
+    //     event: Event,
+    //     participantToRemove: Participant
+    // ): Event => {
+    //     const newParticipants: Participant[] = event.participants.filter(
+    //         (participant: Participant):
+    //         boolean => participant.discordId !== participantToRemove.discordId
+    //     );
+    //     const newEvent: Event = { ...event, };
+    //     newEvent.participants = newParticipants;
+    //     return newEvent;
+    // };
 
-    /**
-     * Updates a specific [[Event]] in an [[Event]] array
-     * @param events The source event array
-     * @param updatedEvent The updated event
-     * @returns A new updated event array with the updated event
-     * @category Event Operator
-     */
-    export const modifyEventArray = (
-        events: Event[],
-        updatedEvent: Event
-    ): Event[] => {
-        const newEvents: Event[] = events.map(
-            (event: Event): Event => {
-                if (event.id === updatedEvent.id) return updatedEvent;
-                return event;
-            }
-        );
-        return newEvents;
-    };
+    // /**
+    //  * Updates a specific [[Event]] in an [[Event]] array
+    //  * @param events The source event array
+    //  * @param updatedEvent The updated event
+    //  * @returns A new updated event array with the updated event
+    //  * @category Event Operator
+    //  */
+    // export const modifyEventArray = (
+    //     events: Event[],
+    //     updatedEvent: Event
+    // ): Event[] => {
+    //     const newEvents: Event[] = events.map(
+    //         (event: Event): Event => {
+    //             if (event.id === updatedEvent.id) return updatedEvent;
+    //             return event;
+    //         }
+    //     );
+    //     return newEvents;
+    // };
 
-    /**
-     * Finds a [[Participant]] by their Discord id
-     * @param participants The source Participant array to search
-     * @param discordId The linked Discord id to find
-     * @returns The found participant
-     * @category Participant Filter
-     */
-    export const getParticipantByDiscordId = (
-        participants: Participant[],
-        discordId: string
-    ): Participant => participants.find(
-        (participant: Participant): boolean => participant.discordId === discordId
-    );
+    // /**
+    //  * Finds a [[Participant]] by their Discord id
+    //  * @param participants The source Participant array to search
+    //  * @param discordId The linked Discord id to find
+    //  * @returns The found participant
+    //  * @category Participant Filter
+    //  */
+    // export const getParticipantByDiscordId = (
+    //     participants: Participant[],
+    //     discordId: string
+    // ): Participant => participants.find(
+    //     (participant: Participant): boolean => participant.discordId === discordId
+    // );
 
-    /**
-     * Gets all [[Participant]]s in a [[Team]]
-     * @param event The source event to search
-     * @param teamName The team name to find
-     * @returns The array of participants in the team
-     * @category Participant Filter
-     */
-    export const getTeamParticipants = (
-        event: Event,
-        teamName: string
-    ):
-    Participant[] => {
-        if (event.teams === undefined) return undefined;
-        const foundTeam: Team = event.teams.find(
-            (info: Team):
-            boolean => info.name === teamName
-        );
-        if (foundTeam === undefined) return undefined;
-        const teamParticipants: Participant[] = foundTeam.linkedDiscordIds.map(
-            (discordId: string):
-            Participant => getParticipantByDiscordId(
-                event.participants,
-                discordId
-            )
-        );
-        const filteredParticipants: Participant[] = teamParticipants.filter(
-            (participant: Participant):
-            boolean => participant !== undefined
-        );
-        return filteredParticipants;
-    };
+    // /**
+    //  * Gets all [[Participant]]s in a [[Team]]
+    //  * @param event The source event to search
+    //  * @param teamName The team name to find
+    //  * @returns The array of participants in the team
+    //  * @category Participant Filter
+    //  */
+    // export const getTeamParticipants = (
+    //     event: Event,
+    //     teamName: string
+    // ):
+    // Participant[] => {
+    //     if (event.teams === undefined) return undefined;
+    //     const foundTeam: Team = event.teams.find(
+    //         (info: Team):
+    //         boolean => info.name === teamName
+    //     );
+    //     if (foundTeam === undefined) return undefined;
+    //     const teamParticipants: Participant[] = foundTeam.linkedDiscordIds.map(
+    //         (discordId: string):
+    //         Participant => getParticipantByDiscordId(
+    //             event.participants,
+    //             discordId
+    //         )
+    //     );
+    //     const filteredParticipants: Participant[] = teamParticipants.filter(
+    //         (participant: Participant):
+    //         boolean => participant !== undefined
+    //     );
+    //     return filteredParticipants;
+    // };
 }

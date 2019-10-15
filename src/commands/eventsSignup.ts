@@ -12,6 +12,7 @@ const eventsSignup = (
         msg.content,
     );
 
+    /*
     let errors: string[] = [];
     if (params.id === undefined) {
         errors = [
@@ -56,6 +57,7 @@ const eventsSignup = (
             // grab stats
         }
     }
+    */
 };
 
 export default eventsSignup;

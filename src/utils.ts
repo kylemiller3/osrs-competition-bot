@@ -98,14 +98,6 @@ export namespace Utils {
     };
 
     process.on(
-        'beforeExit',
-        (code: number):
-        void => {
-            logger.info(`Process is shutting down: ${code}`);
-        }
-    );
-
-    process.on(
         'uncaughtException',
         (error: Error):
         void => {
