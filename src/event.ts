@@ -157,9 +157,14 @@ export namespace Event {
      * Contract of the information necessary to track a guild
      * @category Event
      */
-    export interface CompetingGuild {
+    export interface Guild {
         discordId: string
         guildMessages?: GuildMessages
+    }
+
+    export interface CompetingGuilds {
+        creator: Guild
+        others?: Guild[]
     }
 
     /**
@@ -167,11 +172,10 @@ export namespace Event {
      * @category Event
      */
     export interface Event {
-        id?: Integer.IntLike
-        global?: boolean
-        competingGuilds: CompetingGuild[]
+        id?: number
         name: string
         when: When
+        guilds: CompetingGuilds
         teams: Team[]
         tracker: Tracker
     }

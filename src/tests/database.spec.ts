@@ -1,10 +1,10 @@
 import { describe, it, utils, } from 'mocha';
 import { assert, expect, } from 'chai';
 import pgp from 'pg-promise';
+import { async, } from 'rxjs/internal/scheduler/async';
 import { Event, } from '../event';
 import { Db2, } from '../database';
 import { Utils, } from '../utils';
-import { async } from 'rxjs/internal/scheduler/async';
 
 const accountA: Event.CompetitiveAccount = {
     rsn: 'rsn1',
@@ -347,11 +347,11 @@ const accountA: Event.CompetitiveAccount = {
 };
 
 const insertEventA: Event.Event = {
-    competingGuilds: [
-        {
+    guilds: {
+        creator: {
             discordId: 'testA',
         },
-    ],
+    },
     when: {
         start: new Date('9999-12-31T23:00:00.000Z'),
         end: new Date('9999-12-31T23:59:00.000Z'),
@@ -364,8 +364,8 @@ const insertEventA: Event.Event = {
 };
 
 const insertEventB: Event.Event = {
-    competingGuilds: [
-        {
+    guilds: {
+        creator: {
             discordId: 'testE',
             guildMessages: {
                 scoreboardMessage: {
@@ -378,20 +378,22 @@ const insertEventB: Event.Event = {
                 },
             },
         },
-        {
-            discordId: 'testA',
-            guildMessages: {
-                scoreboardMessage: {
-                    channelId: 'testB',
-                    messageId: 'testE',
-                },
-                statusMessage: {
-                    channelId: 'testB',
-                    messageId: 'testF',
+        others: [
+            {
+                discordId: 'testA',
+                guildMessages: {
+                    scoreboardMessage: {
+                        channelId: 'testB',
+                        messageId: 'testE',
+                    },
+                    statusMessage: {
+                        channelId: 'testB',
+                        messageId: 'testF',
+                    },
                 },
             },
-        },
-    ],
+        ],
+    },
     name: 'test event B',
     when: {
         start: new Date('1970-01-01T00:00:00.000Z'),
@@ -461,39 +463,19 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Insert event', async (): Promise<void> => {
-        let idA: number;
-        let idB: number;
+        let idA: {id: number};
+        let idB: {id: number};
         it('should not throw an error.', async (): Promise<void> => {
-            idB = await Db2.insertEvent(Db2.testDb, insertEventB);
-            idA = await Db2.insertEvent(Db2.testDb, insertEventA);
+            idB = await Db2.insertOrUpdateEvent(Db2.testDb, insertEventB);
+            idA = await Db2.insertOrUpdateEvent(Db2.testDb, insertEventA);
+            insertEventA.id = idA.id;
+            insertEventB.id = idB.id;
         });
         it('should have uniquely defined row values.', (): void => {
             assert(idA !== null && idA !== undefined);
             assert(idB !== null && idB !== undefined);
             assert(idA !== idB);
         });
-        // it('should fail when event name is null.', async (): Promise<void> => {
-        //     const event: Event.Event = {
-        //         ...insertEventA,
-        //         name: null,
-        //     };
-        //     let failed = false;
-        //     await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-        //         failed = true;
-        //     });
-        //     assert(failed);
-        // });
-        // it('should fail when event name is undefined.', async (): Promise<void> => {
-        //     const event: Event.Event = {
-        //         ...insertEventA,
-        //         name: undefined,
-        //     };
-        //     let failed = false;
-        //     await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-        //         failed = true;
-        //     });
-        //     assert(failed);
-        // });
         it('should fail when starting date is greater than ending date.', async (): Promise<void> => {
             const event: Event.Event = {
                 ...insertEventA,
@@ -503,7 +485,7 @@ describe('Postgres Database', (): void => {
                 },
             };
             let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
+            await Db2.insertOrUpdateEvent(Db2.testDb, event).catch((): void => {
                 failed = true;
             });
             assert(failed);
@@ -517,18 +499,7 @@ describe('Postgres Database', (): void => {
                 },
             };
             let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-                failed = true;
-            });
-            assert(failed);
-        });
-        it('should fail when no guilds inserted.', async (): Promise<void> => {
-            const event: Event.Event = {
-                ...insertEventA,
-                competingGuilds: [],
-            };
-            let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
+            await Db2.insertOrUpdateEvent(Db2.testDb, event).catch((): void => {
                 failed = true;
             });
             assert(failed);
@@ -544,13 +515,23 @@ describe('Postgres Database', (): void => {
                 ],
             };
             let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
+            await Db2.insertOrUpdateEvent(Db2.testDb, event).catch((): void => {
                 failed = true;
             });
             assert(failed);
         });
     });
-    describe('Fetching all guild events', async (): Promise<void> => {
+    describe('Update event', async (): Promise<void> => {
+        let idB: {id: number};
+        it('should not throw an error.', async (): Promise<void> => {
+            insertEventB.name = 'updated event B';
+            idB = await Db2.insertOrUpdateEvent(Db2.testDb, insertEventB);
+        });
+        it('should have same id as event updated.', async (): Promise<void> => {
+            assert(idB.id === insertEventB.id);
+        });
+    });
+    describe('Fetch all guild events', async (): Promise<void> => {
         let fetchedEvents: Event.Event[];
         it('should return a list of events.', async (): Promise<void> => {
             fetchedEvents = await Db2.fetchAllGuildEvents(Db2.testDb, 'testA');
@@ -562,6 +543,18 @@ describe('Postgres Database', (): void => {
             assert(fetchedEvents[0].id !== null && fetchedEvents[0].id !== undefined);
             assert(fetchedEvents[1].id !== null && fetchedEvents[1].id !== undefined);
             assert(fetchedEvents[0].id !== fetchedEvents[1].id);
+        });
+    });
+    describe('Fetching owned guild events', async (): Promise<void> => {
+        let fetchedEvents: Event.Event[];
+        it('should return a list of events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchAllGuildOwnedEvents(Db2.testDb, 'testA');
+        });
+        it('should return one event.', (): void => {
+            assert(fetchedEvents.length === 1);
+        });
+        it('should both have a uniquely defined id.', (): void => {
+            assert(fetchedEvents[0].id !== null && fetchedEvents[0].id !== undefined);
         });
     });
     describe('Fetching all participant\'s events', async (): Promise<void> => {

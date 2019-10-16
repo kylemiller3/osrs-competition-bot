@@ -1,9 +1,9 @@
-import pgp, { TableName } from 'pg-promise';
+import pgp from 'pg-promise';
 // eslint-disable-next-line import/no-unresolved
 import pg from 'pg-promise/typescript/pg-subset';
+import { async, } from 'rxjs/internal/scheduler/async';
 import { Utils, } from './utils';
 import { Event, } from './event';
-import { async } from 'rxjs/internal/scheduler/async';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db2 {
@@ -14,11 +14,8 @@ export namespace Db2 {
 
     enum EVENTS_COL {
         ID = 'id',
-        DISCORD_GUILD_ID = 'discord_guild_id',
         EVENT = 'event',
     }
-
-    const GLOBAL_KEY = 'global';
 
     export const initOptions: pgp.IInitOptions = {
         capSQL: true,
@@ -106,25 +103,25 @@ export namespace Db2 {
         async (task: pgp.ITask<unknown>):
         Promise<void> => {
             task.none({
+                text: 'CREATE OR REPLACE FUNCTION '
+                + 'f_cast_isots(text) '
+                + 'RETURNS timestamptz AS '
+                + '$$SELECT to_timestamp($1, \'YYYY-MM-DDTHH24:MI\')$$ '
+                + 'LANGUAGE sql IMMUTABLE',
+            });
+            task.none({
                 text: 'CREATE TABLE IF NOT EXISTS '
                         + `${TABLES.EVENTS}`
                         + '('
-                            + `${EVENTS_COL.ID} SERIAL NOT NULL, `
-                            + `${EVENTS_COL.DISCORD_GUILD_ID} TEXT NOT NULL, `
-                            + `${EVENTS_COL.EVENT} JSONB NOT NULL, `
-                            + 'PRIMARY KEY'
-                            + '('
-                                + `${EVENTS_COL.ID}, ${EVENTS_COL.DISCORD_GUILD_ID}`
-                            + ')'
+                            + `${EVENTS_COL.ID} SERIAL PRIMARY KEY, `
+                            + `${EVENTS_COL.EVENT} JSONB NOT NULL `
                         + ')',
             });
             task.none({
                 text: 'CREATE INDEX idx_name ON '
                         + `${TABLES.EVENTS}`
                         + '('
-                            + '('
-                                + `${EVENTS_COL.EVENT}->>'name'`
-                            + ')'
+                            + `(${EVENTS_COL.EVENT}->>'name')`
                         + ')',
 
             });
@@ -132,48 +129,54 @@ export namespace Db2 {
                 text: 'CREATE INDEX idx_start ON '
                         + `${TABLES.EVENTS}`
                         + '('
+                            + 'f_cast_isots'
                             + '('
-                                + `${EVENTS_COL.EVENT}->'when'->>'start'`
+                                + `(${EVENTS_COL.EVENT}->'when'->>'start')`
                             + ')'
                         + ')',
-
             });
             task.none({
                 text: 'CREATE INDEX idx_end ON '
                         + `${TABLES.EVENTS}`
                         + '('
+                            + 'f_cast_isots'
                             + '('
-                                + `${EVENTS_COL.EVENT}->'when'->>'end'`
+                                + `(${EVENTS_COL.EVENT}->'when'->>'end')`
                             + ')'
                         + ')',
-
             });
             task.none({
-                text: 'CREATE INDEX idx_guilds ON '
+                text: 'CREATE INDEX idx_creator_guild_id ON '
                         + `${TABLES.EVENTS}`
                         + '('
-                            + '('
-                                + `${EVENTS_COL.EVENT}->'competingGuilds'->>'discordId'`
-                            + ')'
+                            + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId')`
                         + ')',
-
+            });
+            task.none({
+                text: 'CREATE INDEX idx_other_guilds ON '
+                        + `${TABLES.EVENTS} `
+                        + 'USING gin '
+                        + '('
+                            + `(${EVENTS_COL.EVENT}->'guilds'->'others')`
+                            + ' jsonb_path_ops'
+                        + ')',
             });
             task.none({
                 text: 'CREATE INDEX idx_participants ON '
                         + `${TABLES.EVENTS} `
                         + 'USING gin '
                         + '('
-                            + '('
-                                + `${EVENTS_COL.EVENT}->'teams'->'participants->>discordId'`
-                            + ')'
+                            + `(${EVENTS_COL.EVENT}->'teams'->'participants')`
                             + ' jsonb_path_ops'
                         + ')',
-
             });
             task.none({
                 text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
-                    + `ADD CONSTRAINT name_is_defined CHECK (${EVENTS_COL.EVENT} ? 'name' AND NOT ${EVENTS_COL.EVENT}->>'name' IS NULL)`,
+                    + 'ADD CONSTRAINT name_is_defined CHECK '
+                    + '('
+                        + `(${EVENTS_COL.EVENT} ? 'name' AND NOT ${EVENTS_COL.EVENT}->>'name' IS NULL)`
+                    + ')',
             });
             task.none({
                 text: 'ALTER TABLE '
@@ -196,17 +199,10 @@ export namespace Db2 {
             task.none({
                 text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
-                    + 'ADD CONSTRAINT one_or_more_guilds CHECK '
+                    + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
                     + '('
-                        + `jsonb_array_length(${EVENTS_COL.EVENT}->'competingGuilds') > 0`
-                    + ')',
-            });
-            task.none({
-                text: 'ALTER TABLE '
-                    + `${TABLES.EVENTS} `
-                    + 'ADD CONSTRAINT guild_id_is_defined CHECK '
-                    + '('
-                        + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$.competingGuilds[*].discordId')`
+                        // + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$.competingGuilds[*].discordId')`
+                        + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'discordId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' IS NULL`
                     + ')',
             });
             task.none({
@@ -214,39 +210,42 @@ export namespace Db2 {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT teams_have_participant CHECK '
                     + '('
-                        + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? (@.teams.size() == 0 || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
+                        + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? ((@.teams.type() == "array" && @.teams.size() == 0) || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
                     + ')',
             });
         }
     );
 
-    export const insertEvent = (
+    export const insertNewEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'insert new event',
+        text: `INSERT INTO ${TABLES.EVENTS} (${EVENTS_COL.EVENT}) VALUES ($1) RETURNING ${EVENTS_COL.ID}`,
+    });
+    export const updateEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'update event',
+        text: `UPDATE ${TABLES.EVENTS} SET ${EVENTS_COL.EVENT} = $2 WHERE ${EVENTS_COL.ID} = $1 RETURNING ${EVENTS_COL.ID}`,
+    });
+    export const insertOrUpdateEvent = (
         db: pgp.IDatabase<unknown>,
         event: Event.Event,
-    ): Promise<number> => db.one({
-        text: 'INSERT INTO '
-            + `${TABLES.EVENTS}`
-            + '('
-                + `${EVENTS_COL.DISCORD_GUILD_ID}, `
-                + `${EVENTS_COL.EVENT} `
-            + ')'
-            + 'VALUES'
-            + '('
-                // eslint-disable-next-line no-nested-ternary
-                + `'${event.global
-                    ? GLOBAL_KEY
-                    : event.competingGuilds.length > 0
-                        ? event.competingGuilds[0].discordId
-                        : null
-                }', `
-                + `'${JSON.stringify(event)}'`
-            + ')'
-            // + `ON CONFLICT (${EVENTS_COL.DISCORD_GUILD_ID}, ${EVENTS_COL.ID}) DO UPDATE `
-            // + `SET ${EVENTS_COL.EVENT} = ${event} `
-            + `RETURNING ${EVENTS_COL.ID}`,
-    });
+    ): Promise<{id: number}> => {
+        if (event.id === undefined) {
+            insertNewEventStmt.values = [
+                JSON.stringify(event),
+            ];
+            return db.one(
+                insertNewEventStmt,
+            );
+        }
+        updateEventStmt.values = [
+            event.id,
+            JSON.stringify(event),
+        ];
+        return db.one(
+            updateEventStmt,
+        );
+    };
 
-    export const fetchAllGuildEvents = async (
+    export const fetchAllGuildOwnedEvents = (
         db: pgp.IDatabase<unknown>,
         guildId: string,
     ): Promise<Event.Event[]> => db.manyOrNone({
@@ -256,12 +255,35 @@ export namespace Db2 {
         + 'FROM '
         + `${TABLES.EVENTS} `
         + 'WHERE '
-        + `${EVENTS_COL.DISCORD_GUILD_ID} = '${guildId}' `
-        + 'OR '
-        + `${EVENTS_COL.EVENT}->'competingGuilds' @> '[{"discordId":"${guildId}"}]'`,
+        + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = '${guildId}'`,
     });
 
-    export const deleteGuildEvent = async (
+    export const fetchAllGuildEvents = (
+        db: pgp.IDatabase<unknown>,
+        guildId: string,
+    ): Promise<Event.Event[]> => db.manyOrNone({
+        text: 'SELECT '
+        + `${EVENTS_COL.ID}, `
+        + `${EVENTS_COL.EVENT} `
+        + 'FROM '
+        + `${TABLES.EVENTS} `
+        + 'WHERE '
+        + `${EVENTS_COL.EVENT}->'guilds'->'others' @> '[{"discordId":"${guildId}"}]'`
+        + ' OR '
+        + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = '${guildId}'`,
+    });
+
+    export const fetchAllEvents = (
+        db: pgp.IDatabase<unknown>,
+    ): Promise<Event.Event[]> => db.manyOrNone({
+        text: 'SELECT '
+        + `${EVENTS_COL.ID}, `
+        + `${EVENTS_COL.EVENT} `
+        + 'FROM '
+        + `${TABLES.EVENTS} `,
+    });
+
+    export const deleteGuildEvent = (
         db: pgp.IDatabase<unknown>,
         guildId: string,
         eventId: number,
@@ -269,12 +291,10 @@ export namespace Db2 {
         text: 'DELETE FROM '
             + `${TABLES.EVENTS}`
             + ' WHERE '
-            + `${EVENTS_COL.ID} = '${eventId}'`
-            + ' AND '
-            + `${EVENTS_COL.DISCORD_GUILD_ID} = '${guildId}'`,
+            + `${EVENTS_COL.ID} = '${eventId}'`,
     });
 
-    export const fetchAllAParticipantsEvents = async (
+    export const fetchAllAParticipantsEvents = (
         db: pgp.IDatabase<unknown>,
         discordId: string,
     ): Promise<Event.Event[]> => db.manyOrNone({
@@ -288,7 +308,7 @@ export namespace Db2 {
         + `teams->'participants' @> '[{"discordId":"${discordId}"}]'`,
     });
 
-    export const fetchEventsStartingBetweenDates = async (
+    export const fetchEventsStartingBetweenDates = (
         db: pgp.IDatabase<unknown>,
         dateA: Date,
         dateB: Date,
