@@ -5,4 +5,5 @@ docs
 auth.json
 *.log
 *.out
+*.db
 !.gitignore

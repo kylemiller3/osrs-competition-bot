@@ -1,4 +1,5 @@
 import * as log4js from 'log4js';
+import { utils } from 'mocha';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
@@ -97,6 +98,13 @@ export namespace Utils {
         logger.error(error.message);
     };
 
+    // process.on('exit', (): void => {
+
+    // });
+    // process.on('SIGHUP', (): void => process.exit(128 + 1));
+    // process.on('SIGINT', (): void => process.exit(128 + 2));
+    // process.on('SIGTERM', (): void => process.exit(128 + 15));
+
     process.on(
         'uncaughtException',
         (error: Error):
@@ -110,4 +118,10 @@ export namespace Utils {
             );
         }
     );
+
+    // process.on('unhandledRejection',
+    //     (up: Error):
+    //     void => {
+    //         throw up;
+    //     });
 }

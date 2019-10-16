@@ -1,6 +1,7 @@
 import {
     hiscores,
 } from 'osrs-json-api';
+import Integer from 'integer';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
@@ -70,7 +71,6 @@ export namespace Event {
      * @category Event
      */
     export interface Participant {
-        id?: number
         discordId: string
         customScore: number
         runescapeAccounts: Account[]
@@ -81,7 +81,6 @@ export namespace Event {
      * @category Event
      */
     export interface Account {
-        id?: number
         rsn: string
     }
 
@@ -114,8 +113,7 @@ export namespace Event {
      * @category Event
      */
     export interface Team {
-        id?: number
-        name: string
+        name?: string
         participants: Participant[]
     }
 
@@ -160,7 +158,6 @@ export namespace Event {
      * @category Event
      */
     export interface CompetingGuild {
-        id?: number
         discordId: string
         guildMessages?: GuildMessages
     }
@@ -170,12 +167,13 @@ export namespace Event {
      * @category Event
      */
     export interface Event {
-        id?: number // database id
-        competingGuilds: CompetingGuild[] // info necessary to manage a tracked guild
-        name: string // name of the event
-        when?: When // when the event starts and ends
-        teams: Team[] // the team (or participants) of the event (can be cross guild)
-        tracker?: Tracker // what is being tracked if anything
+        id?: Integer.IntLike
+        global?: boolean
+        competingGuilds: CompetingGuild[]
+        name: string
+        when: When
+        teams: Team[]
+        tracker: Tracker
     }
 
     /**
