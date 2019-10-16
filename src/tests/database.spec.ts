@@ -4,173 +4,174 @@ import pgp from 'pg-promise';
 import { Event, } from '../event';
 import { Db2, } from '../database';
 import { Utils, } from '../utils';
+import { async } from 'rxjs/internal/scheduler/async';
 
 const accountA: Event.CompetitiveAccount = {
     rsn: 'rsn1',
     starting: {
         skills: {
             overall: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 0,
             },
             attack: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 1,
             },
             strength: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 2,
             },
             defence: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 3,
             },
             ranged: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 4,
             },
             prayer: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 5,
             },
             magic: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 6,
             },
             runecraft: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 7,
             },
             construction: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 8,
             },
             hitpoints: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 9,
             },
             agility: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 10,
             },
             herblore: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 11,
             },
             thieving: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 12,
             },
             crafting: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 13,
             },
             fletching: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 14,
             },
             slayer: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 15,
             },
             hunter: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 16,
             },
             mining: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 17,
             },
             smithing: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 18,
             },
             fishing: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 19,
             },
             cooking: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 20,
             },
             firemaking: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 21,
             },
             woodcutting: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 22,
             },
             farming: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 23,
             },
         },
         bh: {
             rogue: {
-                rank: null,
+                rank: -1,
                 score: 24,
             },
             hunter: {
-                rank: null,
+                rank: -1,
                 score: 25,
             },
         },
         lms: {
-            rank: null,
+            rank: -1,
             score: 26,
         },
         clues: {
             all: {
-                rank: null,
+                rank: -1,
                 score: 26,
             },
             beginner: {
-                rank: null,
+                rank: -1,
                 score: 27,
             },
             easy: {
-                rank: null,
+                rank: -1,
                 score: 28,
             },
             medium: {
-                rank: null,
+                rank: -1,
                 score: 29,
             },
             hard: {
-                rank: null,
+                rank: -1,
                 score: 30,
             },
             elite: {
-                rank: null,
+                rank: -1,
                 score: 31,
             },
             master: {
-                rank: null,
+                rank: -1,
                 score: 32,
             },
         },
@@ -178,167 +179,167 @@ const accountA: Event.CompetitiveAccount = {
     ending: {
         skills: {
             overall: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 33,
             },
             attack: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 34,
             },
             strength: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 35,
             },
             defence: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 36,
             },
             ranged: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 37,
             },
             prayer: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 38,
             },
             magic: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 39,
             },
             runecraft: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 40,
             },
             construction: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 41,
             },
             hitpoints: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 42,
             },
             agility: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 43,
             },
             herblore: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 44,
             },
             thieving: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 45,
             },
             crafting: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 46,
             },
             fletching: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 47,
             },
             slayer: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 48,
             },
             hunter: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 49,
             },
             mining: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 50,
             },
             smithing: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 51,
             },
             fishing: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 52,
             },
             cooking: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 53,
             },
             firemaking: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 54,
             },
             woodcutting: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 55,
             },
             farming: {
-                rank: null,
-                level: null,
+                rank: '-1',
+                level: -1,
                 xp: 56,
             },
         },
         bh: {
             rogue: {
-                rank: null,
+                rank: -1,
                 score: 57,
             },
             hunter: {
-                rank: null,
+                rank: -1,
                 score: 58,
             },
         },
         lms: {
-            rank: null,
+            rank: -1,
             score: 59,
         },
         clues: {
             all: {
-                rank: null,
+                rank: -1,
                 score: 60,
             },
             beginner: {
-                rank: null,
+                rank: -1,
                 score: 61,
             },
             easy: {
-                rank: null,
+                rank: -1,
                 score: 62,
             },
             medium: {
-                rank: null,
+                rank: -1,
                 score: 63,
             },
             hard: {
-                rank: null,
+                rank: -1,
                 score: 64,
             },
             elite: {
-                rank: null,
+                rank: -1,
                 score: 65,
             },
             master: {
-                rank: null,
+                rank: -1,
                 score: 66,
             },
         },
@@ -445,7 +446,6 @@ describe('Postgres Database', (): void => {
         it('should not throw an error.', async (): Promise<void> => {
             connection = await Db2.testDb.connect();
         });
-        return null;
     });
     describe('Disconnect', (): void => {
         it('should not throw an error.', (): void => {
@@ -459,42 +459,41 @@ describe('Postgres Database', (): void => {
             });
             await Db2.createTable(Db2.testDb);
         });
-        return null;
     });
     describe('Insert event', async (): Promise<void> => {
         let idA: number;
         let idB: number;
         it('should not throw an error.', async (): Promise<void> => {
-            idA = await Db2.insertEvent(Db2.testDb, insertEventA);
             idB = await Db2.insertEvent(Db2.testDb, insertEventB);
+            idA = await Db2.insertEvent(Db2.testDb, insertEventA);
         });
         it('should have uniquely defined row values.', (): void => {
             assert(idA !== null && idA !== undefined);
             assert(idB !== null && idB !== undefined);
             assert(idA !== idB);
         });
-        it('should fail when event name is null.', async (): Promise<void> => {
-            const event: Event.Event = {
-                ...insertEventA,
-                name: null,
-            };
-            let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-                failed = true;
-            });
-            assert(failed);
-        });
-        it('should fail when event name is undefined.', async (): Promise<void> => {
-            const event: Event.Event = {
-                ...insertEventA,
-                name: undefined,
-            };
-            let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-                failed = true;
-            });
-            assert(failed);
-        });
+        // it('should fail when event name is null.', async (): Promise<void> => {
+        //     const event: Event.Event = {
+        //         ...insertEventA,
+        //         name: null,
+        //     };
+        //     let failed = false;
+        //     await Db2.insertEvent(Db2.testDb, event).catch((): void => {
+        //         failed = true;
+        //     });
+        //     assert(failed);
+        // });
+        // it('should fail when event name is undefined.', async (): Promise<void> => {
+        //     const event: Event.Event = {
+        //         ...insertEventA,
+        //         name: undefined,
+        //     };
+        //     let failed = false;
+        //     await Db2.insertEvent(Db2.testDb, event).catch((): void => {
+        //         failed = true;
+        //     });
+        //     assert(failed);
+        // });
         it('should fail when starting date is greater than ending date.', async (): Promise<void> => {
             const event: Event.Event = {
                 ...insertEventA,
@@ -534,13 +533,15 @@ describe('Postgres Database', (): void => {
             });
             assert(failed);
         });
-        it('should fail when start is null.', async (): Promise<void> => {
+        it('should fail when no participants for a team are inserted.', async (): Promise<void> => {
             const event: Event.Event = {
                 ...insertEventA,
-                when: {
-                    start: null,
-                    end: insertEventA.when.end,
-                },
+                teams: [
+                    {
+                        name: 'test',
+                        participants: [],
+                    },
+                ],
             };
             let failed = false;
             await Db2.insertEvent(Db2.testDb, event).catch((): void => {
@@ -548,49 +549,6 @@ describe('Postgres Database', (): void => {
             });
             assert(failed);
         });
-        it('should fail when start is undefined.', async (): Promise<void> => {
-            const event: Event.Event = {
-                ...insertEventA,
-                when: {
-                    start: undefined,
-                    end: insertEventA.when.end,
-                },
-            };
-            let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-                failed = true;
-            });
-            assert(failed);
-        });
-        it('should fail when end is null.', async (): Promise<void> => {
-            const event: Event.Event = {
-                ...insertEventA,
-                when: {
-                    start: insertEventA.when.start,
-                    end: null,
-                },
-            };
-            let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-                failed = true;
-            });
-            assert(failed);
-        });
-        it('should fail when end is undefined.', async (): Promise<void> => {
-            const event: Event.Event = {
-                ...insertEventA,
-                when: {
-                    start: insertEventA.when.start,
-                    end: undefined,
-                },
-            };
-            let failed = false;
-            await Db2.insertEvent(Db2.testDb, event).catch((): void => {
-                failed = true;
-            });
-            assert(failed);
-        });
-        return null;
     });
     describe('Fetching all guild events', async (): Promise<void> => {
         let fetchedEvents: Event.Event[];
@@ -605,7 +563,6 @@ describe('Postgres Database', (): void => {
             assert(fetchedEvents[1].id !== null && fetchedEvents[1].id !== undefined);
             assert(fetchedEvents[0].id !== fetchedEvents[1].id);
         });
-        return null;
     });
     describe('Fetching all participant\'s events', async (): Promise<void> => {
         let fetchedEvents: Event.Event[];
@@ -615,10 +572,9 @@ describe('Postgres Database', (): void => {
         it('should return one event.', (): void => {
             assert(fetchedEvents.length === 1);
         });
-        return null;
     });
+    let fetchedEvents: Event.Event[];
     describe('Fetch all events between dates', async (): Promise<void> => {
-        let fetchedEvents: Event.Event[];
         it('should return a list of events.', async (): Promise<void> => {
             fetchedEvents = await Db2.fetchEventsStartingBetweenDates(
                 Db2.testDb,
@@ -630,12 +586,16 @@ describe('Postgres Database', (): void => {
             assert(fetchedEvents.length === 1);
         });
     });
+    describe('Delete event', async (): Promise<void> => {
+        it('should not throw an error.', async (): Promise<void> => {
+            await Db2.deleteGuildEvent(Db2.testDb, 'testE', fetchedEvents[0].id as number);
+        });
+    });
     describe('Clean up', async (): Promise<void> => {
         it('should drop events table.', async (): Promise<void> => {
             await Db2.testDb.none({
                 text: 'DROP TABLE events',
             });
         });
-        return null;
     });
 });

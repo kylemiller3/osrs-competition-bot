@@ -1,5 +1,4 @@
 import * as log4js from 'log4js';
-import { utils } from 'mocha';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
@@ -112,7 +111,6 @@ export namespace Utils {
             logger.fatal(error);
             log4js.shutdown(
                 (err: Error): void => {
-                    console.log(`Shutdown: ${err}`);
                     process.exit(1);
                 }
             );

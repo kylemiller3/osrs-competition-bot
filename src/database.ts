@@ -1,8 +1,9 @@
-import pgp from 'pg-promise';
+import pgp, { TableName } from 'pg-promise';
 // eslint-disable-next-line import/no-unresolved
 import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
+import { async } from 'rxjs/internal/scheduler/async';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db2 {
@@ -103,7 +104,7 @@ export namespace Db2 {
         db: pgp.IDatabase<unknown>,
     ): Promise<unknown> => db.tx(
         async (task: pgp.ITask<unknown>):
-        Promise<unknown> => {
+        Promise<void> => {
             task.none({
                 text: 'CREATE TABLE IF NOT EXISTS '
                         + `${TABLES.EVENTS}`
@@ -200,26 +201,22 @@ export namespace Db2 {
                         + `jsonb_array_length(${EVENTS_COL.EVENT}->'competingGuilds') > 0`
                     + ')',
             });
-            // task.none({
-            //     text: 'ALTER TABLE '
-            //         + `${TABLES.EVENTS} `
-            //         + 'ADD CONSTRAINT guild_id_is_defined CHECK '
-            //         + '('
-            //             + `${EVENTS_COL.EVENT}->'competingGuilds'->0 ? 'discordId'`
-            //         + ')',
-            // });
-
-            // ?????
-            // task.none({
-            //     text: 'ALTER TABLE '
-            //         + `${TABLES.EVENTS} `
-            //         + 'ADD CONSTRAINT one_or_more_team_members_per_team CHECK '
-            //         + '('
-            //             + `jsonb_array_length(${EVENTS_COL.EVENT}->'teams'->'participants') > 0`
-            //         + ')',
-            // });
-
-            return null;
+            task.none({
+                text: 'ALTER TABLE '
+                    + `${TABLES.EVENTS} `
+                    + 'ADD CONSTRAINT guild_id_is_defined CHECK '
+                    + '('
+                        + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$.competingGuilds[*].discordId')`
+                    + ')',
+            });
+            task.none({
+                text: 'ALTER TABLE '
+                    + `${TABLES.EVENTS} `
+                    + 'ADD CONSTRAINT teams_have_participant CHECK '
+                    + '('
+                        + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? (@.teams.size() == 0 || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
+                    + ')',
+            });
         }
     );
 
@@ -244,6 +241,8 @@ export namespace Db2 {
                 }', `
                 + `'${JSON.stringify(event)}'`
             + ')'
+            // + `ON CONFLICT (${EVENTS_COL.DISCORD_GUILD_ID}, ${EVENTS_COL.ID}) DO UPDATE `
+            // + `SET ${EVENTS_COL.EVENT} = ${event} `
             + `RETURNING ${EVENTS_COL.ID}`,
     });
 
@@ -260,6 +259,19 @@ export namespace Db2 {
         + `${EVENTS_COL.DISCORD_GUILD_ID} = '${guildId}' `
         + 'OR '
         + `${EVENTS_COL.EVENT}->'competingGuilds' @> '[{"discordId":"${guildId}"}]'`,
+    });
+
+    export const deleteGuildEvent = async (
+        db: pgp.IDatabase<unknown>,
+        guildId: string,
+        eventId: number,
+    ): Promise<null> => db.none({
+        text: 'DELETE FROM '
+            + `${TABLES.EVENTS}`
+            + ' WHERE '
+            + `${EVENTS_COL.ID} = '${eventId}'`
+            + ' AND '
+            + `${EVENTS_COL.DISCORD_GUILD_ID} = '${guildId}'`,
     });
 
     export const fetchAllAParticipantsEvents = async (

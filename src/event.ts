@@ -237,8 +237,8 @@ export namespace Event {
     export const findEventById = (
         events: Event[],
         eventIdToSearch: number,
-    ): Event => {
-        const foundEvent: Event = events.find(
+    ): Event | undefined => {
+        const foundEvent: Event | undefined = events.find(
             (event: Event):
             boolean => event.id === eventIdToSearch
         );

@@ -1,8 +1,8 @@
 import * as discord from 'discord.js';
+import { hiscores, } from 'osrs-json-api';
 import { Command, } from '../command';
 import { spoofMessage, } from '../main';
-import { Event } from '../event';
-import { hiscores } from 'osrs-json-api';
+import { Event, } from '../event';
 
 /**
  * See [[Event.Tracking]] structure
@@ -305,7 +305,6 @@ const usersStats = (
             msg,
             msg.mentions.users.array()[0],
         );
-        return;
     }
 };
 
