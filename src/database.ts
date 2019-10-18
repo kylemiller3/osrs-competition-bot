@@ -1,7 +1,6 @@
-import pgp from 'pg-promise';
+import pgp, { PreparedStatement, } from 'pg-promise';
 // eslint-disable-next-line import/no-unresolved
 import pg from 'pg-promise/typescript/pg-subset';
-import { async, } from 'rxjs/internal/scheduler/async';
 import { Utils, } from './utils';
 import { Event, } from './event';
 
@@ -71,8 +70,10 @@ export namespace Db2 {
             }
             if (event.query) {
                 // query string is available
+                Utils.logger.error('Query: ', event.query);
                 if (event.params) {
                     // query parameters are available
+                    Utils.logger.error('Params: ', event.params);
                 }
             }
             if (event.ctx) {
@@ -184,7 +185,7 @@ export namespace Db2 {
                     + 'ADD CONSTRAINT valid_dates CHECK '
                     + '('
                         + '('
-                            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp < (${EVENTS_COL.EVENT}->'when'->>'end')::timestamp `
+                            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp < ((${EVENTS_COL.EVENT}->'when'->>'end')::timestamp + (60 || 'minutes')::interval)`
                             + 'AND '
                             + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp > NOW()`
                         + ')'
@@ -201,7 +202,6 @@ export namespace Db2 {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
                     + '('
-                        // + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$.competingGuilds[*].discordId')`
                         + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'discordId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' IS NULL`
                     + ')',
             });
@@ -218,113 +218,191 @@ export namespace Db2 {
 
     export const insertNewEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'insert new event',
-        text: `INSERT INTO ${TABLES.EVENTS} (${EVENTS_COL.EVENT}) VALUES ($1) RETURNING ${EVENTS_COL.ID}`,
+        text: `INSERT INTO ${TABLES.EVENTS} `
+        + `(${EVENTS_COL.EVENT}) `
+        + 'VALUES '
+        + '($1) '
+        + `RETURNING ${EVENTS_COL.ID}`,
     });
     export const updateEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'update event',
-        text: `UPDATE ${TABLES.EVENTS} SET ${EVENTS_COL.EVENT} = $2 WHERE ${EVENTS_COL.ID} = $1 RETURNING ${EVENTS_COL.ID}`,
+        text: `UPDATE ${TABLES.EVENTS} `
+        + 'SET '
+        + `${EVENTS_COL.EVENT} = $2 `
+        + 'WHERE '
+        + `${EVENTS_COL.ID} = $1 `
+        + `RETURNING ${EVENTS_COL.ID}`,
     });
     export const insertOrUpdateEvent = (
         db: pgp.IDatabase<unknown>,
         event: Event.Event,
     ): Promise<{id: number}> => {
         if (event.id === undefined) {
-            insertNewEventStmt.values = [
-                JSON.stringify(event),
-            ];
             return db.one(
                 insertNewEventStmt,
+                JSON.stringify(event),
             );
         }
-        updateEventStmt.values = [
-            event.id,
-            JSON.stringify(event),
-        ];
         return db.one(
             updateEventStmt,
+            [
+                event.id,
+                JSON.stringify(event),
+            ],
         );
     };
 
-    export const fetchAllGuildOwnedEvents = (
+    const fetchAllEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch all events',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS}`,
+    });
+    export const fetchAllEvents = (
+        db: pgp.IDatabase<unknown>,
+    ): Promise<Event.Event[]> => db.manyOrNone(
+        fetchAllEventsStmt,
+    );
+
+    const fetchAllCreatorGuildsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch all owned events',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1`,
+    });
+    export const fetchCreatorEvents = (
         db: pgp.IDatabase<unknown>,
         guildId: string,
-    ): Promise<Event.Event[]> => db.manyOrNone({
-        text: 'SELECT '
-        + `${EVENTS_COL.ID}, `
-        + `${EVENTS_COL.EVENT} `
-        + 'FROM '
-        + `${TABLES.EVENTS} `
-        + 'WHERE '
-        + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = '${guildId}'`,
-    });
+    ): Promise<Event.Event[]> => db.manyOrNone(
+        fetchAllCreatorGuildsStmt,
+        guildId,
+    );
 
+    const fetchAllGuildStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch all guild events',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
+            + 'OR '
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`,
+    });
     export const fetchAllGuildEvents = (
         db: pgp.IDatabase<unknown>,
         guildId: string,
-    ): Promise<Event.Event[]> => db.manyOrNone({
+    ): Promise<Event.Event[]> => db.manyOrNone(
+        fetchAllGuildStmt,
+        [
+            guildId,
+        ],
+    );
+
+    const fetchAllOfAParticipantsEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch a participant\'s events',
         text: 'SELECT '
-        + `${EVENTS_COL.ID}, `
-        + `${EVENTS_COL.EVENT} `
-        + 'FROM '
-        + `${TABLES.EVENTS} `
-        + 'WHERE '
-        + `${EVENTS_COL.EVENT}->'guilds'->'others' @> '[{"discordId":"${guildId}"}]'`
-        + ' OR '
-        + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = '${guildId}'`,
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS}, `
+            + `jsonb_array_elements(${EVENTS_COL.EVENT}->'teams') teams `
+            + 'WHERE '
+            + 'teams->\'participants\' @> jsonb_build_array(jsonb_build_object(\'discordId\', $1::text))',
     });
-
-    export const fetchAllEvents = (
-        db: pgp.IDatabase<unknown>,
-    ): Promise<Event.Event[]> => db.manyOrNone({
-        text: 'SELECT '
-        + `${EVENTS_COL.ID}, `
-        + `${EVENTS_COL.EVENT} `
-        + 'FROM '
-        + `${TABLES.EVENTS} `,
-    });
-
-    export const deleteGuildEvent = (
-        db: pgp.IDatabase<unknown>,
-        guildId: string,
-        eventId: number,
-    ): Promise<null> => db.none({
-        text: 'DELETE FROM '
-            + `${TABLES.EVENTS}`
-            + ' WHERE '
-            + `${EVENTS_COL.ID} = '${eventId}'`,
-    });
-
-    export const fetchAllAParticipantsEvents = (
+    export const fetchAllOfAParticipantsEvents = (
         db: pgp.IDatabase<unknown>,
         discordId: string,
-    ): Promise<Event.Event[]> => db.manyOrNone({
-        text: 'SELECT '
-        + `${EVENTS_COL.ID}, `
-        + `${EVENTS_COL.EVENT} `
-        + 'FROM '
-        + `${TABLES.EVENTS}, `
-        + `jsonb_array_elements(${EVENTS_COL.EVENT}->'teams') teams `
-        + 'WHERE '
-        + `teams->'participants' @> '[{"discordId":"${discordId}"}]'`,
-    });
+    ): Promise<Event.Event[]> => db.manyOrNone(
+        fetchAllOfAParticipantsEventsStmt,
+        discordId,
+    );
 
+    const eventsBetweenDatesStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch all between dates',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + '('
+                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamp`
+            + ')'
+                + ' OVERLAPS '
+            + '('
+                + '$1::timestamp, $2::timestamp'
+            + ')',
+    });
     export const fetchEventsStartingBetweenDates = (
         db: pgp.IDatabase<unknown>,
         dateA: Date,
         dateB: Date,
-    ): Promise<Event.Event[]> => db.manyOrNone({
+    ): Promise<Event.Event[]> => db.manyOrNone(
+        eventsBetweenDatesStmt,
+        [
+            dateA.toISOString(),
+            dateB.toISOString(),
+        ]
+    );
+
+    const guildEventsBetweenDatesStmt: pgp.PreparedStatement = new PreparedStatement({
+        name: 'fetch all guild events between dates',
         text: 'SELECT '
-        + `${EVENTS_COL.ID}, `
-        + `${EVENTS_COL.EVENT} `
-        + 'FROM '
-        + `${TABLES.EVENTS} `
-        + 'WHERE '
-        + '('
-            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamp`
-        + ')'
-        + ' OVERLAPS '
-        + '('
-            + `'${dateA.toISOString()}'::timestamp, '${dateB.toISOString()}'::timestamp`
-        + ')',
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + '('
+                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
+                + 'OR '
+                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`
+            + ') '
+            + 'AND '
+            + '('
+                + '('
+                    + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamp`
+                + ')'
+                + ' OVERLAPS '
+                + '('
+                    + '$2::timestamp, $3::timestamp'
+                + ')'
+            + ')',
     });
+    export const fetchAllGuildEventsBetweenDates = (
+        db: pgp.IDatabase<unknown>,
+        guildId: string,
+        dateA: Date,
+        dateB: Date,
+    ): Promise<Event.Event[]> => db.manyOrNone(
+        guildEventsBetweenDatesStmt,
+        [
+            guildId,
+            dateA.toISOString(),
+            dateB.toISOString(),
+        ],
+    );
+
+    const deleteEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'delete event',
+        text: 'DELETE FROM '
+            + `${TABLES.EVENTS}`
+            + ' WHERE '
+            + `${EVENTS_COL.ID} = $1`,
+    });
+    export const deleteEvent = (
+        db: pgp.IDatabase<unknown>,
+        eventId: number,
+    ): Promise<null> => db.none(
+        deleteEventStmt,
+        eventId,
+    );
 }

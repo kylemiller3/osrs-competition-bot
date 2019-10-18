@@ -13,7 +13,30 @@
             "preLaunchTask": "npm: build",
             "runtimeArgs": ["-r", "esm"],
             "stopOnEntry": true,
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Mocha Tests",
+            "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+            "args": [
+                "-u",
+                "tdd",
+                "--timeout",
+                "999999",
+                "--colors",
+                "--require",
+                "esm",
+                "--require",
+                "ts-node/register",
+                "--project",
+                "${workspaceFolder}/tsconfig.json",
+                "${workspaceFolder}/**/*spec.ts"
+            ],
+            "console": "integratedTerminal",
+            "stopOnEntry": false,
+            "port": 32165
         }
     ]
 }

@@ -1,7 +1,6 @@
-import { describe, it, utils, } from 'mocha';
-import { assert, expect, } from 'chai';
+import { describe, it, } from 'mocha';
+import { assert, } from 'chai';
 import pgp from 'pg-promise';
-import { async, } from 'rxjs/internal/scheduler/async';
 import { Event, } from '../event';
 import { Db2, } from '../database';
 import { Utils, } from '../utils';
@@ -368,10 +367,12 @@ const insertEventB: Event.Event = {
         creator: {
             discordId: 'testE',
             guildMessages: {
-                scoreboardMessage: {
-                    channelId: 'testB',
-                    messageId: 'testC',
-                },
+                scoreboardMessages: [
+                    {
+                        channelId: 'testB',
+                        messageId: 'testC',
+                    },
+                ],
                 statusMessage: {
                     channelId: 'testB',
                     messageId: 'testD',
@@ -382,10 +383,12 @@ const insertEventB: Event.Event = {
             {
                 discordId: 'testA',
                 guildMessages: {
-                    scoreboardMessage: {
-                        channelId: 'testB',
-                        messageId: 'testE',
-                    },
+                    scoreboardMessages: [
+                        {
+                            channelId: 'testB',
+                            messageId: 'testE',
+                        },
+                    ],
                     statusMessage: {
                         channelId: 'testB',
                         messageId: 'testF',
@@ -442,7 +445,7 @@ const insertEventB: Event.Event = {
 
 
 describe('Postgres Database', (): void => {
-    Utils.logger.level = 'error';
+    Utils.logger.level = 'fatal';
     let connection: pgp.IConnected<unknown>;
     describe('Connect', (): void => {
         it('should not throw an error.', async (): Promise<void> => {
@@ -504,6 +507,20 @@ describe('Postgres Database', (): void => {
             });
             assert(failed);
         });
+        it('should fail when starting and ending date is within 60 minutes.', async (): Promise<void> => {
+            const event: Event.Event = {
+                ...insertEventA,
+                when: {
+                    start: new Date(1000),
+                    end: new Date(1000 + 1000 * 60 * 60 - 1),
+                },
+            };
+            let failed = false;
+            await Db2.insertOrUpdateEvent(Db2.testDb, event).catch((): void => {
+                failed = true;
+            });
+            assert(failed);
+        });
         it('should fail when no participants for a team are inserted.', async (): Promise<void> => {
             const event: Event.Event = {
                 ...insertEventA,
@@ -531,6 +548,27 @@ describe('Postgres Database', (): void => {
             assert(idB.id === insertEventB.id);
         });
     });
+    describe('Fetch all events', async (): Promise<void> => {
+        let fetchedEvents: Event.Event[];
+        it('should return a list of events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchAllEvents(Db2.testDb);
+        });
+        it('should have two events.', (): void => {
+            assert(fetchedEvents.length === 2);
+        });
+    });
+    describe('Fetching owned guild events', async (): Promise<void> => {
+        let fetchedEvents: Event.Event[];
+        it('should return a list of events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchCreatorEvents(Db2.testDb, 'testA');
+        });
+        it('should return one event.', (): void => {
+            assert(fetchedEvents.length === 1);
+        });
+        it('should a defined id.', (): void => {
+            assert(fetchedEvents[0].id !== null && fetchedEvents[0].id !== undefined);
+        });
+    });
     describe('Fetch all guild events', async (): Promise<void> => {
         let fetchedEvents: Event.Event[];
         it('should return a list of events.', async (): Promise<void> => {
@@ -545,43 +583,80 @@ describe('Postgres Database', (): void => {
             assert(fetchedEvents[0].id !== fetchedEvents[1].id);
         });
     });
-    describe('Fetching owned guild events', async (): Promise<void> => {
-        let fetchedEvents: Event.Event[];
-        it('should return a list of events.', async (): Promise<void> => {
-            fetchedEvents = await Db2.fetchAllGuildOwnedEvents(Db2.testDb, 'testA');
-        });
-        it('should return one event.', (): void => {
-            assert(fetchedEvents.length === 1);
-        });
-        it('should both have a uniquely defined id.', (): void => {
-            assert(fetchedEvents[0].id !== null && fetchedEvents[0].id !== undefined);
-        });
-    });
     describe('Fetching all participant\'s events', async (): Promise<void> => {
         let fetchedEvents: Event.Event[];
         it('should return a list of events.', async (): Promise<void> => {
-            fetchedEvents = await Db2.fetchAllAParticipantsEvents(Db2.testDb, 'discord1');
+            fetchedEvents = await Db2.fetchAllOfAParticipantsEvents(Db2.testDb, 'discord1');
         });
         it('should return one event.', (): void => {
             assert(fetchedEvents.length === 1);
         });
     });
-    let fetchedEvents: Event.Event[];
     describe('Fetch all events between dates', async (): Promise<void> => {
+        let fetchedEvents: Event.Event[];
         it('should return a list of events.', async (): Promise<void> => {
             fetchedEvents = await Db2.fetchEventsStartingBetweenDates(
                 Db2.testDb,
                 new Date('1970-01-01T01:00:00.000Z'),
-                new Date('9999-12-31T01:00:00.000Z')
+                new Date('9999-12-31T01:00:00.000Z'),
             );
         });
         it('should return one event.', (): void => {
             assert(fetchedEvents.length === 1);
         });
+        it('should return two events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchEventsStartingBetweenDates(
+                Db2.testDb,
+                new Date('1970-01-01T00:00:00.000Z'),
+                new Date('9999-12-31T23:59:59.999Z'),
+            );
+            assert(fetchedEvents.length === 2);
+        });
+    });
+    describe('Fetch all guild events between dates', async (): Promise<void> => {
+        let fetchedEvents: Event.Event[];
+        it('should return a list of events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchAllGuildEventsBetweenDates(
+                Db2.testDb,
+                'testA',
+                new Date('9999-12-31T00:00:00.000Z'),
+                new Date('9999-12-31T23:59:59.999Z'),
+            );
+        });
+        it('should return one event.', (): void => {
+            assert(fetchedEvents.length === 1);
+        });
+        it('should return no events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchAllGuildEventsBetweenDates(
+                Db2.testDb,
+                'testA',
+                new Date('9999-12-31T23:59:58.999Z'),
+                new Date('9999-12-31T23:59:59.999Z'),
+            );
+            assert(fetchedEvents.length === 0);
+        });
+        it('should return one event.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchAllGuildEventsBetweenDates(
+                Db2.testDb,
+                'testE',
+                new Date('1970-01-01T00:00:00.000Z'),
+                new Date('9999-12-31T23:59:59.999Z'),
+            );
+            assert(fetchedEvents.length === 1);
+        });
+        it('should return two events.', async (): Promise<void> => {
+            fetchedEvents = await Db2.fetchAllGuildEventsBetweenDates(
+                Db2.testDb,
+                'testA',
+                new Date('1970-01-01T00:00:00.000Z'),
+                new Date('9999-12-31T23:59:59.999Z'),
+            );
+            assert(fetchedEvents.length === 2);
+        });
     });
     describe('Delete event', async (): Promise<void> => {
         it('should not throw an error.', async (): Promise<void> => {
-            await Db2.deleteGuildEvent(Db2.testDb, 'testE', fetchedEvents[0].id as number);
+            await Db2.deleteEvent(Db2.testDb, 0);
         });
     });
     describe('Clean up', async (): Promise<void> => {

@@ -577,10 +577,13 @@ export namespace Command {
                 Object.keys(cDescription.params).map(
                     (paramName: string):
                     string => {
-                        if (cDescription.params[paramName].required) {
-                            return `${paramName}=(${cDescription.params[paramName].usage})`;
+                        if (cDescription.params) {
+                            if (cDescription.params[paramName].required) {
+                                return `${paramName}=(${cDescription.params[paramName].usage})`;
+                            }
+                            return `${paramName}?=(${cDescription.params[paramName].usage})`;
                         }
-                        return `${paramName}?=(${cDescription.params[paramName].usage})`;
+                        return '';
                     }
                 ).join(' ')
             );
@@ -611,7 +614,7 @@ export namespace Command {
             key: string
         ): string => {
             const cDescription: Description = lookup[key];
-            const paramNames: string[] = cDescription.params !== undefined
+            const paramNames: string[] | undefined = cDescription.params !== undefined
                 ? Object.keys(cDescription.params)
                 : undefined;
             if (paramNames === undefined) {
@@ -619,7 +622,12 @@ export namespace Command {
             }
             const paramStr: string = paramNames.map(
                 (name: string):
-                string => `\t\t${name}: ${cDescription.params[name].description} Expects: ${cDescription.params[name].expectedType}. Required: ${cDescription.params[name].required}. Default: ${cDescription.params[name].default}.`
+                string => {
+                    if (cDescription.params) {
+                        return `\t\t${name}: ${cDescription.params[name].description} Expects: ${cDescription.params[name].expectedType}. Required: ${cDescription.params[name].required}. Default: ${cDescription.params[name].default}.`;
+                    }
+                    return '';
+                }
             ).join('\n');
             return `${cDescription.command}\n\tDescription: ${cDescription.description}\n\tParams:\n${paramStr}\n\t${generateCommandUsageString(key as unknown as ALL)}`;
         };
@@ -643,7 +651,7 @@ export namespace Command {
         str: string,
     ): T => {
         const cDescription: Description = lookup[command];
-        const params: Record<string, ParamDescription> = cDescription.params;
+        const params: Record<string, ParamDescription> | undefined = cDescription.params;
         if (params === undefined) return {} as unknown as T;
 
         const reduceRecord = (
@@ -672,12 +680,13 @@ export namespace Command {
             }
         ).reduce(reduceRecord);
 
-        const results: Record<string, string> = allKeys.map(
+        const results: Record<string, string | undefined> = allKeys.map(
             (key: string):
-            Record<string, string> => {
-                const exec: RegExpExecArray = regexes[key].exec(str);
+            Record<string, string | undefined> => {
+                const exec: RegExpExecArray | null = regexes[key].exec(str);
                 if (exec === null) {
-                    if (cDescription.params[key].default !== undefined) {
+                    if (cDescription.params !== undefined
+                        && cDescription.params[key].default !== undefined) {
                         return {
                             [key]: cDescription.params[key].default as string,
                         };
@@ -695,33 +704,35 @@ export namespace Command {
         const parsed: Record<string, string | number | boolean> = allKeys.map(
             (key: string):
             Record<string, string | number | boolean> => {
-                switch (params[key].expectedType) {
-                    case ParamType.BOOLEAN:
-                        return {
-                            [key]: (
-                                results[key].toLowerCase() !== 'false'
-                                && results[key].toLowerCase() !== 'no'
-                            ),
-                        };
-                    case ParamType.NUMBER: {
-                        const num: number = parseInt(
-                            results[key],
-                            10,
-                        );
-                        return {
-                            [key]: (
-                                Number.isNaN(num)
-                                    ? undefined
-                                    : num
-                            ),
-                        };
+                const value = results[key];
+                if (value !== undefined) {
+                    switch (params[key].expectedType) {
+                        case ParamType.BOOLEAN:
+                            return {
+                                [key]: value.toLowerCase() !== 'false'
+                                        && value.toLowerCase() !== 'no',
+                            };
+                        case ParamType.NUMBER: {
+                            const num: number = parseInt(
+                                value,
+                                10,
+                            );
+                            if (!Number.isNaN(num)) {
+                                return {
+                                    [key]: num,
+                                };
+                            }
+                            break;
+                        }
+                        case ParamType.STRING:
+                            return {
+                                [key]: value,
+                            };
+                        default:
+                            break;
                     }
-                    case ParamType.STRING:
-                    default:
-                        return {
-                            [key]: results[key],
-                        };
                 }
+                return {};
             }
         ).reduce(reduceRecord);
 

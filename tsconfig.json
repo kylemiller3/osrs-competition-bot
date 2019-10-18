@@ -1,8 +1,7 @@
 {
     "compilerOptions": {
-      "resolveJsonModule": true,
       "moduleResolution": "node",
-      "target": "es2019",
+      "target": "es2020",
       "esModuleInterop": true,
       "sourceMap": true,
       "strictNullChecks": true,

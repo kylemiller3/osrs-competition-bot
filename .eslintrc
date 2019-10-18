@@ -27,6 +27,9 @@
     "@typescript-eslint/explicit-member-accessibility": "off",
     "arrow-parens": "off",
     "prefer-destructuring": "off",
-    "@typescript-eslint/prefer-namespace-keyword": "off"
+    "@typescript-eslint/prefer-namespace-keyword": "off",
+    "lines-between-class-members": ["error", "always", {
+      "exceptAfterSingleLine": true
+    }]
   }
 }

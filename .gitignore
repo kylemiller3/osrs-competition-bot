@@ -2,7 +2,7 @@ node_modules
 out
 docs
 .git
-auth.json
+auth.ts
 *.log
 *.out
 *.db

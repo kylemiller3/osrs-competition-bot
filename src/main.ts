@@ -7,7 +7,7 @@ import {
 import {
     filter, tap,
 } from 'rxjs/operators';
-import auth from './auth.json';
+import privateKey from './auth';
 import { Command, } from './command';
 import { Utils, } from './utils';
 import adminSetChannel from './commands/adminSetChannel';
@@ -37,7 +37,7 @@ const gClient: discord.Client = new discord.Client();
  * Observable of all Discord message events
  * @category Observable
  */
-const messageReceived$: Observable<discord.Message> = fromEvent(
+export const messageReceived$: Observable<discord.Message> = fromEvent(
     gClient as unknown as EventEmitter,
     'message'
 );
@@ -64,20 +64,24 @@ export const isAdmin = (
     guild: discord.Guild,
     author: discord.User,
 ): boolean => {
-    const guildMember: discord.GuildMember = guild.members.get(
+    const guildMember: discord.GuildMember | undefined = guild.members.get(
         author.id
     );
     if (guildMember === undefined) {
         Utils.logger.warn(
             `${author.username} was not found in ${guild.name}'s member list. Returning false.`
         );
+        return false;
     }
-    return guildMember.permissions.has(
-        discord.Permissions.FLAGS.ADMINISTRATOR
-    ) || guildMember.roles.some(
-        (role: discord.Role):
-        boolean => role.name.toLowerCase() === 'osrs event manager'
-    );
+    if (discord.Permissions.FLAGS.ADMINISTRATOR) {
+        return guildMember.permissions.has(
+            discord.Permissions.FLAGS.ADMINISTRATOR
+        ) || guildMember.roles.some(
+            (role: discord.Role):
+            boolean => role.name.toLowerCase() === 'osrs event manager'
+        );
+    }
+    return false;
 };
 
 /**
@@ -194,7 +198,7 @@ export const spoofMessage = (
 //
 //--------------
 
-gClient.login(auth.token);
+gClient.login(privateKey);
 
 
 commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);

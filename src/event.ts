@@ -1,7 +1,6 @@
 import {
     hiscores,
 } from 'osrs-json-api';
-import Integer from 'integer';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
@@ -149,7 +148,7 @@ export namespace Event {
      * @category Event
      */
     export interface GuildMessages {
-        scoreboardMessage?: ChannelMessage
+        scoreboardMessages?: ChannelMessage[]
         statusMessage: ChannelMessage
     }
 

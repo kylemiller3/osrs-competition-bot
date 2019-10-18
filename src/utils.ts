@@ -3,9 +3,20 @@ import * as log4js from 'log4js';
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
     /**
+     * Strict mode safe object undefined and null filter
+     * @param input The array to filter
+     * @returns An array without undefined or nulls
+     */
+    export const isDefinedFilter = <T>(
+        input: T | undefined | null
+    ): input is T => typeof input !== 'undefined' && input !== null;
+
+
+    /**
      * Checks to see if a date is in the future
      * @param date The date to check
      * @category Date
+     * @returns True if the date is in the future
      */
     export const isInFuture = (
         date: Date
@@ -15,6 +26,7 @@ export namespace Utils {
      * Checks to see if a date is in the past
      * @param date The date to check
      * @category Date
+     * @returns True if the date is in the past
      */
     export const isInPast = (
         date: Date
@@ -25,6 +37,7 @@ export namespace Utils {
      * @param dateStart The starting date to check
      * @param dateEnd The ending date to check
      * @category Date
+     * @returns True if now is between the supplied dates
      */
     export const isNowBetween = (
         dateStart: Date,

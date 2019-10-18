@@ -1,8 +1,4 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { Event, } from '../event';
-import { Utils, } from '../utils';
-import Error from '../strings';
 
 /**
  * Validates and prepares an event
@@ -154,7 +150,6 @@ const eventsAdd = (
     //     }
     // }
 
-    
     // if (tracking !== Event.Tracking.NONE) {
     //     tracker = {
     //         tracking,
