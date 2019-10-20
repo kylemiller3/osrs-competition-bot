@@ -1,9 +1,12 @@
+/* eslint-disable prefer-arrow-callback */
+/* eslint-disable func-names */
+/* eslint-disable no-unused-expressions */
 import {
     describe, it, beforeEach, afterEach, before, after, utils,
 } from 'mocha';
 import { assert, expect, } from 'chai';
 import pgp from 'pg-promise';
-import * as sinon from 'sinon';
+import sinon from 'sinon';
 import * as discord from 'discord.js';
 import { async, } from 'rxjs/internal/scheduler/async';
 import {
@@ -19,11 +22,21 @@ import { Utils, } from '../utils';
 import { MessageWrapper, } from '../messageWrapper';
 
 
-const longStr = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Consectetur a erat nam at lectus urna. Tortor dignissim convallis aenean et tortor at. Et leo duis ut diam quam nulla porttitor massa id. Feugiat nibh sed pulvinar proin gravida hendrerit lectus a. In nisl nisi scelerisque eu. Ipsum faucibus vitae aliquet nec ullamcorper. Sed viverra ipsum nunc aliquet. Tempor id eu nisl nunc mi ipsum faucibus vitae aliquet. Mattis vulputate enim nulla aliquet. Sit amet massa vitae tortor condimentum lacinia. Scelerisque in dictum non consectetur a. Ac tortor vitae purus faucibus. Ac turpis egestas maecenas pharetra convallis posuere morbi leo. Mauris pharetra et ultrices neque ornare. Facilisis leo vel fringilla est ullamcorper eget nulla facilisi. Viverra accumsan in nisl nisi scelerisque eu ultrices vitae. Id aliquet lectus proin nibh nisl condimentum id venenatis a. Tellus id interdum velit laoreet id donec. Donec et odio pellentesque diam.\n\nViverra mauris in aliquam sem fringilla. Pellentesque dignissim enim sit amet venenatis urna. At in tellus integer feugiat scelerisque varius morbi enim. Erat imperdiet sed euismod nisi porta lorem. Nascetur ridiculus mus mauris vitae ultricies leo integer malesuada. Ut aliquam purus sit amet luctus venenatis lectus. Proin nibh nisl condimentum id venenatis a. Mi eget mauris pharetra et ultrices neque ornare aenean euismod. Purus in massa tempor nec feugiat nisl pretium fusce id. Penatibus et magnis dis parturient. Purus semper eget duis at tellus. Volutpat consequat mauris nunc congue nisi vitae suscipit tellus mauris. Sed turpis tincidunt id aliquet. Morbi tristique senectus et netus et malesuada fames ac turpis. Blandit turpis cursus in hac habitasse. Diam sit amet nisl suscipit adipiscing bibendum est. \n\n\nVenenatis cras sed felis eget velit aliquet sagittis id. Lacus sed viverra tellus in hac. Venenatis a condimentum vitae sapien pellentesque habitant morbi. Odio pellentesque diam volutpat commodo. Est lorem ipsum dolor sit amet consectetur adipiscing elit. Neque egestas congue quisque egestas diam in arcu. Lectus vestibulum mattis ullamcorper velit sed ullamcorper morbi tincidunt ornare. Ornare lectus sit amet est placerat in. Ultrices tincidunt arcu non sodales neque sodales. Egestas sed sed risus pretium quam vulputate. Id diam vel quam elementum pulvinar etiam non. Molestie ac feugiat sed lectus. Nec nam aliquam sem et tortor. Accumsan in nisl nisi scelerisque eu ultrices vitae auctor. \nUt morbi tincidunt augue interdum velit euismod in pellentesque massa. Et ligula ullamcorper malesuada proin libero nunc consequat. Amet consectetur adipiscing elit duis. Pharetra sit amet aliquam id diam maecenas ultricies. Pharetra et ultrices neque ornare aenean euismod elementum nisi. Tellus orci ac auctor augue mauris augue. Ultrices eros in cursus turpis massa tincidunt. Enim lobortis scelerisque fermentum dui faucibus in. Vestibulum lectus mauris ultrices eros in cursus turpis massa. Est ultricies integer quis auctor elit. Pharetra et ultrices neque ornare aenean euismod elementum nisi. Scelerisque purus semper eget duis at. Luctus accumsan tortor posuere ac ut consequat semper. Praesent semper feugiat nibh sed pulvinar proin gravida hendrerit. Elementum integer enim neque volutpat ac tincidunt vitae semper. Leo integer malesuada nunc vel risus commodo. Massa sapien faucibus et molestie ac feugiat. Fames ac turpis egestas sed tempus. Vulputate sapien nec sagittis aliquam malesuada bibendum arcu vitae elementum. Lectus arcu bibendum at varius. \nTortor aliquam nulla facilisi cras. Semper feugiat nibh sed pulvinar proin gravida hendrerit lectus a. Quisque id diam vel quam elementum pulvinar etiam. Vestibulum lectus mauris ultrices eros in cursus turpis massa tincidunt. Pulvinar neque laoreet suspendisse interdum. Ut placerat orci nulla pellentesque dignissim enim sit. Nibh mauris cursus mattis molestie a iaculis at. Dis parturient montes nascetur ridiculus mus mauris vitae ultricies leo. Pellentesque sit amet porttitor eget dolor morbi non. Amet aliquam id diam maecenas ultricies mi eget mauris pharetra. Pulvinar etiam non quam lacus suspendisse faucibus interdum posuere.';
+const longStr = 'Denote simple fat denied add worthy little use. As some he so high down am week. Conduct esteems by cottage to pasture we winding. On assistance he cultivated considered frequently. Person how having tended direct own day man. Saw sufficient indulgence one own you inquietude sympathize. '
++ 'Both rest of know draw fond post as. It agreement defective to excellent. Feebly do engage of narrow. Extensive repulsive belonging depending if promotion be zealously as. Preference inquietude ask now are dispatched led appearance. Small meant in so doubt hopes. Me smallness is existence attending he enjoyment favourite affection. Delivered is to ye belonging enjoyment preferred. Astonished and acceptance men two discretion. Law education recommend did objection how old.\n'
++ 'Arrived totally in as between private. Favour of so as on pretty though elinor direct. Reasonable estimating be alteration we themselves entreaties me of reasonably. Direct wished so be expect polite valley. Whose asked stand it sense no spoil to. Prudent you too his conduct feeling limited and. Side he lose paid as hope so face upon be. Goodness did suitable learning put.\n'
++ 'However venture pursuit he am mr cordial. Forming musical am hearing studied be luckily. Ourselves for determine attending how led gentleman sincerity. Valley afford uneasy joy she thrown though bed set. In me forming general prudent on country carried. Behaved an or suppose justice. Seemed whence how son rather easily and change missed. Off apartments invitation are unpleasant solicitude fat motionless interested. Hardly suffer wisdom wishes valley as an. As friendship advantages resolution it alteration stimulated he or increasing.\n'
++ 'Throwing consider dwelling bachelor joy her proposal laughter. Raptures returned disposed one entirely her men ham. By to admire vanity county an mutual as roused. Of an thrown am warmly merely result depart supply. Required honoured trifling eat pleasure man relation. Assurance yet bed was improving furniture man. Distrusts delighted she listening mrs extensive admitting far.\n'
++ 'Cottage out enabled was entered greatly prevent message. No procured unlocked an likewise. Dear but what she been over gay felt body. Six principles advantages and use entreaties decisively. Eat met has dwelling unpacked see whatever followed. Court in of leave again as am. Greater sixteen to forming colonel no on be. So an advice hardly barton. He be turned sudden engage manner spirit.\n'
++ 'He share of first to worse. Weddings and any opinions suitable smallest nay. My he houses or months settle remove ladies appear. Engrossed suffering supposing he recommend do eagerness. Commanded no of depending extremity recommend attention tolerably. Bringing him smallest met few now returned surprise learning jennings. Objection delivered eagerness he exquisite at do in. Warmly up he nearer mr merely me.\n'
++ 'Of recommend residence education be on difficult repulsive offending. Judge views had mirth table seems great him for her. Alone all happy asked begin fully stand own get. Excuse ye seeing result of we. See scale dried songs old may not. Promotion did disposing you household any instantly. Hills we do under times at first short an.\n'
++ 'Her old collecting she considered discovered. So at parties he warrant oh staying. Square new horses and put better end. Sincerity collected happiness do is contented. Sigh ever way now many. Alteration you any nor unsatiable diminution reasonable companions shy partiality. Leaf by left deal mile oh if easy. Added woman first get led joy not early jokes.\n'
++ 'Up is opinion message manners correct hearing husband my. Disposing commanded dashwoods cordially depending at at. Its strangers who you certainty earnestly resources suffering she. Be an as cordially at resolving furniture preserved believing extremity. Easy mr pain felt in. Too northward affection additions nay. He no an nature ye talent houses wisdom vanity denied.';
+
 describe('Message Wrapper', (): void => {
     Utils.logger.level = 'fatal';
     let testMessage: discord.Message;
-    const mockChannel: discord.TextChannel = {
+    const testChannel: discord.TextChannel = {
         send: (content, options?):
         Promise<discord.Message | discord.Message[]> => Promise.resolve(
             {
@@ -33,10 +46,10 @@ describe('Message Wrapper', (): void => {
         ),
     } as discord.TextChannel;
     testMessage = {
-        channel: mockChannel,
+        channel: testChannel,
         content: 'test',
     } as discord.Message;
-    const sendStub: sinon.SinonStub = sinon.stub(mockChannel, 'send');
+    const sendStub: sinon.SinonStub = sinon.stub(testChannel, 'send');
     describe('Send message', (): void => {
         it('should not throw an error.', (): void => {
             sendStub.onFirstCall().resolves({
@@ -56,15 +69,17 @@ describe('Message Wrapper', (): void => {
                     content: 'msg1',
                 }
             );
-            MessageWrapper.sendMessage$.next(
-                testMessage,
-            );
+
             const sub = MessageWrapper.sentMessages$.subscribe(
                 (): void => {
-                    expect(sendStub.callCount).to.be.equal(1);
+                    expect(sendStub.callCount).to.equal(1);
                     sub.unsubscribe();
                     done();
                 }
+            );
+
+            MessageWrapper.sendMessage$.next(
+                testMessage,
             );
         });
         it('should call send three times.', (
@@ -82,20 +97,21 @@ describe('Message Wrapper', (): void => {
                 ...testMessage,
                 content: 'msg3',
             });
-            MessageWrapper.sendMessage$.next({
-                ...testMessage,
-                content: longStr,
-            } as discord.Message);
 
             const sub = MessageWrapper.sentMessages$.subscribe(
                 (): void => {
-                    expect(sendStub.callCount).to.be.equal(3);
+                    expect(sendStub.callCount).to.equal(3);
                     sub.unsubscribe();
                     done();
                 }
             );
+
+            MessageWrapper.sendMessage$.next({
+                ...testMessage,
+                content: longStr,
+            } as discord.Message);
         });
-        it('should evaluate promises in sequence.', (
+        it('should evaluate promises in correct sequence.', (
             done: DoneFunction
         ): void => {
             sendStub.onFirstCall().returns(
@@ -106,7 +122,7 @@ describe('Message Wrapper', (): void => {
                                 ...testMessage,
                                 content: 'msg1',
                             });
-                        }, 35);
+                        }, 150);
                     }
                 )
             );
@@ -136,19 +152,262 @@ describe('Message Wrapper', (): void => {
             );
 
             const obs = MessageWrapper.sentMessages$;
-            observe((): Observable<discord.Message[]> => obs);
+            observe((): Observable<(discord.Message | null)[]> => obs);
+            const sub = obs.subscribe((values: discord.Message[]): void => {
+                expect(values[0].content).to.equal('msg1');
+                expect(values[1].content).to.equal('msg2');
+                expect(values[2].content).to.equal('msg3');
+                expect(sendStub.callCount).to.equal(3);
+                sub.unsubscribe();
+                done();
+            });
+
             MessageWrapper.sendMessage$.next({
                 ...testMessage,
                 content: longStr,
             } as discord.Message);
-            const sub = obs.subscribe((values: discord.Message[]): void => {
-                expect(values[0].content).to.be.equal('msg1');
-                expect(values[1].content).to.be.equal('msg2');
-                expect(values[2].content).to.be.equal('msg3');
-                expect(sendStub.callCount).to.be.equal(3);
-                sub.unsubscribe();
-                done();
+        });
+        it('should execute concurrently.', (
+            done: DoneFunction,
+        ): void => {
+            sendStub.onFirstCall().returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg1',
+                            });
+                        }, 1500);
+                    }
+                )
+            );
+            sendStub.onSecondCall().returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg2',
+                            });
+                        }, 500);
+                    }
+                )
+            );
+            sendStub.onThirdCall().returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg3',
+                            });
+                        }, 300);
+                    }
+                )
+            );
+
+            sendStub.onCall(3).returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg4',
+                            });
+                        }, 35);
+                    }
+                )
+            );
+            sendStub.onCall(4).returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg5',
+                            });
+                        }, 25);
+                    }
+                )
+            );
+            sendStub.onCall(5).returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg6',
+                            });
+                        }, 15);
+                    }
+                )
+            );
+            sendStub.onCall(6).returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg7',
+                            });
+                        }, 1);
+                    }
+                )
+            );
+            sendStub.onCall(7).returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg8',
+                            });
+                        }, 15);
+                    }
+                )
+            );
+            sendStub.onCall(8).returns(
+                new Promise(
+                    (resolve): void => {
+                        setTimeout((): void => {
+                            resolve({
+                                ...testMessage,
+                                content: 'msg9',
+                            });
+                        }, 400);
+                    }
+                )
+            );
+
+            let count = 0;
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (values: discord.Message[]): void => {
+                    switch (count) {
+                        case 0:
+                            expect(values[0].content).to.be.equal('msg4');
+                            expect(values[1].content).to.be.equal('msg5');
+                            expect(values[2].content).to.be.equal('msg6');
+                            break;
+                        case 1:
+                            expect(values[0].content).to.be.equal('msg7');
+                            expect(values[1].content).to.be.equal('msg8');
+                            expect(values[2].content).to.be.equal('msg9');
+                            break;
+
+                        case 2:
+                            expect(values[0].content).to.be.equal('msg1');
+                            expect(values[1].content).to.be.equal('msg2');
+                            expect(values[2].content).to.be.equal('msg3');
+                            sub.unsubscribe();
+                            done();
+                            break;
+                        default:
+                            throw (new Error('Default case reached.'));
+                    }
+                    count += 1;
+                },
+            );
+
+            MessageWrapper.sendMessage$.next({
+                ...testMessage,
+                content: longStr,
+            } as discord.Message);
+
+            MessageWrapper.sendMessage$.next({
+                ...testMessage,
+                content: longStr,
+            } as discord.Message);
+
+            MessageWrapper.sendMessage$.next({
+                ...testMessage,
+                content: longStr,
+            } as discord.Message);
+        });
+        it('should return array of two values and one null when third promise fails.', function (
+            done: DoneFunction,
+        ): void {
+            this.timeout(35000);
+            sendStub.rejects({
+                ...testMessage,
+                content: 'rejectedx',
             });
+            sendStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'resolved1',
+            });
+            sendStub.onSecondCall().resolves({
+                ...testMessage,
+                content: 'resolved2',
+            });
+
+
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (values: discord.Message[]): void => {
+                    expect(values[0].content).to.be.equal('resolved1');
+                    expect(values[1].content).to.be.equal('resolved2');
+                    expect(values[2]).to.be.null;
+                    expect(values.length).to.be.equal(3);
+                    sub.unsubscribe();
+                    done();
+                },
+            );
+
+            MessageWrapper.sendMessage$.next({
+                ...testMessage,
+                content: longStr,
+            } as discord.Message);
+        });
+        it('should send text correctly.', (
+            done: DoneFunction
+        ): void => {
+            sendStub.onFirstCall().resolves(
+                (longStr.match(
+                    /[\s\S]{1,1975}(?:\n|$)/g
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        content: chunk,
+                    } as discord.Message)
+                )[0]
+            );
+            sendStub.onSecondCall().resolves(
+                (longStr.match(
+                    /[\s\S]{1,1975}(?:\n|$)/g
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        content: chunk,
+                    } as discord.Message)
+                )[1]
+            );
+            sendStub.onThirdCall().resolves(
+                (longStr.match(
+                    /[\s\S]{1,1975}(?:\n|$)/g
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        content: chunk,
+                    } as discord.Message)
+                )[2]
+            );
+
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (values: discord.Message[]): void => {
+                    expect(values[0].content.length).to.be.lessThan(2000);
+                    expect(values[1].content.length).to.be.lessThan(2000);
+                    expect(values[2].content.length).to.be.lessThan(2000);
+                    expect(values.length).to.be.equal(3);
+                    sub.unsubscribe();
+                    done();
+                },
+            );
+
+            MessageWrapper.sendMessage$.next({
+                ...testMessage,
+                content: longStr,
+
+            } as discord.Message);
         });
     });
 

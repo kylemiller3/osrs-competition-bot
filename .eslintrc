@@ -5,7 +5,7 @@
         "paths": ["src"],
         "extensions": [".ts"]
       }
-    },
+    }
   },
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint"],
@@ -16,11 +16,11 @@
     "@typescript-eslint/member-delimiter-style": ["error", {
       "multiline": {
           "delimiter": "none",
-          "requireLast": true,
+          "requireLast": true
       },
       "singleline": {
           "delimiter": "semi",
-          "requireLast": false,
+          "requireLast": false
       }
   }],
     "@typescript-eslint/no-unused-vars": "warn",

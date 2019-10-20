@@ -1,13 +1,15 @@
 import * as discord from 'discord.js';
 import {
-    Observable, from, of, Subscription, Subject, zip, concat, forkJoin, defer, observable,
+    Observable, of, Subject, defer, forkJoin,
 } from 'rxjs';
 import {
-    concatMap, catchError, filter, mergeMap, map, concatAll, share, tap, combineAll, reduce, toArray, flatMap, shareReplay, merge, multicast, publish, refCount, publishReplay,
+    retryBackoff,
+} from 'backoff-rxjs';
+import {
+    catchError, mergeMap, map, share, timeout,
 } from 'rxjs/operators';
-import { fork, } from 'child_process';
 import { Utils, } from './utils';
-import { expect } from 'chai';
+
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace MessageWrapper {
@@ -15,84 +17,44 @@ export namespace MessageWrapper {
     export const sentMessages$ = sendMessage$.pipe(
         mergeMap(
             (input: discord.Message):
-            Observable<discord.Message[]> => {
+            Observable<(discord.Message | null)[]> => {
                 const msgs: discord.Message[] = (input.content.match(
                     /[\s\S]{1,1975}(?:\n|$)/g
-                ) || [])
-                    .map(
-                        (chunk: string):
-                        discord.Message => ({
-                            ...input,
-                            content: chunk,
-                        } as discord.Message)
-                    );
-
-                const observables: Observable<discord.Message[]>[] = msgs.map(
-                    (msg: discord.Message):
-                    Observable<discord.Message[]> => defer(
-                        (): Promise<discord.Message[]> => msg.channel
-                            .send()
-                            .then(
-                                (a: discord.Message | discord.Message[]):
-                                discord.Message[] => Array.of(a).flat()
-                            ),
-                    ),
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        ...input,
+                        content: chunk,
+                    } as discord.Message)
                 );
-                Utils.logger.error(observables);
-                return concat(...observables).pipe(
-                    toArray(),
-                    // eslint-disable-next-line prefer-spread
-                    map((value: discord.Message[][]): discord.Message[] => [].concat.apply([], value))
+
+                const observables: Observable<discord.Message | discord.Message[] | null>[] = msgs.map(
+                    (msg: discord.Message):
+                    Observable<discord.Message | discord.Message[] | null> => defer(
+                        (): Promise<discord.Message | discord.Message[]> => msg.channel.send()
+                    ).pipe(
+                        retryBackoff({
+                            initialInterval: 50,
+                            maxInterval: 10000,
+                            maxRetries: 10,
+                        }),
+                        catchError((error: Error): Observable<null> => {
+                            Utils.logger.error(error);
+                            return of(null);
+                        }),
+                    )
+                );
+                return forkJoin(...observables).pipe(
+                    map(
+                        (obj: (discord.Message | discord.Message[] | null)[]):
+                        (discord.Message | null)[] => obj.flatMap(
+                            ((v: discord.Message | null): discord.Message | null => v)
+                        )
+                    ),
                 );
             }
         ),
         share(),
-        // concatMap(
-        //     (input: [discord.Message, boolean]):
-        //     Observable<(discord.Message | discord.Message[] | null)> => {
-        //         const chunks: string[] = input[0].content.match(
-        //             /[\s\S]{1,1975}(?:\n|$)/g
-        //         ) || [];
-
-        //         // const observables: Promise<discord.Message | discord.Message[] | null> = chunks.map(
-        //         //     (chunk: string):
-        //         //     Promise<discord.Message | discord.Message[]> => input[0].channel.send(
-        //         //         chunk,
-        //         //         { code: input[1], },
-        //         //     ),
-        //         // ).reduce(
-        //         //     (acc, x): Promise<discord.Message | discord.Message[] | null> => acc.then(x), Promise.resolve(input[0]),
-        //         // );
-
-        //         const promises: (() => Promise<discord.Message | discord.Message[]>)[] = chunks.map(
-        //             (chunk: string):
-        //             () => Promise<discord.Message | discord.Message[]> => input[0]
-        //                 .channel.send.bind(
-        //                     input[0].channel,
-        //                     chunk,
-        //                     { code: input[1], }
-        //                 )
-        //         );
-
-        //         const observables: Observable<discord.Message | discord.Message[]>[] = promises.map(
-        //             (bind): Observable<discord.Message | discord.Message[]> => from(
-        //                 bind.call(null)
-        //             ) as Observable<discord.Message | discord.Message[]>
-        //         );
-
-        //         return concat(
-        //             ...observables
-        //         ).pipe(
-        //             catchError(
-        //                 (err: Error):
-        //                 Observable<null> => {
-        //                     Utils.logError(err);
-        //                     return of(null);
-        //                 }
-        //             )
-        //         );
-        //     }
-        // ),
     );
 }
 
