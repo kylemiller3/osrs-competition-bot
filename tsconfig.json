@@ -5,6 +5,8 @@
       "esModuleInterop": true,
       "sourceMap": true,
       "strictNullChecks": true,
-      "outDir": "out"
+      "outDir": "out",
+      //"strictBindCallApply": true,
+      //"strict": true
     }
 }

@@ -1,48 +1,167 @@
 import * as discord from 'discord.js';
 import {
-    Observable, of, Subject, defer, forkJoin,
+    Observable, of, Subject, defer, forkJoin, merge, concat, from, combineLatest, observable, BehaviorSubject, Subscription,
 } from 'rxjs';
 import {
     retryBackoff,
 } from 'backoff-rxjs';
 import {
-    catchError, mergeMap, map, share, timeout,
+    catchError, mergeMap, map, share, timeout, filter, concatMap, combineAll, tap, toArray, flatMap, mergeAll, concatAll, switchMap, reduce,
 } from 'rxjs/operators';
 import { Utils, } from './utils';
-
+import { Command, } from './command';
+import { Network, } from './network';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace MessageWrapper {
-    export const sendMessage$: Subject<discord.Message> = new Subject();
+    /**
+     * Contract of the message information to post
+     */
+    interface SendInfo {
+        message: discord.Message
+        content: string
+        options?: discord.MessageOptions
+    }
+    export const sendMessage$: Subject<SendInfo> = new Subject();
+
+    /**
+     * Contract of the message information to delete
+     */
+    interface DeleteInfo {
+        message: discord.Message
+    }
+    export const deleteMessages$: Subject<DeleteInfo[]> = new Subject();
+
+    /**
+     * Contract of the message information to edit
+     */
+    interface EditInfo {
+        message: discord.Message
+        newContent: string
+        options?: discord.MessageOptions
+    }
+    export const editMessages$: Subject<EditInfo[]> = new Subject();
+
+
+    interface MySubject<T> {
+        sub: Subscription
+        obs$: Subject<T>
+    }
+    const parallelExecute = <T>(...obs$: Observable<T>[]): Observable<T> => {
+        const subjects: MySubject<T>[] = obs$.map((o$): MySubject<T> => {
+            const subject$ = new Subject<T>();
+            const subscription: Subscription = o$.subscribe((o): void => { subject$.next(o); });
+            return { sub: subscription, obs$: subject$.pipe(filter(Utils.isDefinedFilter)) as Subject<T>, };
+        });
+        const subject$ = new Subject<T>();
+        function sub(index: number): void {
+            const current = subjects[index];
+            current.obs$.subscribe((c): void => {
+                subject$.next(c);
+                current.obs$.complete();
+                current.sub.unsubscribe();
+                if (index < subjects.length - 1) {
+                    sub(index + 1);
+                } else {
+                    subject$.complete();
+                }
+            });
+        }
+        sub(0);
+        return subject$;
+    };
+
+    const regex = /[\s\S]{1,1980}(?:\n|$)/g;
     export const sentMessages$ = sendMessage$.pipe(
         mergeMap(
-            (input: discord.Message):
-            Observable<(discord.Message | null)[]> => {
-                const msgs: discord.Message[] = (input.content.match(
-                    /[\s\S]{1,1975}(?:\n|$)/g
-                ) || []).map(
+            (input: SendInfo):
+            Observable<(discord.Message | discord.Message[] | null)[]> => {
+                const chunks: string[] = input.content.match(regex) || [];
+                const observables: Observable<discord.Message | discord.Message[] | null>[] = chunks.map(
                     (chunk: string):
-                    discord.Message => ({
-                        ...input,
-                        content: chunk,
-                    } as discord.Message)
+                    Observable<discord.Message | discord.Message[] | null> => {
+                        const bound = input.message.channel.send.bind(
+                            undefined,
+                            chunk,
+                            input.options,
+                        );
+                        return Network.genericNetworkObservable<discord.Message | discord.Message[]>(
+                            bound,
+                        );
+                    }
                 );
 
-                const observables: Observable<discord.Message | discord.Message[] | null>[] = msgs.map(
-                    (msg: discord.Message):
-                    Observable<discord.Message | discord.Message[] | null> => defer(
-                        (): Promise<discord.Message | discord.Message[]> => msg.channel.send()
-                    ).pipe(
-                        retryBackoff({
-                            initialInterval: 50,
-                            maxInterval: 10000,
-                            maxRetries: 10,
-                        }),
-                        catchError((error: Error): Observable<null> => {
-                            Utils.logger.error(error);
-                            return of(null);
-                        }),
-                    )
+                // const mapped = observables.map(
+                //     (o): Observable<(discord.Message | null)[]> => o.pipe(
+                //         map((x): (discord.Message | null)[] => [x].flatMap(x => x))
+                //     )
+                // );
+                // const r = mapped.reduce(
+                //     (acc: Observable<(discord.Message | null)[]>, x: Observable<(discord.Message | null)[]>):
+                //     Observable<(discord.Message | null)[]> => acc.pipe(
+                //         concatMap((t): Observable<(discord.Message | null)[]> => {
+                //             // Utils.logger.fatal(arr);
+                //             return x.pipe(
+                //                 map((u) => t.concat([u].flatMap(u => u))),
+                //             );
+                //         }),
+                //     ), from(Promise.resolve([]))
+                // );
+                // return r;
+                const obs = parallelExecute<discord.Message | discord.Message[] | null>(...observables);
+                return obs.pipe(
+                    map((x) => [x].flatMap(x=>x))
+                    // reduce((results, item) => [...results, item], [])
+                );
+                // return parallelExecute(...observables).pipe(
+                //     reduce((results, item) => [...results, item,], []),
+                //     flatMap((x): x => x),
+                // );
+            }
+        ),
+        // map(e => [e].flatMap(a=>a)),
+        tap(e => Utils.logger.fatal(e)),
+        share(),
+    );
+
+    export const deletedMessages$ = deleteMessages$.pipe(
+        mergeMap(
+            (input: DeleteInfo[]):
+            Observable<(discord.Message | null)[]> => {
+                const observables: Observable<discord.Message | null>[] = input.map(
+                    (dict: {message: discord.Message}):
+                    Observable<discord.Message | null> => {
+                        const bound = dict.message.delete.bind(undefined);
+                        return Network.genericNetworkObservable<discord.Message>(
+                            bound,
+                        );
+                    }
+                );
+                return concat(forkJoin(...observables)).pipe(
+                    map(
+                        (obj: (discord.Message | discord.Message[] | null)[]):
+                        (discord.Message | null)[] => obj.flatMap(
+                            ((v: discord.Message | null): discord.Message | null => v)
+                        )
+                    ),
+                );
+            }
+        ),
+        share(),
+    );
+
+    export const editedMessages$ = editMessages$.pipe(
+        mergeMap(
+            (input: EditInfo[]):
+            Observable<(discord.Message | null)[]> => {
+                const observables: Observable<discord.Message | null>[] = input.map(
+                    (dict: {message: discord.Message; newContent: string; options: discord.MessageOptions}):
+                    Observable<discord.Message | null> => {
+                        const bound = dict.message.edit.bind(undefined, dict.newContent, dict.options);
+                        return Network.genericNetworkObservable<discord.Message>(
+                            bound,
+                        );
+                    }
                 );
                 return forkJoin(...observables).pipe(
                     map(
@@ -57,81 +176,3 @@ export namespace MessageWrapper {
         share(),
     );
 }
-
-
-// class MessageWrapper2 {
-//     message: discord.Message;
-//     chunks: string[];
-//     chunkPtr: number = 0;
-//     postedMessages: discord.Message[];
-//     blockQuotes: boolean;
-
-
-//     constructor(message: discord.Message, blockQuotes: boolean) {
-//         this.message = message;
-//         this.chunks = message.content.match(/[\s\S]{1,1975}(?:\n|$)/g) || [];
-//         this.blockQuotes = blockQuotes;
-//     }
-
-//     // sendEntireMessage(content: string, blockQuotes: boolean): void {
-//     //     this.chunks.forEach(
-//     //         (): boolean => this.sendNextMessage()
-//     //     );
-//     //     const sub = this.sendEntireMessageSub(this.chunks);
-//     //     this.chunkPtr = this.chunks.length - 1;
-//     //     sub.unsubscribe();
-//     // }
-
-//     // sendNextChunk(): void {
-//     //     const chunk: string = this.chunks[this.chunkPtr];
-//     //     this.chunkPtr += 1;
-//     //     if (this.chunks.length > 0) {
-//     //         chunk.concat('...');
-//     //     }
-//     //     return this.message.channel.send(
-//     //         chunk,
-//     //         { code: this.blockQuotes, },
-//     //     ).catch((e: Error): null => {
-//     //         Utils.logError(e);
-//     //         return null;
-//     //     });
-//     // }
-
-//     sendEntireMessageSub = (
-//         chunks: string[]
-//     ): Subscription => from(chunks)
-//         .pipe(
-//             concatMap(
-//                 (chunk: string):
-//                 Observable<discord.Message | discord.Message[]> => {
-//                     this.chunks = this.chunks.slice(1);
-//                     if (this.chunks.length > 0) {
-//                         chunk.concat('...');
-//                     }
-//                     return from(this.message.channel.send(
-//                         chunk,
-//                         { code: this.blockQuotes, },
-//                     ));
-//                 }
-//             ),
-//             catchError(
-//                 (err: Error):
-//                 Observable<null> => {
-//                     Utils.logError(err);
-//                     this.message.reply(
-//                         'There was an error posting a message. Please try again later.'
-//                     ).catch();
-//                     throw err;
-//                 }
-//             ),
-//             filter(Utils.isDefinedFilter),
-//         )
-//         .subscribe(
-//             (msg: discord.Message | discord.Message[]):
-//             void => {
-//                 this.postedMessages.concat(msg);
-//             },
-//             (): void => {},
-//             (): void => Utils.logger.debug('Successfully posted all messages.'),
-//         )
-// }

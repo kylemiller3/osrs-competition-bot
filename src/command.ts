@@ -13,6 +13,10 @@ export namespace Command {
     }
 
     /**
+     * Contract containing what to ask the user and the error message on failure
+     */
+
+    /**
      * Contract describing a parameter
      * of a command
      * @category Interfaces
@@ -159,7 +163,7 @@ export namespace Command {
      * @category Event Implementations
      */
     const eventsDelete: Description = {
-        description: 'Deletes an event with name.',
+        description: 'Deletes an event with id.',
         accessControl: onlyAdmin,
         command: '!f events delete',
         params: {
@@ -240,6 +244,13 @@ export namespace Command {
             user: {
                 description: 'Mention of the user to sign-up.',
                 usage: '@mention',
+                expectedType: ParamType.STRING,
+                required: false,
+                default: '',
+            },
+            team: {
+                description: 'The team to sign-up the user for',
+                usage: 'teamname',
                 expectedType: ParamType.STRING,
                 required: false,
                 default: '',
