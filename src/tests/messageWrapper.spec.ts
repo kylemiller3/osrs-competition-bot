@@ -286,22 +286,22 @@ describe('Message Wrapper', (): void => {
 
             let count = 0;
             const sub = MessageWrapper.sentMessages$.subscribe(
-                (values: (discord.Message | null)[]): void => {
+                (values: (discord.Message)[]): void => {
                     switch (count) {
                         case 0:
-                            // expect(values[0].content).to.be.equal('msg4');
-                            // expect(values[1].content).to.be.equal('msg5');
-                            // expect(values[2].content).to.be.equal('msg6');
+                            expect(values[0].content).to.be.equal('msg4');
+                            expect(values[1].content).to.be.equal('msg5');
+                            expect(values[2].content).to.be.equal('msg6');
                             break;
                         case 1:
-                            // expect(values[0].content).to.be.equal('msg7');
-                            // expect(values[1].content).to.be.equal('msg8');
-                            // expect(values[2].content).to.be.equal('msg9');
+                            expect(values[0].content).to.be.equal('msg7');
+                            expect(values[1].content).to.be.equal('msg8');
+                            expect(values[2].content).to.be.equal('msg9');
                             break;
                         case 2:
-                            // expect(values[0].content).to.be.equal('msg1');
-                            // expect(values[1].content).to.be.equal('msg2');
-                            // expect(values[2].content).to.be.equal('msg3');
+                            expect(values[0].content).to.be.equal('msg1');
+                            expect(values[1].content).to.be.equal('msg2');
+                            expect(values[2].content).to.be.equal('msg3');
 
                             sub.unsubscribe();
                             done();
@@ -330,90 +330,90 @@ describe('Message Wrapper', (): void => {
                 content: longStr,
             });
         });
-        // it('should return array of two values and one null when third promise fails.', function (
-        //     done: DoneFunction,
-        // ): void {
-        //     this.timeout(35000);
-        //     sendStub.rejects({
-        //         ...testMessage,
-        //         content: 'rejectedx',
-        //     });
-        //     sendStub.onFirstCall().resolves({
-        //         ...testMessage,
-        //         content: 'resolved1',
-        //     });
-        //     sendStub.onSecondCall().resolves({
-        //         ...testMessage,
-        //         content: 'resolved2',
-        //     });
+        it('should return array of two values and one null when third promise fails.', function (
+            done: DoneFunction,
+        ): void {
+            this.timeout(35000);
+            sendStub.rejects({
+                ...testMessage,
+                content: 'rejectedx',
+            });
+            sendStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'resolved1',
+            });
+            sendStub.onSecondCall().resolves({
+                ...testMessage,
+                content: 'resolved2',
+            });
 
 
-        //     const sub = MessageWrapper.sentMessages$.subscribe(
-        //         (values: discord.Message[]): void => {
-        //             expect(values[0].content).to.be.equal('resolved1');
-        //             expect(values[1].content).to.be.equal('resolved2');
-        //             expect(values[2]).to.be.null;
-        //             expect(values.length).to.be.equal(3);
-        //             sub.unsubscribe();
-        //             done();
-        //         },
-        //     );
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (values: discord.Message[]): void => {
+                    expect(values[0].content).to.be.equal('resolved1');
+                    expect(values[1].content).to.be.equal('resolved2');
+                    expect(values[2]).to.be.null;
+                    expect(values.length).to.be.equal(3);
+                    sub.unsubscribe();
+                    done();
+                },
+            );
 
-        //     MessageWrapper.sendMessage$.next({
-        //         message: testMessage,
-        //         content: longStr,
-        //     });
-        // });
-        // it('should send text correctly.', (
-        //     done: DoneFunction
-        // ): void => {
-        //     sendStub.onFirstCall().resolves(
-        //         (longStr.match(
-        //             /[\s\S]{1,1975}(?:\n|$)/g
-        //         ) || []).map(
-        //             (chunk: string):
-        //             discord.Message => ({
-        //                 content: chunk,
-        //             } as discord.Message)
-        //         )[0]
-        //     );
-        //     sendStub.onSecondCall().resolves(
-        //         (longStr.match(
-        //             /[\s\S]{1,1975}(?:\n|$)/g
-        //         ) || []).map(
-        //             (chunk: string):
-        //             discord.Message => ({
-        //                 content: chunk,
-        //             } as discord.Message)
-        //         )[1]
-        //     );
-        //     sendStub.onThirdCall().resolves(
-        //         (longStr.match(
-        //             /[\s\S]{1,1975}(?:\n|$)/g
-        //         ) || []).map(
-        //             (chunk: string):
-        //             discord.Message => ({
-        //                 content: chunk,
-        //             } as discord.Message)
-        //         )[2]
-        //     );
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: longStr,
+            });
+        });
+        it('should send text correctly.', (
+            done: DoneFunction
+        ): void => {
+            sendStub.onFirstCall().resolves(
+                (longStr.match(
+                    /[\s\S]{1,1975}(?:\n|$)/g
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        content: chunk,
+                    } as discord.Message)
+                )[0]
+            );
+            sendStub.onSecondCall().resolves(
+                (longStr.match(
+                    /[\s\S]{1,1975}(?:\n|$)/g
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        content: chunk,
+                    } as discord.Message)
+                )[1]
+            );
+            sendStub.onThirdCall().resolves(
+                (longStr.match(
+                    /[\s\S]{1,1975}(?:\n|$)/g
+                ) || []).map(
+                    (chunk: string):
+                    discord.Message => ({
+                        content: chunk,
+                    } as discord.Message)
+                )[2]
+            );
 
-        //     const sub = MessageWrapper.sentMessages$.subscribe(
-        //         (values: discord.Message[]): void => {
-        //             expect(values[0].content.length).to.be.lessThan(2000);
-        //             expect(values[1].content.length).to.be.lessThan(2000);
-        //             expect(values[2].content.length).to.be.lessThan(2000);
-        //             expect(values.length).to.be.equal(3);
-        //             sub.unsubscribe();
-        //             done();
-        //         },
-        //     );
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (values: discord.Message[]): void => {
+                    expect(values[0].content.length).to.be.lessThan(2000);
+                    expect(values[1].content.length).to.be.lessThan(2000);
+                    expect(values[2].content.length).to.be.lessThan(2000);
+                    expect(values.length).to.be.equal(3);
+                    sub.unsubscribe();
+                    done();
+                },
+            );
 
-        //     MessageWrapper.sendMessage$.next({
-        //         message: testMessage,
-        //         content: longStr,
-        //     });
-        // });
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: longStr,
+            });
+        });
     });
 
     let subscribed: Subscription;

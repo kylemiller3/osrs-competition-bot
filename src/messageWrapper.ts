@@ -42,54 +42,44 @@ export namespace MessageWrapper {
     }
     export const editMessages$: Subject<EditInfo[]> = new Subject();
 
-
-    interface MySubject<T> {
-        sub: Subscription
-        obs$: Subject<T>
-    }
-    const parallelExecute = <T>(...obs$: Observable<T>[]): Observable<T> => {
-        const subjects: MySubject<T>[] = obs$.map((o$): MySubject<T> => {
-            const subject$ = new Subject<T>();
-            const subscription: Subscription = o$.subscribe((o): void => { subject$.next(o); });
-            return { sub: subscription, obs$: subject$.pipe(filter(Utils.isDefinedFilter)) as Subject<T>, };
-        });
-        const subject$ = new Subject<T>();
-        function sub(index: number): void {
-            const current = subjects[index];
-            current.obs$.subscribe((c): void => {
-                subject$.next(c);
-                current.obs$.complete();
-                current.sub.unsubscribe();
-                if (index < subjects.length - 1) {
-                    sub(index + 1);
-                } else {
-                    subject$.complete();
-                }
-            });
-        }
-        sub(0);
-        return subject$;
-    };
-
     const regex = /[\s\S]{1,1980}(?:\n|$)/g;
     export const sentMessages$ = sendMessage$.pipe(
         mergeMap(
             (input: SendInfo):
-            Observable<(discord.Message | discord.Message[] | null)[]> => {
+            Observable<(discord.Message | null)[]> => {
                 const chunks: string[] = input.content.match(regex) || [];
-                const observables: Observable<discord.Message | discord.Message[] | null>[] = chunks.map(
+                const observables: Observable<(discord.Message | null)[]>[] = chunks.map(
                     (chunk: string):
-                    Observable<discord.Message | discord.Message[] | null> => {
+                    Observable<(discord.Message | null)[]> => {
                         const bound = input.message.channel.send.bind(
                             undefined,
                             chunk,
                             input.options,
                         );
+                        // eslint-disable-next-line max-len
                         return Network.genericNetworkObservable<discord.Message | discord.Message[]>(
                             bound,
+                        ).pipe(
+                            // eslint-disable-next-line comma-dangle
+                            map((x): (discord.Message | null)[] => [x].flatMap(
+                                (t): (discord.Message | discord.Message[] | null) => t
+                            ))
                         );
                     }
                 );
+
+                const promise = observables
+                    .map(
+                        (obs: Observable<(discord.Message | null)[]>):
+                        Promise<(discord.Message | null)[]> => obs.toPromise()
+                    )
+                    .reduce(async (promiseChain, currentTask):
+                    Promise<(discord.Message | null)[]> => [
+                        ...await promiseChain,
+                        ...await currentTask,
+                    ].flatMap((x): (discord.Message | null) => x));
+
+                return from(promise);
 
                 // const mapped = observables.map(
                 //     (o): Observable<(discord.Message | null)[]> => o.pipe(
@@ -108,15 +98,6 @@ export namespace MessageWrapper {
                 //     ), from(Promise.resolve([]))
                 // );
                 // return r;
-                const obs = parallelExecute<discord.Message | discord.Message[] | null>(...observables);
-                return obs.pipe(
-                    map((x) => [x].flatMap(x=>x))
-                    // reduce((results, item) => [...results, item], [])
-                );
-                // return parallelExecute(...observables).pipe(
-                //     reduce((results, item) => [...results, item,], []),
-                //     flatMap((x): x => x),
-                // );
             }
         ),
         // map(e => [e].flatMap(a=>a)),
