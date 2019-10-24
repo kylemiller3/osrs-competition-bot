@@ -1,4 +1,4 @@
-import { Observable, defer, of, } from 'rxjs';
+import { Observable, defer, of, from, } from 'rxjs';
 
 import { retryBackoff, } from 'backoff-rxjs';
 import { timeout, catchError, } from 'rxjs/operators';
@@ -14,19 +14,18 @@ export namespace Network {
     export const genericNetworkObservable = <T>(
         bound: () => Promise<T | null>,
     ): Observable<T | null> => {
-        const ret: Observable<T | null> = defer(
-            (): Promise<T | null> => bound()
+        const ret: Observable<T | null> = from(
+            bound()
         ).pipe(
             retryBackoff({
                 initialInterval: 50,
                 maxInterval: 10000,
                 maxRetries: 10,
             }),
-            timeout(120000), // just in case
-            catchError((error: Error): Observable<null> => { // must catch to get values
-                Utils.logger.error(error);
-                return of(null);
-            }),
+            // catchError((error: Error): Observable<null> => { // must catch to get values
+            //     Utils.logger.error(error);
+            //     return of(null);
+            // }),
         );
         return ret;
     };

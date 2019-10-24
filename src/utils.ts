@@ -86,7 +86,7 @@ export namespace Utils {
                         'file',
                         'out',
                     ],
-                    level: 'debug',
+                    level: 'trace',
                     enableCallStack: true,
                 },
             },

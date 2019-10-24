@@ -47,132 +47,120 @@ describe('Message Wrapper', (): void => {
         ),
     } as discord.TextChannel;
     testMessage = {
+        delete: ():
+        Promise<discord.Message> => Promise.resolve(
+            {
+                ...testMessage,
+                deleted: true,
+            } as discord.Message,
+        ),
+        edit: (content: string, options: discord.MessageOptions):
+        Promise<discord.Message> => Promise.resolve(
+            {
+                ...testMessage,
+                editedAt: null,
+                editedTimestamp: null,
+            } as unknown as discord.Message,
+        ),
         channel: testChannel,
         content: 'test',
     } as discord.Message;
 
     const sendStub: sinon.SinonStub = sinon.stub(testChannel, 'send');
+    const deleteStub: sinon.SinonStub = sinon.stub(testMessage, 'delete');
+    const editStub: sinon.SinonStub = sinon.stub(testMessage, 'edit');
     describe('Send message', (): void => {
-        // it('should not throw an error.', (): void => {
-        //     sendStub.onFirstCall().resolves({
-        //         ...testMessage,
-        //         content: 'msg1',
-        //     });
-        //     MessageWrapper.sendMessage$.next({
-        //         message: testMessage,
-        //         content: testMessage.content,
-        //     });
-        // });
-        // it('should call send once.', (
-        //     done: DoneFunction
-        // ): void => {
-        //     sendStub.onFirstCall().resolves(
-        //         {
-        //             ...testMessage,
-        //             content: 'msg1',
-        //         }
-        //     );
+        it('should not throw an error.', (): void => {
+            sendStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'msg1',
+            });
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: testMessage.content,
+                tag: 'any',
+            });
+        });
+        it('should receive same tag as sent.', (
+            done: DoneFunction
+        ): void => {
+            sendStub.onFirstCall().resolves(
+                {
+                    ...testMessage,
+                    content: 'msg1',
+                }
+            );
 
-        //     const sub = MessageWrapper.sentMessages$.subscribe(
-        //         (): void => {
-        //             expect(sendStub.callCount).to.equal(1);
-        //             sub.unsubscribe();
-        //             done();
-        //         }
-        //     );
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (response: MessageWrapper.Response): void => {
+                    expect(response.tag).to.be.equal('snowflake');
+                    sub.unsubscribe();
+                    done();
+                }
+            );
 
-        //     MessageWrapper.sendMessage$.next({
-        //         message: testMessage,
-        //         content: testMessage.content,
-        //     });
-        // });
-        // it('should call send three times.', (
-        //     done: DoneFunction
-        // ): void => {
-        //     sendStub.onFirstCall().resolves({
-        //         ...testMessage,
-        //         content: 'msg1',
-        //     });
-        //     sendStub.onSecondCall().resolves({
-        //         ...testMessage,
-        //         content: 'msg2',
-        //     });
-        //     sendStub.onThirdCall().resolves({
-        //         ...testMessage,
-        //         content: 'msg3',
-        //     });
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: testMessage.content,
+                tag: 'snowflake',
+            });
+        });
+        it('should call send once.', (
+            done: DoneFunction
+        ): void => {
+            sendStub.onFirstCall().resolves(
+                {
+                    ...testMessage,
+                    content: 'msg1',
+                }
+            );
 
-        //     const sub = MessageWrapper.sentMessages$.subscribe(
-        //         (): void => {
-        //             expect(sendStub.callCount).to.equal(3);
-        //             sub.unsubscribe();
-        //             done();
-        //         }
-        //     );
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (): void => {
+                    expect(sendStub.callCount).to.equal(1);
+                    sub.unsubscribe();
+                    done();
+                }
+            );
 
-        //     MessageWrapper.sendMessage$.next({
-        //         message: testMessage,
-        //         content: longStr,
-        //     });
-        // });
-        // it('should evaluate promises in correct sequence.', (
-        //     done: DoneFunction
-        // ): void => {
-        //     sendStub.onFirstCall().returns(
-        //         new Promise(
-        //             (resolve): void => {
-        //                 setTimeout((): void => {
-        //                     resolve({
-        //                         ...testMessage,
-        //                         content: 'msg1',
-        //                     });
-        //                 }, 10);
-        //             }
-        //         )
-        //     );
-        //     sendStub.onSecondCall().returns(
-        //         new Promise(
-        //             (resolve): void => {
-        //                 setTimeout((): void => {
-        //                     resolve({
-        //                         ...testMessage,
-        //                         content: 'msg2',
-        //                     });
-        //                 }, 55);
-        //             }
-        //         )
-        //     );
-        //     sendStub.onThirdCall().returns(
-        //         new Promise(
-        //             (resolve): void => {
-        //                 setTimeout((): void => {
-        //                     resolve({
-        //                         ...testMessage,
-        //                         content: 'msg3',
-        //                     });
-        //                 }, 45);
-        //             }
-        //         )
-        //     );
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: testMessage.content,
+                tag: 'any',
+            });
+        });
+        it('should call send three times.', (
+            done: DoneFunction
+        ): void => {
+            sendStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'msg1',
+            });
+            sendStub.onSecondCall().resolves({
+                ...testMessage,
+                content: 'msg2',
+            });
+            sendStub.onThirdCall().resolves({
+                ...testMessage,
+                content: 'msg3',
+            });
 
-        //     const obs = MessageWrapper.sentMessages$;
-        //     observe((): Observable<(discord.Message | discord.Message[] | null)[]> => obs);
-        //     const sub = obs.subscribe((values: discord.Message[]): void => {
-        //         expect(values[0].content).to.equal('msg1');
-        //         expect(values[1].content).to.equal('msg2');
-        //         expect(values[2].content).to.equal('msg3');
-        //         expect(sendStub.callCount).to.equal(3);
-        //         sub.unsubscribe();
-        //         done();
-        //     });
+            const sub = MessageWrapper.sentMessages$.subscribe(
+                (): void => {
+                    expect(sendStub.callCount).to.equal(3);
+                    sub.unsubscribe();
+                    done();
+                }
+            );
 
-        //     MessageWrapper.sendMessage$.next({
-        //         message: testMessage,
-        //         content: longStr,
-        //     });
-        // });
-        it('should execute concurrently.', (
-            done: DoneFunction,
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: longStr,
+                tag: 'any',
+            });
+        });
+        it('should evaluate promises in correct sequence.', (
+            done: DoneFunction
         ): void => {
             sendStub.onFirstCall().returns(
                 new Promise(
@@ -182,7 +170,7 @@ describe('Message Wrapper', (): void => {
                                 ...testMessage,
                                 content: 'msg1',
                             });
-                        }, 1000);
+                        }, 10);
                     }
                 )
             );
@@ -194,7 +182,7 @@ describe('Message Wrapper', (): void => {
                                 ...testMessage,
                                 content: 'msg2',
                             });
-                        }, 500);
+                        }, 55);
                     }
                 )
             );
@@ -206,164 +194,259 @@ describe('Message Wrapper', (): void => {
                                 ...testMessage,
                                 content: 'msg3',
                             });
-                        }, 300);
+                        }, 45);
                     }
                 )
             );
 
+            const obs = MessageWrapper.sentMessages$;
+            observe((): Observable<MessageWrapper.Response> => obs);
+            const sub = obs.subscribe(
+                (msgs: MessageWrapper.Response):
+                void => {
+                    // @ts-ignore
+                    expect(msgs.messages[0].content).to.equal('msg1');
+                    // @ts-ignore
+                    expect(msgs.messages[1].content).to.equal('msg2');
+                    // @ts-ignore
+                    expect(msgs.messages[2].content).to.equal('msg3');
+                    expect(sendStub.callCount).to.equal(3);
+                    sub.unsubscribe();
+                    done();
+                }
+            );
+
+            MessageWrapper.sendMessage$.next({
+                message: testMessage,
+                content: longStr,
+                tag: 'tag',
+            });
+        });
+        it('should execute concurrently.', (
+            done: DoneFunction,
+        ): void => {
+            sendStub.onFirstCall().returns(
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg1',
+                                } as discord.Message);
+                            }, 100);
+                        }
+                    )
+                )
+            );
+            sendStub.onSecondCall().returns(
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg2',
+                                } as discord.Message);
+                            }, 750);
+                        }
+                    )
+                )
+            );
+            sendStub.onThirdCall().returns(
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg3',
+                                } as discord.Message);
+                            }, 100);
+                        }
+                    )
+                )
+            );
+
             sendStub.onCall(3).returns(
-                new Promise(
-                    (resolve): void => {
-                        setTimeout((): void => {
-                            resolve({
-                                ...testMessage,
-                                content: 'msg4',
-                            });
-                        }, 35);
-                    }
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg4',
+                                } as discord.Message);
+                            }, 350);
+                        }
+                    )
                 )
             );
             sendStub.onCall(4).returns(
-                new Promise(
-                    (resolve): void => {
-                        setTimeout((): void => {
-                            resolve({
-                                ...testMessage,
-                                content: 'msg5',
-                            });
-                        }, 25);
-                    }
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg5',
+                                } as discord.Message);
+                            }, 300);
+                        }
+                    )
                 )
             );
             sendStub.onCall(5).returns(
-                new Promise(
-                    (resolve): void => {
-                        setTimeout((): void => {
-                            resolve({
-                                ...testMessage,
-                                content: 'msg6',
-                            });
-                        }, 15);
-                    }
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg6',
+                                } as discord.Message);
+                            }, 25);
+                        }
+                    )
                 )
             );
             sendStub.onCall(6).returns(
-                new Promise(
-                    (resolve): void => {
-                        setTimeout((): void => {
-                            resolve({
-                                ...testMessage,
-                                content: 'msg7',
-                            });
-                        }, 26);
-                    }
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg7',
+                                } as discord.Message);
+                            }, 20);
+                        }
+                    )
                 )
             );
             sendStub.onCall(7).returns(
-                new Promise(
-                    (resolve): void => {
-                        setTimeout((): void => {
-                            resolve({
-                                ...testMessage,
-                                content: 'msg8',
-                            });
-                        }, 15);
-                    }
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg8',
+                                } as discord.Message);
+                            }, 25);
+                        }
+                    )
                 )
             );
             sendStub.onCall(8).returns(
-                new Promise(
-                    (resolve): void => {
-                        setTimeout((): void => {
-                            resolve({
-                                ...testMessage,
-                                content: 'msg9',
-                            });
-                        }, 400);
-                    }
+                defer(
+                    (): Promise<discord.Message> => new Promise(
+                        (resolve): void => {
+                            setTimeout((): void => {
+                                resolve({
+                                    ...testMessage,
+                                    content: 'msg9',
+                                } as discord.Message);
+                            }, 55);
+                        }
+                    )
                 )
             );
 
             let count = 0;
             const sub = MessageWrapper.sentMessages$.subscribe(
-                (values: (discord.Message)[]): void => {
+                (response: (MessageWrapper.Response)):
+                void => {
                     switch (count) {
                         case 0:
-                            expect(values[0].content).to.be.equal('msg4');
-                            expect(values[1].content).to.be.equal('msg5');
-                            expect(values[2].content).to.be.equal('msg6');
+                            // @ts-ignore
+                            expect(response.messages[0].content).to.be.equal('msg7');
+                            // @ts-ignore
+                            expect(response.messages[1].content).to.be.equal('msg8');
+                            // @ts-ignore
+                            expect(response.messages[2].content).to.be.equal('msg9');
                             break;
                         case 1:
-                            expect(values[0].content).to.be.equal('msg7');
-                            expect(values[1].content).to.be.equal('msg8');
-                            expect(values[2].content).to.be.equal('msg9');
+                            // @ts-ignore
+                            expect(response.messages[0].content).to.be.equal('msg4');
+                            // @ts-ignore
+                            expect(response.messages[1].content).to.be.equal('msg5');
+                            // @ts-ignore
+                            expect(response.messages[2].content).to.be.equal('msg6');
                             break;
                         case 2:
-                            expect(values[0].content).to.be.equal('msg1');
-                            expect(values[1].content).to.be.equal('msg2');
-                            expect(values[2].content).to.be.equal('msg3');
+                            // @ts-ignore
+                            expect(response.messages[0].content).to.be.equal('msg1');
+                            // @ts-ignore
+                            expect(response.messages[1].content).to.be.equal('msg2');
+                            // @ts-ignore
+                            expect(response.messages[2].content).to.be.equal('msg3');
 
                             sub.unsubscribe();
                             done();
                             break;
                         default:
-
-                            // throw (new Error('Default case reached.'));
+                            throw (new Error('Default case reached.'));
                     }
                     count += 1;
-                    Utils.logger.fatal(sendStub.callCount);
                 },
             );
 
             MessageWrapper.sendMessage$.next({
                 message: testMessage,
                 content: longStr,
+                tag: 'tag',
             });
 
             MessageWrapper.sendMessage$.next({
                 message: testMessage,
                 content: longStr,
+                tag: 'tag',
             });
 
             MessageWrapper.sendMessage$.next({
                 message: testMessage,
                 content: longStr,
+                tag: 'tag',
             });
         });
-        it('should return array of two values and one null when third promise fails.', function (
-            done: DoneFunction,
-        ): void {
-            this.timeout(35000);
-            sendStub.rejects({
-                ...testMessage,
-                content: 'rejectedx',
-            });
-            sendStub.onFirstCall().resolves({
-                ...testMessage,
-                content: 'resolved1',
-            });
-            sendStub.onSecondCall().resolves({
-                ...testMessage,
-                content: 'resolved2',
-            });
+        // it('should return array of two values and one null when third promise fails.', function (
+        //     done: DoneFunction,
+        // ): void {
+        //     this.timeout(35000);
+        //     sendStub.rejects({
+        //         ...testMessage,
+        //         content: 'rejectedx',
+        //     });
+        //     sendStub.onFirstCall().resolves({
+        //         ...testMessage,
+        //         content: 'resolved1',
+        //     });
+        //     sendStub.onSecondCall().resolves({
+        //         ...testMessage,
+        //         content: 'resolved2',
+        //     });
 
 
-            const sub = MessageWrapper.sentMessages$.subscribe(
-                (values: discord.Message[]): void => {
-                    expect(values[0].content).to.be.equal('resolved1');
-                    expect(values[1].content).to.be.equal('resolved2');
-                    expect(values[2]).to.be.null;
-                    expect(values.length).to.be.equal(3);
-                    sub.unsubscribe();
-                    done();
-                },
-            );
+        //     const sub = MessageWrapper.sentMessages$.subscribe(
+        //         (response: MessageWrapper.Response): void => {
+        //             // @ts-ignore
+        //             expect(response.messages[0].content).to.be.equal('resolved1');
+        //             // @ts-ignore
+        //             expect(response.messages[1].content).to.be.equal('resolved2');
+        //             expect(response.messages[2]).to.be.null;
+        //             expect(response.messages.length).to.be.equal(3);
+        //             sub.unsubscribe();
+        //             done();
+        //         },
+        //     );
 
-            MessageWrapper.sendMessage$.next({
-                message: testMessage,
-                content: longStr,
-            });
-        });
+        //     MessageWrapper.sendMessage$.next({
+        //         message: testMessage,
+        //         content: longStr,
+        //         tag: 'tag',
+        //     });
+        // });
         it('should send text correctly.', (
             done: DoneFunction
         ): void => {
@@ -399,11 +482,15 @@ describe('Message Wrapper', (): void => {
             );
 
             const sub = MessageWrapper.sentMessages$.subscribe(
-                (values: discord.Message[]): void => {
-                    expect(values[0].content.length).to.be.lessThan(2000);
-                    expect(values[1].content.length).to.be.lessThan(2000);
-                    expect(values[2].content.length).to.be.lessThan(2000);
-                    expect(values.length).to.be.equal(3);
+                (response: MessageWrapper.Response):
+                void => {
+                    // @ts-ignore
+                    expect(response.messages[0].content.length).to.be.lessThan(2000);
+                    // @ts-ignore
+                    expect(response.messages[1].content.length).to.be.lessThan(2000);
+                    // @ts-ignore
+                    expect(response.messages[2].content.length).to.be.lessThan(2000);
+                    expect(response.messages.length).to.be.equal(3);
                     sub.unsubscribe();
                     done();
                 },
@@ -412,23 +499,165 @@ describe('Message Wrapper', (): void => {
             MessageWrapper.sendMessage$.next({
                 message: testMessage,
                 content: longStr,
+                tag: 'tag',
             });
         });
     });
+    describe('Delete messages', (): void => {
+        it('should not throw an error.', (): void => {
+            deleteStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'msg1',
+            });
+            MessageWrapper.deleteMessages$.next(
+                {
+                    message: testMessage,
+                    tag: 'tag',
+                },
+            );
+        });
+        it('should receive same tag as sent.', (
+            done: DoneFunction
+        ): void => {
+            deleteStub.onFirstCall().resolves(
+                {
+                    ...testMessage,
+                    content: 'msg1',
+                }
+            );
 
-    let subscribed: Subscription;
-    beforeEach((): void => {
-        subscribed = MessageWrapper.sentMessages$.subscribe(
+            const sub = MessageWrapper.deletedMessages$.subscribe(
+                (response: MessageWrapper.Response): void => {
+                    expect(response.tag).to.be.equal('snowflake');
+                    sub.unsubscribe();
+                    done();
+                }
+            );
+
+            MessageWrapper.deleteMessages$.next(
+                {
+                    message: testMessage,
+                    tag: 'snowflake',
+                },
+            );
+        });
+        it('should delete a message.', (
+            done: DoneFunction
+        ): void => {
+            deleteStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'msg1',
+                deleted: true,
+            });
+            const sub = MessageWrapper.deletedMessages$.subscribe(
+                (msgs: MessageWrapper.Response): void => {
+                    // @ts-ignore
+                    expect(msgs.messages[0].deleted).to.be.true;
+                    expect(deleteStub.callCount).to.be.equal(1);
+                    sub.unsubscribe();
+                    done();
+                }
+            );
+            MessageWrapper.deleteMessages$.next(
+                {
+                    message: testMessage,
+                    tag: 'tag',
+                },
+            );
+        });
+    });
+    describe('Edit messages', (): void => {
+        it('should not throw an error.', (): void => {
+            editStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'msg1 edit',
+            });
+            MessageWrapper.editMessages$.next(
+                {
+                    message: testMessage,
+                    newContent: 'msg1 edit',
+                    tag: 'tag',
+                }
+            );
+        });
+        it('should receive same tag as sent.', (
+            done: DoneFunction
+        ): void => {
+            editStub.onFirstCall().resolves(
+                {
+                    ...testMessage,
+                    content: 'msg1 edited',
+                }
+            );
+
+            const sub = MessageWrapper.editedMessages$.subscribe(
+                (response: MessageWrapper.Response): void => {
+                    expect(response.tag).to.be.equal('snowflake');
+                    sub.unsubscribe();
+                    done();
+                }
+            );
+
+            MessageWrapper.editMessages$.next(
+                {
+                    message: testMessage,
+                    newContent: 'msg1 edited',
+                    tag: 'snowflake',
+                },
+            );
+        });
+        it('should edit a message.', (
+            done: DoneFunction
+        ): void => {
+            editStub.onFirstCall().resolves({
+                ...testMessage,
+                content: 'msg1 edit',
+            });
+            const sub = MessageWrapper.editedMessages$.subscribe(
+                (msgs: MessageWrapper.Response): void => {
+                    // @ts-ignore
+                    expect(msgs.messages[0].content).to.be.equal('msg1 edit');
+                    expect(editStub.callCount).to.be.equal(1);
+                    sub.unsubscribe();
+                    done();
+                }
+            );
+            MessageWrapper.editMessages$.next(
+                {
+                    message: testMessage,
+                    newContent: 'msg1 edit',
+                    tag: 'tag',
+                }
+            );
+        });
+    });
+
+    let sentSub: Subscription;
+    let delStub: Subscription;
+    let editSub: Subscription;
+    before((): void => {
+        sentSub = MessageWrapper.sentMessages$.subscribe(
+            // (msgs: discord.Message[]): void => Utils.logger.fatal(msgs)
+        );
+        delStub = MessageWrapper.deletedMessages$.subscribe(
+            // (msgs: discord.Message[]): void => Utils.logger.fatal(msgs)
+        );
+        editSub = MessageWrapper.editedMessages$.subscribe(
             // (msgs: discord.Message[]): void => Utils.logger.fatal(msgs)
         );
     });
 
     afterEach((): void => {
-        subscribed.unsubscribe();
         sendStub.reset();
+        deleteStub.reset();
+        editStub.reset();
     });
 
     after((): void => {
+        sentSub.unsubscribe();
+        delStub.unsubscribe();
+        editSub.unsubscribe();
         sendStub.restore();
+        deleteStub.restore();
     });
 });
