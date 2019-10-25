@@ -1,4 +1,6 @@
-import { Observable, defer, of, from, } from 'rxjs';
+import {
+    Observable, defer, of, from,
+} from 'rxjs';
 
 import { retryBackoff, } from 'backoff-rxjs';
 import { timeout, catchError, } from 'rxjs/operators';
@@ -22,10 +24,10 @@ export namespace Network {
                 maxInterval: 10000,
                 maxRetries: 10,
             }),
-            // catchError((error: Error): Observable<null> => { // must catch to get values
-            //     Utils.logger.error(error);
-            //     return of(null);
-            // }),
+            catchError((error: Error): Observable<null> => { // must catch to get values
+                Utils.logger.error(error);
+                return of(null);
+            }),
         );
         return ret;
     };

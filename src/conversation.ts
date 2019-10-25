@@ -1,10 +1,13 @@
 import * as discord from 'discord.js';
-import { Subscription, Observable, merge, } from 'rxjs';
 import {
-    filter, timeout, map, take, tap,
+    Subscription, Observable, merge, zip, Subject, throwError, BehaviorSubject, of,
+} from 'rxjs';
+import {
+    filter, timeout, map, take, tap, catchError, withLatestFrom, distinctUntilChanged,
 } from 'rxjs/operators';
 import { async, } from 'rxjs/internal/scheduler/async';
 // import { uuid, } from 'uuid-v4';
+import { as } from 'pg-promise';
 import { messageReceived$, } from './main';
 import { Command, } from './command';
 import { MessageWrapper, } from './messageWrapper';
@@ -12,88 +15,169 @@ import { Utils, } from './utils';
 
 export interface Qa {
     questions: (discord.Message | null)[] // keep track of all questions
-    answer?: discord.Message // and answers
+    answer: discord.Message // and answers
 }
 
 export class Conversation {
     qa: Qa[];
-    opMessage: discord.Message; // original message containing author id etc
-    uuid: string; // conversation tag
+    opMessage: discord.Message;
+    uuid: string;
+    nextQa$: Observable<[discord.Message, MessageWrapper.Response]>;
+    qaSub: Subscription
+    errorInjector$: Subject<[discord.Message, MessageWrapper.Response]>
 
-    constructor(opMessage: discord.Message) {
+    constructor(opMessage: discord.Message, handler: (qa: [discord.Message, MessageWrapper.Response]) => void) {
+        this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
-        this.qa = [];
-        Utils.logger.debug(`Starting a new conversation with '${this.opMessage.author.username}' with conversation id '${this.uuid}'`);
-    }
 
-    // answer received
-    nextAnswer$(): Observable<discord.Message> {
-        return messageReceived$.pipe(
+        const nextA$ = messageReceived$.pipe(
             // need op message state
             filter(
                 (msg: discord.Message):
                 boolean => msg.author.id === this.opMessage.author.id
             ),
-            take(1),
-            tap(
-                (msg: discord.Message):
-                void => Utils.logger.trace(`The user '${this.opMessage.author.username}' id '${this.uuid}' sent a reply '${msg.content}'`)
-            ),
             timeout(60000),
             tap(
                 (msg: discord.Message):
                 void => {
-                    this.qa[this.qa.length - 1].answer = msg;
-                    if (msg.content === '!stop!') {
-                        Utils.logger.trace(`The conversation with '${this.opMessage.author.username}' id '${this.uuid}' was stopped by the user`);
-                        throw (new Error('User stopped the conversation'));
-                    }
+                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.username}' continued with answer ${msg.content}`);
+                }
+            ),
+            catchError(
+                (error: Error):
+                Observable<discord.Message> => {
+                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.username}' will end because they did not reply '${error}'`);
+                    throw (error);
                 }
             ),
         );
-    }
 
-    questionsSent$(): Observable<MessageWrapper.Response> {
-        return MessageWrapper.sentMessages$.pipe(
-            filter(
-                (response: MessageWrapper.Response):
-                boolean => response.tag === this.uuid
-            ),
+        const nextQ$ = MessageWrapper.sentMessages$.pipe(
+            // filter(
+            //     (response: MessageWrapper.Response):
+            //     boolean => response.tag === this.uuid
+            // ),
             tap(
                 (response: MessageWrapper.Response):
                 void => {
-                    this.qa.push({
-                        questions: response.messages,
-                    });
+                    const content = response.messages.map(
+                        (msg: discord.Message | null): string => {
+                            if (msg !== null) {
+                                return msg.content;
+                            }
+                            return '(NULL)';
+                        }
+                    ).join('\n');
+                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.username}' continued with question '${content}'`);
+                }
+            ),
+            catchError(
+                (error: Error):
+                Observable<MessageWrapper.Response> => {
+                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.username}' will end because the question did not send '${error}'`);
+                    throw (error);
                 }
             ),
         );
+
+        const nextQa$ = nextA$.pipe(
+            withLatestFrom(nextQ$),
+            distinctUntilChanged(
+                (x, y): boolean => {
+                    const xContent = x[0].content;
+                    const yContent = y[0].content;
+                    return xContent === yContent;
+                }
+            ),
+            tap(
+                (arr: [discord.Message, MessageWrapper.Response]):
+                void => {
+                    if (this.qa[this.qa.length - 1]) {
+                        // check to see if our question is distinct or assign
+                        // this.qa[this.qa.length]
+                        // DO I NEED THIS????
+                    }
+                    // DO I NEED THIS???
+                    this.qa.push({
+                        questions: arr[1].messages,
+                        answer: arr[0],
+                    });
+                }
+            ),
+            catchError(
+                (error: Error):
+                Observable<[discord.Message, MessageWrapper.Response]> => {
+                    const sendInfo: MessageWrapper.SendInfo = {
+                        message: this.opMessage,
+                        content: 'Meowbe later.',
+                        tag: this.uuid,
+                    };
+                    MessageWrapper.sendMessage$.next(sendInfo);
+                    this.stopConversation();
+                    return of([null,  null]) as unknown as Observable<[discord.Message, MessageWrapper.Response]>;
+                }
+            )
+        );
+
+        this.nextQa$ = nextQa$;
+        this.qaSub = this.nextQa$.subscribe(
+            handler,
+        );
+
+        // start conversation
+        Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
+    }
+
+    stopConversation(): void {
+        Utils.logger.trace(`Ending conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
+        this.qaSub.unsubscribe();
     }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace ConversationManager {
-    let allConversations = [];
+    interface ConversationRecord {
+        conversation: Conversation
+        command: Command.ALL
+    }
+    export const allConversations: Record<string, ConversationRecord> = {};
 
-    export const requestNewConversation = (
-        opMessage: discord.Message
-    ): Conversation => {
-        const foundConversation: Conversation | undefined = allConversations.find(
-            (conversation: Conversation):
-            boolean => opMessage.author.id === conversation.opMessage.author.id
-        );
-        if (foundConversation) {
-            // we found a conversation let's end the previous
-            // not sure what to do here? delete? replace?
-            allConversations = allConversations.filter(
-                (conversation: Conversation):
-                boolean => opMessage.author.id !== conversation.opMessage.author.id
-            );
-        }
-        // make a new conversation
-        return new Conversation(opMessage);
-    };
+    // export const requestNewConversation = (
+    //     opMessage: discord.Message,
+    //     command: Command.ALL,
+    // ): Conversation => {
+    //     // find our record
+    //     const foundConversation: ConversationRecord | undefined = allConversations[
+    //         opMessage.author.id
+    //     ];
+    //     if (foundConversation) {
+    //         // we found a conversation let's end the previous
+    //         foundConversation.conversation.stopConversation();
+    //     }
+
+    //     const conversation = new Conversation(opMessage);
+    //     // make a new conversation
+    //     allConversations[opMessage.author.id] = {
+    //         conversation,
+    //         command,
+    //     };
+    //     return new Conversation(opMessage);
+    // };
+
+    // export const getConversation = (
+    //     authorId: string,
+    //     command: Command.ALL,
+    // ): Conversation | undefined => {
+    //     const record: ConversationRecord = allConversations[authorId];
+    //     if (record) {
+    //         // is this a conversation about our command?
+    //         return record.command === command
+    //             ? record.conversation
+    //             : undefined;
+    //     }
+    //     return undefined;
+    // };
 }
 
 // export class Conversation {
