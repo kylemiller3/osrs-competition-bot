@@ -5,9 +5,74 @@ import {
 import { Observable, Subscribable, Subscription, } from 'rxjs';
 import { Utils, } from '../utils';
 import { MessageWrapper, } from '../messageWrapper';
-import { messageReceived$, } from '../main';
-import { Conversation, ConversationManager, } from '../conversation';
-import { Command } from '../command';
+import { messageReceived$, spoofMessage, gClient, } from '../main';
+import { Conversation, Qa, } from '../conversation';
+import { Command, } from '../command';
+
+enum ADMIN_SET_CHANNEL {
+    WHICH_CHANNEL,
+    WHICH_CHANNEL_ERROR,
+    DONE,
+}
+
+class AdminSetChannelConversation extends Conversation<ADMIN_SET_CHANNEL> {
+    constructor(opMessage: discord.Message) {
+        super(opMessage);
+        this.state = ADMIN_SET_CHANNEL.WHICH_CHANNEL;
+    }
+
+    produceQ(): [string, ADMIN_SET_CHANNEL] | null {
+        switch (this.state) {
+            case ADMIN_SET_CHANNEL.WHICH_CHANNEL:
+                return ['Set to which text channel?', ADMIN_SET_CHANNEL.WHICH_CHANNEL,];
+            case ADMIN_SET_CHANNEL.WHICH_CHANNEL_ERROR:
+                return ['Could not find channel mention.\nex: \'#general\'', ADMIN_SET_CHANNEL.WHICH_CHANNEL_ERROR,];
+            default:
+                return null;
+        }
+    }
+
+    consumeQa(qa: Qa<ADMIN_SET_CHANNEL>): void {
+        const parser = <T>(paramName: string):
+        Record<string, T> => Command.parseParameters<Record<string, T>>(
+            Command.ALL.ADMIN_SET_CHANNEL,
+            `${paramName}=${qa.answer.content}`
+        );
+        const answer = <T>(param: string):
+        T | undefined => parser<T>(param)[param];
+        switch (this.state) {
+            // case ADMIN_SET_CHANNEL.WHICH_CHANNEL:
+            // case ADMIN_SET_CHANNEL.WHICH_CHANNEL_ERROR: {
+            //     const parsed: string | undefined = answer('channel');
+            //     if (parsed) {
+            //         this.mergeParams({ channel: parsed, });
+            //         this.state = ADMIN_SET_CHANNEL.DONE;
+            //     } else {
+            //         this.state = ADMIN_SET_CHANNEL.WHICH_CHANNEL_ERROR;
+            //     }
+            //     break;
+            // }
+            case ADMIN_SET_CHANNEL.WHICH_CHANNEL:
+            case ADMIN_SET_CHANNEL.WHICH_CHANNEL_ERROR: {
+                const channelMentions = qa.answer.mentions.channels;
+                if (channelMentions.array().length === 0) {
+                    this.state = ADMIN_SET_CHANNEL.WHICH_CHANNEL_ERROR;
+                } else {
+                    this.state = ADMIN_SET_CHANNEL.DONE;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    done(): void {
+        Utils.logger.trace(`Conversation with ${this.opMessage.author.username} finished successfully.`);
+    }
+}
+
+const tempDict = {};
 
 /**
  * Validates and executes set channel function
@@ -16,48 +81,30 @@ import { Command } from '../command';
 const adminSetChannel = (
     msg: discord.Message,
 ): void => {
-    const conver = new Conversation(msg, (qa: [discord.Message, MessageWrapper.Response]): void => {
-        const sendInfo: MessageWrapper.SendInfo = {
-            message: msg,
-            content: 'uwu whats this',
-            tag: this.uuid,
-        };
-        MessageWrapper.sendMessage$.next(
-            sendInfo
-        );
-    });
+    // ConversationManager.handleConversation(
+    //     msg,
+    //     Command.ALL.ADMIN_SET_CHANNEL,
+    //     (qa: [discord.Message, MessageWrapper.Response]): void => {
+    //         const conversation =
+    //     }
+    // );
 
-    setTimeout((): void => {
-        conver.stopConversation();
-        const conver2 = new Conversation(msg, (qa2: [discord.Message, MessageWrapper.Response]): void => {
-            const sendInfo: MessageWrapper.SendInfo = {
-                message: msg,
-                content: 'sowwy',
-                tag: this.uuid,
-            };
-            MessageWrapper.sendMessage$.next(
-                sendInfo
-            );
-        });
-        const sendInfo2: MessageWrapper.SendInfo = {
-            message: msg,
-            content: 'notices u',
-            tag: this.uuid,
-        };
-        MessageWrapper.sendMessage$.next(
-            sendInfo2
-        );
-    }, 5000);
+    const adminSetChannelConversation = new AdminSetChannelConversation(msg);
+    tempDict[msg.author.id] = adminSetChannelConversation;
 
+    const question = adminSetChannelConversation.produceQ();
+    if (question === null) {
+        return;
+    }
     const sendInfo: MessageWrapper.SendInfo = {
         message: msg,
-        content: 'hewwo World!',
-        tag: this.uuid,
+        content: question[0],
+        tag: adminSetChannelConversation.uuid,
     };
     MessageWrapper.sendMessage$.next(
         sendInfo
     );
-    
+
     // const channel = msg.mentions.channels.first();
     // if (channel === undefined) return;
     // if (msg.guild.channels.get(channel.id) === undefined) return;
@@ -66,5 +113,13 @@ const adminSetChannel = (
     // Utils.logger.debug(`Channel set to ${channel.id}`);
     // msg.reply(`channel set to <#${channel.id}>.`);
 };
+
+//     //     [Command.ALL.ADMIN_SET_CHANNEL]: {
+//     //         channel: {
+//     //             q: 'Set to which text channel?',
+//     //             ex: '#general',
+//     //             err: 'Could not find channel mention.',
+//     //         },
+//     //     },
 
 export default adminSetChannel;

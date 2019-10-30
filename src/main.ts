@@ -31,7 +31,7 @@ import help from './commands/help';
  * Global discord client
  * @category Global
  */
-const gClient: discord.Client = new discord.Client();
+export const gClient: discord.Client = new discord.Client();
 
 /**
  * Observable of all Discord message events

@@ -1,15 +1,10 @@
 import * as discord from 'discord.js';
 import {
-    Observable, of, Subject, defer, forkJoin, merge, concat, from, combineLatest, observable, BehaviorSubject, Subscription,
+    Observable, of, Subject, forkJoin, from,
 } from 'rxjs';
 import {
-    retryBackoff,
-} from 'backoff-rxjs';
-import {
-    catchError, mergeMap, map, share, timeout, filter, concatMap, combineAll, tap, toArray, flatMap, mergeAll, concatAll, switchMap, reduce, refCount,
+    mergeMap, map, share,
 } from 'rxjs/operators';
-import { Utils, } from './utils';
-import { Command, } from './command';
 import { Network, } from './network';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
