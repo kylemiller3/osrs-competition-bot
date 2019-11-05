@@ -13,7 +13,6 @@ import { Utils, } from './utils';
 import adminSetChannel from './commands/adminSetChannel';
 import eventsAdd from './commands/eventsAdd';
 import eventsDelete from './commands/eventsDelete';
-import eventsEdit from './commands/eventsEdit';
 import eventsEndEvent from './commands/eventsEndEvent';
 import eventsForceSignup from './commands/eventsForceSignup';
 import eventsForceUnsignup from './commands/eventsForceUnsignup';

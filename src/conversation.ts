@@ -1,31 +1,58 @@
 import * as discord from 'discord.js';
 import {
-    Subscription, Observable, merge, zip, Subject, throwError, BehaviorSubject, of, pipe,
+    Subscription, Observable, merge, Subject,
 } from 'rxjs';
 import {
-    filter, timeout, map, take, tap, catchError, withLatestFrom, distinctUntilChanged,
+    filter, timeout, map, tap, catchError, withLatestFrom, distinctUntilChanged,
 } from 'rxjs/operators';
-import { async, } from 'rxjs/internal/scheduler/async';
-// import { uuid, } from 'uuid-v4';
 import { messageReceived$, } from './main';
-import { Command, } from './command';
 import { MessageWrapper, } from './messageWrapper';
 import { Utils, } from './utils';
+import { Command } from './command';
 
-export interface Qa<T> {
+export enum CONVERSATION_STATE {
+    Q1,
+    Q1E,
+    Q1C,
+    Q2,
+    Q2E,
+    Q2C,
+    Q3,
+    Q3E,
+    Q3C,
+    Q4,
+    Q4E,
+    Q4C,
+    Q5,
+    Q5E,
+    Q5C,
+    Q6,
+    Q6E,
+    Q6C,
+    DONE,
+}
+
+export interface Qa {
     questions: (discord.Message | null)[] // keep track of all questions
     answer: discord.Message // and answers
 }
 
-export abstract class Conversation<T> {
-    qa: Qa<T>[];
+export abstract class Conversation {
+    qa: Qa[];
     opMessage: discord.Message;
     uuid: string;
     qaSub: Subscription
-    nextQa$: Observable<Qa<T>>;
-    errorInjector$: Subject<Qa<T>>;
-    param: Record<string, string | number | boolean>;
-    state: T;
+    nextQa$: Observable<Qa>;
+    errorInjector$: Subject<Qa>;
+    param: Record<string, string | number | boolean | Date | {}>;
+    state: CONVERSATION_STATE;
+    returnMessage: string;
+
+    static parser = <T>(command: Command.ALL, paramName: string, answer: string):
+    Record<string, T> => Command.parseParameters<Record<string, T>>(
+        command,
+        `${paramName}=${answer}`
+    );
 
     constructor(
         opMessage: discord.Message,
@@ -34,8 +61,11 @@ export abstract class Conversation<T> {
         this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
-        this.errorInjector$ = new Subject<Qa<T>>();
+        this.errorInjector$ = new Subject<Qa>();
         this.param = {};
+        this.state = CONVERSATION_STATE.Q1;
+        this.returnMessage = 'This shouldn\'t be visible!';
+        
 
         const nextA$ = messageReceived$.pipe(
             // need op message state
@@ -98,7 +128,7 @@ export abstract class Conversation<T> {
             ),
             map(
                 (value: [discord.Message, MessageWrapper.Response]):
-                Qa<T> => ({
+                Qa => ({
                     answer: value[0],
                     questions: value[1].messages,
                 })
@@ -120,7 +150,7 @@ export abstract class Conversation<T> {
             // ),
             catchError(
                 (error: Error):
-                Observable<Qa<T>> => {
+                Observable<Qa> => {
                     const sendInfo: MessageWrapper.SendInfo = {
                         message: this.opMessage,
                         content: 'Meowbe later.',
@@ -138,20 +168,27 @@ export abstract class Conversation<T> {
         );
 
         this.qaSub = this.nextQa$.subscribe(
-            (qa: Qa<T>):
+            (qa: Qa):
             void => {
                 this.consumeQa(qa);
-                const question: [string, T] | null = this.produceQ();
+                const question: string | null = this.produceQ();
                 if (question !== null) {
                     const sendInfo: MessageWrapper.SendInfo = {
                         message: this.opMessage,
-                        content: question[0],
+                        content: question,
                         tag: this.uuid,
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
                 } else {
+                    this.state = CONVERSATION_STATE.DONE;
+                    const sendInfo: MessageWrapper.SendInfo = {
+                        message: this.opMessage,
+                        content: this.returnMessage,
+                        tag: this.uuid,
+                    };
+                    MessageWrapper.sendMessage$.next(sendInfo);
+                    Utils.logger.trace(`Conversation with ${this.opMessage.author.username} finished successfully.`);
                     this.qaSub.unsubscribe();
-                    this.done();
                 }
             },
             (error: Error): void => {
@@ -164,9 +201,8 @@ export abstract class Conversation<T> {
         Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
     }
 
-    abstract consumeQa(qa: Qa<T>): void;
-    abstract produceQ(): [string, T] | null;
-    abstract done(): void;
+    abstract consumeQa(qa: Qa): void;
+    abstract produceQ(): string | null;
 
     stopConversation(): void {
         this.errorInjector$.error(
@@ -183,48 +219,37 @@ export abstract class Conversation<T> {
     }
 }
 
-// // eslint-disable-next-line @typescript-eslint/no-namespace
-// export namespace ConversationManager {
-//     interface ConversationRecord {
-//         conversation: Conversation
-//         command: Command.ALL
-//     }
-//     const allConversations: Record<string, ConversationRecord> = {};
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace ConversationManager {
+    const allConversations: Record<string, Conversation> = {};
 
-//     export const handleConversation = (
-//         opMessage: discord.Message,
-//         command: Command.ALL,
-//         handler: (qa: [discord.Message, MessageWrapper.Response]) => void,
-//     ): Conversation => {
-//         // find our record
-//         const foundConversation: ConversationRecord | undefined = allConversations[
-//             opMessage.author.id
-//         ];
+    export const startNewConversation = (
+        msg: discord.Message,
+        newConversation: Conversation
+    ): void => {
+        const foundConversation: Conversation | undefined = allConversations[
+            msg.author.id
+        ];
 
-//         if (foundConversation) {
-//             // we found a conversation let's end the previous
-//             // if it's for a different command
-//             if (foundConversation.command !== command) {
-//                 foundConversation.conversation.stopConversation();
-//             } else {
-//                 // THIS SHOULDN'T BE TRUE
-//                 Utils.logger.error('I shouldn\'t be here.');
-//                 return foundConversation.conversation;
-//             }
-//         }
+        if (foundConversation) {
+            foundConversation.stopConversation();
+        }
+        allConversations[msg.author.id] = newConversation;
 
-//         const conversation = new Conversation(
-//             opMessage,
-//             handler,
-//         );
-//         // make a new conversation
-//         allConversations[opMessage.author.id] = {
-//             conversation,
-//             command,
-//         };
-//         return conversation;
-//     };
-// }
+        const question = newConversation.produceQ();
+        if (question === null) {
+            return;
+        }
+        const sendInfo: MessageWrapper.SendInfo = {
+            message: msg,
+            content: question,
+            tag: newConversation.uuid,
+        };
+        MessageWrapper.sendMessage$.next(
+            sendInfo
+        );
+    };
+}
 
 // export class Conversation {
 //     questions: discord.Message[][] = [];
