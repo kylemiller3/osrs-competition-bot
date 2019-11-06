@@ -8,27 +8,34 @@ import {
 import { messageReceived$, } from './main';
 import { MessageWrapper, } from './messageWrapper';
 import { Utils, } from './utils';
-import { Command } from './command';
+import { Command, } from './command';
 
 export enum CONVERSATION_STATE {
     Q1,
     Q1E,
     Q1C,
+    Q1O,
     Q2,
     Q2E,
     Q2C,
+    Q2O,
     Q3,
     Q3E,
     Q3C,
+    Q3O,
     Q4,
     Q4E,
     Q4C,
+    Q4O,
     Q5,
     Q5E,
     Q5C,
+    Q5O,
     Q6,
     Q6E,
     Q6C,
+    Q6O,
+    CONFIRM,
     DONE,
 }
 
@@ -46,7 +53,7 @@ export abstract class Conversation {
     errorInjector$: Subject<Qa>;
     param: Record<string, string | number | boolean | Date | {}>;
     state: CONVERSATION_STATE;
-    returnMessage: string;
+    confirmationMessage: string;
 
     static parser = <T>(command: Command.ALL, paramName: string, answer: string):
     Record<string, T> => Command.parseParameters<Record<string, T>>(
@@ -64,14 +71,14 @@ export abstract class Conversation {
         this.errorInjector$ = new Subject<Qa>();
         this.param = {};
         this.state = CONVERSATION_STATE.Q1;
-        this.returnMessage = 'This shouldn\'t be visible!';
-        
+        this.confirmationMessage = 'This shouldn\'t be visible!';
 
         const nextA$ = messageReceived$.pipe(
             // need op message state
             filter(
                 (msg: discord.Message):
                 boolean => msg.author.id === this.opMessage.author.id
+                && msg.channel.id === this.opMessage.channel.id
             ),
             timeout(60000),
             tap(
@@ -119,13 +126,13 @@ export abstract class Conversation {
 
         const nextQa$ = nextA$.pipe(
             withLatestFrom(nextQ$),
-            distinctUntilChanged(
-                (x, y): boolean => {
-                    const xContent = x[0].content;
-                    const yContent = y[0].content;
-                    return xContent === yContent;
-                }
-            ),
+            // distinctUntilChanged(
+            //     (x, y): boolean => {
+            //         const xContent = x[0].content;
+            //         const yContent = y[0].content;
+            //         return xContent === yContent;
+            //     }
+            // ),
             map(
                 (value: [discord.Message, MessageWrapper.Response]):
                 Qa => ({
@@ -168,9 +175,9 @@ export abstract class Conversation {
         );
 
         this.qaSub = this.nextQa$.subscribe(
-            (qa: Qa):
-            void => {
-                this.consumeQa(qa);
+            async (qa: Qa):
+            Promise<void> => {
+                await this.consumeQa(qa);
                 const question: string | null = this.produceQ();
                 if (question !== null) {
                     const sendInfo: MessageWrapper.SendInfo = {
@@ -180,10 +187,9 @@ export abstract class Conversation {
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
                 } else {
-                    this.state = CONVERSATION_STATE.DONE;
                     const sendInfo: MessageWrapper.SendInfo = {
                         message: this.opMessage,
-                        content: this.returnMessage,
+                        content: this.confirmationMessage,
                         tag: this.uuid,
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
@@ -201,7 +207,7 @@ export abstract class Conversation {
         Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
     }
 
-    abstract consumeQa(qa: Qa): void;
+    abstract async consumeQa(qa: Qa): Promise<void>;
     abstract produceQ(): string | null;
 
     stopConversation(): void {
@@ -209,13 +215,6 @@ export abstract class Conversation {
             new Error('Stop Conversation was called'),
         );
         this.qaSub.unsubscribe();
-    }
-
-    mergeParams(input: Record<string, string | number | boolean>): void {
-        this.param = {
-            ...this.param,
-            ...input,
-        };
     }
 }
 

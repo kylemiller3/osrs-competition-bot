@@ -3,7 +3,6 @@ import { Event, } from '../event';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
-import { Command, } from '../command';
 import { Utils, } from '../utils';
 
 class EventAdd extends Conversation {
@@ -22,7 +21,7 @@ class EventAdd extends Conversation {
             case CONVERSATION_STATE.Q3:
                 return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR tbd for long running event.';
             case CONVERSATION_STATE.Q3E:
-                return 'Failed to set date. Does your event end before it starts?';
+                return 'Failed to set date. Maybe your event end before it starts?';
             case CONVERSATION_STATE.Q3C:
                 return `Ending date is set for ${this.param.end.toString()}. Is this ok? y/N`;
             case CONVERSATION_STATE.Q4:
@@ -35,12 +34,14 @@ class EventAdd extends Conversation {
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q5E:
                 return 'Could not set global flag. Try yes or no.';
+            case CONVERSATION_STATE.CONFIRM:
+                return `The event looks like this:\n${JSON.stringify(this.param, null, 2)}\n\nIs this ok? y/N`;
             default:
                 return null;
         }
     }
 
-    consumeQa(qa: Qa): void {
+    consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
@@ -119,7 +120,7 @@ class EventAdd extends Conversation {
                         .startsWith(value)
                 );
 
-                let what: Event.BountyHunter[] | Event.Clues[] | Event.Skills[];
+                let what: Event.BountyHunter[] | Event.Clues[] | Event.Skills[] | undefined;
                 if (tracking !== undefined) {
                     const tracks: string = type
                         .toLowerCase()
@@ -180,12 +181,11 @@ class EventAdd extends Conversation {
                             // default undefined
                             if (what.length === 0) {
                                 this.state = CONVERSATION_STATE.Q4E;
-                                return;
+                                return Promise.resolve();
                             }
                             break;
                         }
                         default:
-                            what = [];
                             break;
                     }
 
@@ -215,13 +215,39 @@ class EventAdd extends Conversation {
             case CONVERSATION_STATE.Q5E: {
                 const global: string = qa.answer.content;
                 this.param.global = Utils.isYes(global);
-                this.returnMessage = JSON.stringify(this.param);
-                this.state = CONVERSATION_STATE.DONE;
+                this.state = CONVERSATION_STATE.CONFIRM;
+                break;
+            }
+            case CONVERSATION_STATE.CONFIRM: {
+                const answer: string = qa.answer.content;
+                if (!Utils.isYes(answer)) {
+                    this.state = CONVERSATION_STATE.DONE;
+                    this.confirmationMessage = 'Cancelled.';
+                } else {
+                    // save here
+                    const event: Event.Event = {
+                        name: this.param.name as string,
+                        when: {
+                            start: this.param.start as Date,
+                            end: this.param.end as Date,
+                        },
+                        guilds: {
+                            creator: {
+                                discordId: qa.answer.guild.id,
+                            },
+                        },
+                        teams: [],
+                        tracker: this.param.tracker as Event.Tracker,
+                    };
+                    this.confirmationMessage = 'Saved event to database.'; // saved yes or no
+                    this.state = CONVERSATION_STATE.DONE;
+                }
                 break;
             }
             default:
                 break;
         }
+        return Promise.resolve();
     }
 }
 

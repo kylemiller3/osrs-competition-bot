@@ -62,7 +62,7 @@ export namespace MessageWrapper {
                             input.options,
                         );
                         // eslint-disable-next-line max-len
-                        return Network.genericNetworkObservable<discord.Message | discord.Message[]>(
+                        return Network.genericNetworkFetch$<discord.Message | discord.Message[]>(
                             bound,
                         ).pipe(
                             // eslint-disable-next-line comma-dangle
@@ -115,7 +115,7 @@ export namespace MessageWrapper {
                 const bound = input.message.delete.bind(
                     input.message,
                 );
-                const request = Network.genericNetworkObservable<discord.Message>(
+                const request = Network.genericNetworkFetch$<discord.Message>(
                     bound,
                 );
                 return forkJoin(
@@ -144,7 +144,7 @@ export namespace MessageWrapper {
                     input.newContent,
                     input.options,
                 );
-                const request = Network.genericNetworkObservable<discord.Message>(
+                const request = Network.genericNetworkFetch$<discord.Message>(
                     bound,
                 );
                 return forkJoin(

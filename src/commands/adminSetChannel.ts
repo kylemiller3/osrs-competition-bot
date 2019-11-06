@@ -9,13 +9,13 @@ class AdminSetChannelConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Set to which text channel?';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find channel mention.\nex: \'#general\'';
+                return 'Could not find channel mention.\nExample: \'#general\'';
             default:
                 return null;
         }
     }
 
-    consumeQa(qa: Qa): void {
+    consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
@@ -25,13 +25,14 @@ class AdminSetChannelConversation extends Conversation {
                 } else {
                     this.state = CONVERSATION_STATE.DONE;
                     // save to db here
-                    this.returnMessage = 'Channel set successfully'; // or failure
+                    this.confirmationMessage = 'Channel set successfully'; // or failure
                 }
                 break;
             }
             default:
                 break;
         }
+        return Promise.resolve();
     }
 }
 
