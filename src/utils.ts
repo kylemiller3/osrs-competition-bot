@@ -129,18 +129,18 @@ export namespace Utils {
     // process.on('SIGINT', (): void => process.exit(128 + 2));
     // process.on('SIGTERM', (): void => process.exit(128 + 15));
 
-    process.on(
-        'uncaughtException',
-        (error: Error):
-        void => {
-            logger.fatal(error);
-            log4js.shutdown(
-                (err: Error): void => {
-                    process.exit(1);
-                }
-            );
-        }
-    );
+    // process.on(
+    //     'uncaughtException',
+    //     (error: Error):
+    //     void => {
+    //         logger.fatal(error);
+    //         log4js.shutdown(
+    //             (err: Error): void => {
+    //                 process.exit(1);
+    //             }
+    //         );
+    //     }
+    // );
 
     // process.on('unhandledRejection',
     //     (up: Error):

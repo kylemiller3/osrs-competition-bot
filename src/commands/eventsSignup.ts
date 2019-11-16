@@ -1,14 +1,10 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { Event, } from '../event';
+import { hiscores, } from 'osrs-json-api';
 import { Utils, } from '../utils';
-import Error from '../strings';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
-import { Db2, } from '../database';
 import { Network, } from '../network';
-import { hiscores } from 'osrs-json-api';
 
 class EventsSignupConversation extends Conversation {
     produceQ(): string | null {

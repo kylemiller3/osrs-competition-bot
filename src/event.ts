@@ -170,7 +170,7 @@ export namespace Event {
      * Contract for a RuneScape Event
      * @category Event
      */
-    export interface Event {
+    export interface Object {
         id?: number
         name: string
         when: When
@@ -186,7 +186,7 @@ export namespace Event {
      * @category Helper
      */
     export const getEventTracking = (
-        event: Event
+        event: Event.Object
     ): Tracking => {
         if (event.tracker === undefined) return Tracking.NONE;
         return event.tracker.tracking;
@@ -197,7 +197,7 @@ export namespace Event {
      * @param event The event to check
      */
     export const isLongRunningEvent = (
-        event: Event,
+        event: Event.Object,
     ): boolean => event.when.end === undefined;
 
     /**
@@ -207,7 +207,7 @@ export namespace Event {
      * @category Event Property
      */
     export const isTeamEvent = (
-        event: Event,
+        event: Event.Object,
     ): boolean => event.teams !== undefined;
 
     /**
@@ -217,7 +217,7 @@ export namespace Event {
      * @category Event Property
      */
     export const isEventCasual = (
-        event: Event,
+        event: Event.Object,
     ): boolean => getEventTracking(event) === Tracking.NONE;
 
     /**
@@ -227,7 +227,7 @@ export namespace Event {
      * @category Event Property
      */
     export const isEventCustom = (
-        event: Event
+        event: Event.Object
     ): boolean => getEventTracking(event) === Tracking.CUSTOM;
 
     /**
@@ -238,11 +238,11 @@ export namespace Event {
      * @category Event Filter
      */
     export const findEventById = (
-        events: Event[],
+        events: Event.Object[],
         eventIdToSearch: number,
-    ): Event | undefined => {
-        const foundEvent: Event | undefined = events.find(
-            (event: Event):
+    ): Event.Object | undefined => {
+        const foundEvent: Event.Object | undefined = events.find(
+            (event: Event.Object):
             boolean => event.id === eventIdToSearch
         );
         return foundEvent;

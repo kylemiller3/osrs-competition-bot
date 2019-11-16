@@ -1,14 +1,14 @@
-import * as discord from 'discord.js';
-import {
-    describe, it, beforeEach, afterEach, before, after, utils,
-} from 'mocha';
-import { assert, expect, } from 'chai';
-import sinon from 'sinon';
-import { Subscription } from 'rxjs';
-import { Conversation, } from '../conversation';
-import { MessageWrapper, } from '../messageWrapper';
+// import * as discord from 'discord.js';
+// import {
+//     describe, it, beforeEach, afterEach, before, after, utils,
+// } from 'mocha';
+// import { assert, expect, } from 'chai';
+// import sinon from 'sinon';
+// import { Subscription } from 'rxjs';
+// import { Conversation, } from '../conversation';
+// import { MessageWrapper, } from '../messageWrapper';
 
-describe('Conversation Component', (): void => {
+// describe('Conversation Component', (): void => {
     // let testMessage: discord.Message;
     // const testChannel: discord.TextChannel = {
     //     send: (content, options?):
@@ -50,4 +50,4 @@ describe('Conversation Component', (): void => {
     // after((): void => {
     //     nextStub.restore();
     // });
-});
+// });

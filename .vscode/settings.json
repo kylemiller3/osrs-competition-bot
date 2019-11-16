@@ -19,6 +19,7 @@
         "UNSIGNUP",
         "Unnotified",
         "appenders",
+        "bigint",
         "cast",
         "ddthh",
         "f",
@@ -45,6 +46,7 @@
         "upcoming",
         "updateleaderboard",
         "updatescore",
+        "upsert",
         "uuidv"
     ]
 }

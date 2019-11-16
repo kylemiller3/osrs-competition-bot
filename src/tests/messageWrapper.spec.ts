@@ -17,7 +17,7 @@ import Rx, {
 } from 'rxjs';
 import { observe, DoneFunction, marbles, } from 'rxjs-marbles/mocha';
 import { Event, } from '../event';
-import { Db2, } from '../database';
+import { Db, } from '../database';
 import { Utils, } from '../utils';
 import { MessageWrapper, } from '../messageWrapper';
 import { Network, } from '../network';

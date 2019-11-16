@@ -66,10 +66,9 @@ export namespace MessageWrapper {
                             bound,
                         ).pipe(
                             // eslint-disable-next-line comma-dangle
-                            // @ts-ignore
-                            map((x): (discord.Message | null)[] => [x].flatMap(
+                            map((x: discord.Message | discord.Message[] | null): (discord.Message | null)[] => [x].flatMap(
                                 // @ts-ignore
-                                (t): (discord.Message | discord.Message[] | null) => t
+                                (t: discord.Message | discord.Message[] | null): (discord.Message | discord.Message[] | null) => t
                             ))
                         );
                     }

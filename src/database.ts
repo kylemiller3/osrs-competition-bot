@@ -3,17 +3,24 @@ import pgp, { PreparedStatement, } from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
+import { Settings, } from './settings';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace Db2 {
+export namespace Db {
 
     enum TABLES {
         EVENTS = 'events',
+        SETTINGS = 'settings',
     }
 
     enum EVENTS_COL {
         ID = 'id',
         EVENT = 'event',
+    }
+
+    enum SETTINGS_COL {
+        GUILD_ID = 'guild_id',
+        CHANNEL_ID = 'channel_id',
     }
 
     export const initOptions: pgp.IInitOptions = {
@@ -98,11 +105,26 @@ export namespace Db2 {
         password: '123',
     });
 
-    export const createTable = (
-        db: pgp.IDatabase<unknown>,
+    export const createTables = (
+        db: pgp.IDatabase<unknown, pg.IClient> = Db.mainDb,
     ): Promise<unknown> => db.tx(
         async (task: pgp.ITask<unknown>):
         Promise<void> => {
+            //---------------
+            // Settings table
+            //---------------
+            task.none({
+                text: 'CREATE TABLE IF NOT EXISTS '
+                + `${TABLES.SETTINGS}`
+                + '('
+                    + `${SETTINGS_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
+                    + `${SETTINGS_COL.CHANNEL_ID} TEXT NOT NULL`
+                + ')',
+            });
+
+            //------------
+            // Event table
+            //------------
             task.none({
                 text: 'CREATE OR REPLACE FUNCTION '
                 + 'f_cast_isots(text) '
@@ -216,7 +238,7 @@ export namespace Db2 {
         }
     );
 
-    export const insertNewEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    const insertNewEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'insert new event',
         text: `INSERT INTO ${TABLES.EVENTS} `
         + `(${EVENTS_COL.EVENT}) `
@@ -224,18 +246,18 @@ export namespace Db2 {
         + '($1) '
         + `RETURNING ${EVENTS_COL.ID}`,
     });
-    export const updateEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    const updateEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'update event',
         text: `UPDATE ${TABLES.EVENTS} `
         + 'SET '
         + `${EVENTS_COL.EVENT} = $2 `
         + 'WHERE '
-        + `${EVENTS_COL.ID} = $1 `
+        + `${EVENTS_COL.ID} = $1::bigint `
         + `RETURNING ${EVENTS_COL.ID}`,
     });
     export const insertOrUpdateEvent = (
-        db: pgp.IDatabase<unknown>,
-        event: Event.Event,
+        event: Event.Object,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<{id: number}> => {
         if (event.id === undefined) {
             return db.one(
@@ -258,15 +280,37 @@ export namespace Db2 {
             + `${EVENTS_COL.ID}, `
             + `${EVENTS_COL.EVENT} `
             + 'FROM '
-            + `${TABLES.EVENTS}`,
+            + `${TABLES.EVENTS} `
+            + 'ORDER BY '
+            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp ASC, `
+            + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp ASC, `
+            + `${EVENTS_COL.ID} ASC`,
     });
     export const fetchAllEvents = (
-        db: pgp.IDatabase<unknown>,
-    ): Promise<Event.Event[]> => db.manyOrNone(
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[]> => db.manyOrNone(
         fetchAllEventsStmt,
     );
 
-    const fetchAllCreatorGuildsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    const fetchEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch event',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + `${EVENTS_COL.ID} = $1::bigint`,
+    });
+    export const fetchEvent = (
+        id: number,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object | null> => db.oneOrNone(
+        fetchEventStmt,
+        id,
+    );
+
+    const fetchAllCreatorsGuildStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all owned events',
         text: 'SELECT '
             + `${EVENTS_COL.ID}, `
@@ -274,17 +318,17 @@ export namespace Db2 {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'WHERE '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1`,
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`,
     });
     export const fetchCreatorEvents = (
-        db: pgp.IDatabase<unknown>,
         guildId: string,
-    ): Promise<Event.Event[]> => db.manyOrNone(
-        fetchAllCreatorGuildsStmt,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[]> => db.manyOrNone(
+        fetchAllCreatorsGuildStmt,
         guildId,
     );
 
-    const fetchAllGuildStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    const fetchAllGuildEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all guild events',
         text: 'SELECT '
             + `${EVENTS_COL.ID}, `
@@ -294,17 +338,61 @@ export namespace Db2 {
             + 'WHERE '
             + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
             + 'OR '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`,
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text `
+            + 'ORDER BY '
+            + `${EVENTS_COL.ID} DESC`,
     });
     export const fetchAllGuildEvents = (
-        db: pgp.IDatabase<unknown>,
         guildId: string,
-    ): Promise<Event.Event[]> => db.manyOrNone(
-        fetchAllGuildStmt,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[]> => db.manyOrNone(
+        fetchAllGuildEventsStmt,
         [
             guildId,
         ],
     );
+
+    // const fetchGuildIdAdjustedEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    //     name: 'fetch owned event id adjusted',
+    //     text: 'SELECT '
+    //         + `${EVENTS_COL.ID}, `
+    //         + `${EVENTS_COL.EVENT}, `
+    //         + 'row_number() '
+    //         + 'OVER '
+    //         + '('
+    //             + 'ORDER BY '
+    //             + `${EVENTS_COL.ID} `
+    //             + 'DESC'
+    //         + ') '
+    //         + 'AS relativeRowNumber '
+    //         + 'FROM '
+    //         + '('
+    //             + 'SELECT '
+    //             + `${EVENTS_COL.ID}, `
+    //             + `${EVENTS_COL.EVENT} `
+    //             + 'FROM '
+    //             + `${TABLES.EVENTS} `
+    //             + 'WHERE '
+    //             + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
+    //             + 'OR '
+    //             + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`
+    //             + 'ORDER BY '
+    //             + `${EVENTS_COL.ID} DESC`
+    //         + ') '
+    //         + 'WHERE '
+    //         + 'relativeRowNumber = $2::bigint',
+    // });
+    // export const fetchGuildIdAdjustedEvent = (
+    //     db: pgp.IDatabase<unknown>,
+    //     guildId: string,
+    //     relativeRowNumber: number,
+    // ): Promise<Event.Event | null> => db.oneOrNone(
+    //     fetchGuildIdAdjustedEventStmt,
+    //     [
+    //         guildId,
+    //         relativeRowNumber,
+    //     ],
+    // );
 
     const fetchAllOfAParticipantsEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch a participant\'s events',
@@ -318,9 +406,9 @@ export namespace Db2 {
             + 'teams->\'participants\' @> jsonb_build_array(jsonb_build_object(\'discordId\', $1::text))',
     });
     export const fetchAllOfAParticipantsEvents = (
-        db: pgp.IDatabase<unknown>,
         discordId: string,
-    ): Promise<Event.Event[]> => db.manyOrNone(
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[]> => db.manyOrNone(
         fetchAllOfAParticipantsEventsStmt,
         discordId,
     );
@@ -342,10 +430,10 @@ export namespace Db2 {
             + ')',
     });
     export const fetchEventsStartingBetweenDates = (
-        db: pgp.IDatabase<unknown>,
         dateA: Date,
         dateB: Date,
-    ): Promise<Event.Event[]> => db.manyOrNone(
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[]> => db.manyOrNone(
         eventsBetweenDatesStmt,
         [
             dateA.toISOString(),
@@ -378,11 +466,11 @@ export namespace Db2 {
             + ')',
     });
     export const fetchAllGuildEventsBetweenDates = (
-        db: pgp.IDatabase<unknown>,
         guildId: string,
         dateA: Date,
         dateB: Date,
-    ): Promise<Event.Event[]> => db.manyOrNone(
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[]> => db.manyOrNone(
         guildEventsBetweenDatesStmt,
         [
             guildId,
@@ -396,13 +484,40 @@ export namespace Db2 {
         text: 'DELETE FROM '
             + `${TABLES.EVENTS}`
             + ' WHERE '
-            + `${EVENTS_COL.ID} = $1`,
+            + `${EVENTS_COL.ID} = $1::bigint`,
     });
     export const deleteEvent = (
-        db: pgp.IDatabase<unknown>,
         eventId: number,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<null> => db.none(
         deleteEventStmt,
         eventId,
+    );
+
+    const upsertSettingsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'insert new settings',
+        text: `INSERT INTO ${TABLES.SETTINGS} `
+        + '('
+            + `${SETTINGS_COL.GUILD_ID}, `
+            + `${SETTINGS_COL.CHANNEL_ID} `
+        + ')'
+        + 'VALUES '
+        + '($1, $2) '
+        + 'ON CONFLICT '
+        + `(${SETTINGS_COL.GUILD_ID}) `
+        + 'DO UPDATE '
+        + 'SET '
+        + `${SETTINGS_COL.CHANNEL_ID} = $2 `
+        + `RETURNING ${SETTINGS_COL.CHANNEL_ID}`,
+    });
+    export const upsertSettings = (
+        settings: Settings.Object,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<{channelId: string}> => db.one(
+        upsertSettingsStmt,
+        [
+            settings.guildId,
+            settings.channelId,
+        ],
     );
 }

@@ -4,6 +4,7 @@ import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
 import { Utils, } from '../utils';
+import { Db } from '../database';
 
 class EventAdd extends Conversation {
     produceQ(): string | null {
@@ -41,7 +42,7 @@ class EventAdd extends Conversation {
         }
     }
 
-    consumeQa(qa: Qa): Promise<void> {
+    async consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
@@ -225,7 +226,7 @@ class EventAdd extends Conversation {
                     this.confirmationMessage = 'Cancelled.';
                 } else {
                     // save here
-                    const event: Event.Event = {
+                    const event: Event.Object = {
                         name: this.param.name as string,
                         when: {
                             start: this.param.start as Date,
@@ -239,7 +240,9 @@ class EventAdd extends Conversation {
                         teams: [],
                         tracker: this.param.tracker as Event.Tracker,
                     };
-                    this.confirmationMessage = 'Saved event to database.'; // saved yes or no
+                    const obj = await Db.insertOrUpdateEvent(event);
+                    Utils.logger.trace(`Saved event id ${obj.id} to database.`);
+                    this.confirmationMessage = 'Event successfully scheduled.';
                     this.state = CONVERSATION_STATE.DONE;
                 }
                 break;
@@ -263,6 +266,7 @@ const eventsAdd = (
         msg,
         eventAddConversation
     );
+
     // const params: Command.EventsAdd = Command.parseParameters(
     //     Command.ALL.EVENTS_ADD,
     //     msg.content,
