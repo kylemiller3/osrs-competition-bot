@@ -448,6 +448,15 @@ const insertEventB: Event.Object = {
     },
 };
 
+const settingsA: Settings.Object = {
+    guildId: 'guild 1',
+    channelId: 'channel 1',
+};
+
+const settingsB: Settings.Object = {
+    guildId: 'guild 2',
+    channelId: 'channel 2',
+};
 
 describe('Postgres Database', (): void => {
     Utils.logger.level = 'fatal';
@@ -462,32 +471,40 @@ describe('Postgres Database', (): void => {
             connection.done();
         });
     });
-    describe('Create event table', async (): Promise<void> => {
+    describe('Create tables', async (): Promise<void> => {
         it('should not throw an error.', async (): Promise<void> => {
             await Db.testDb.none({
-                text: 'DROP TABLE IF EXISTS events',
+                text: 'DROP TABLE IF EXISTS events, settings',
             });
             await Db.createTables(Db.testDb);
         });
     });
-    describe('Insert event', async (): Promise<void> => {
-        let idA: {id: number};
-        let idB: {id: number};
+    describe('Upsert event', async (): Promise<void> => {
+        let a: Event.Object;
+        let b: Event.Object;
         it('should not throw an error.', async (): Promise<void> => {
-            idB = await Db.insertOrUpdateEvent(insertEventB, Db.testDb);
-            idA = await Db.insertOrUpdateEvent(
+            b = await Db.upsertEvent(insertEventB, Db.testDb);
+            a = await Db.upsertEvent(
                 insertEventA,
                 Db.testDb
             );
-            insertEventA.id = idA.id;
-            insertEventB.id = idB.id;
+            insertEventA.id = a.id;
+            insertEventB.id = b.id;
         });
         it('should have uniquely defined row values.', (): void => {
-            expect(idA).to.not.be.null;
-            expect(idA).to.not.be.undefined;
-            expect(idB).to.not.be.null;
-            expect(idB).to.not.be.undefined;
-            expect(idA).to.not.equal(idB);
+            expect(a).to.not.be.null;
+            expect(a).to.not.be.undefined;
+            expect(b).to.not.be.null;
+            expect(b).to.not.be.undefined;
+            expect(a.id).to.not.be.null;
+            expect(a.id).to.not.be.undefined;
+            expect(b.id).to.not.be.null;
+            expect(b.id).to.not.be.undefined;
+            expect(a.id).to.not.equal(b.id);
+        });
+        it('should have same inserted event names.', (): void => {
+            expect(a.name).to.equal(insertEventA.name);
+            expect(b.name).to.equal(insertEventB.name);
         });
         it('should fail when starting date is greater than ending date.', async (): Promise<void> => {
             const event: Event.Object = {
@@ -498,7 +515,7 @@ describe('Postgres Database', (): void => {
                 },
             };
             let failed = false;
-            await Db.insertOrUpdateEvent(
+            await Db.upsertEvent(
                 event,
                 Db.testDb
             ).catch((): void => {
@@ -515,7 +532,7 @@ describe('Postgres Database', (): void => {
                 },
             };
             let failed = false;
-            await Db.insertOrUpdateEvent(
+            await Db.upsertEvent(
                 event,
                 Db.testDb
             ).catch((): void => {
@@ -532,7 +549,7 @@ describe('Postgres Database', (): void => {
                 },
             };
             let failed = false;
-            await Db.insertOrUpdateEvent(
+            await Db.upsertEvent(
                 event,
                 Db.testDb
             ).catch((): void => {
@@ -551,7 +568,7 @@ describe('Postgres Database', (): void => {
                 ],
             };
             let failed = false;
-            await Db.insertOrUpdateEvent(
+            await Db.upsertEvent(
                 event,
                 Db.testDb
             ).catch((): void => {
@@ -559,18 +576,14 @@ describe('Postgres Database', (): void => {
             });
             assert(failed);
         });
-    });
-    describe('Update event', async (): Promise<void> => {
-        let idB: {id: number};
-        it('should not throw an error.', async (): Promise<void> => {
-            insertEventB.name = 'updated event B';
-            idB = await Db.insertOrUpdateEvent(
-                insertEventB,
+        it('should update event name.', async (): Promise<void> => {
+            const b1: Event.Object = { ...insertEventB, name: 'updated event B', };
+            b = await Db.upsertEvent(
+                b1,
                 Db.testDb
             );
-        });
-        it('should have same id as event updated.', async (): Promise<void> => {
-            expect(idB.id).to.equal(insertEventB.id);
+            expect(b.id).to.equal(b1.id);
+            expect(b.name).to.equal(b1.name);
         });
     });
     describe('Fetch all events', async (): Promise<void> => {
@@ -721,24 +734,50 @@ describe('Postgres Database', (): void => {
             );
         });
     });
-    // incomplete
     describe('Upsert settings', async (): Promise<void> => {
         it('should not throw an error.', async (): Promise<void> => {
-            const settings: Settings.Object = {
-                guildId: 'guild 1',
-                channelId: 'channel 1',
-            };
-            await Db.upsertSettings(
-                settings,
+            Db.upsertSettings(
+                settingsA,
+                Db.testDb,
+            );
+            Db.upsertSettings(
+                settingsB,
                 Db.testDb,
             );
         });
-    });
-    describe('Clean up', async (): Promise<void> => {
-        it('should drop events table.', async (): Promise<void> => {
-            await Db.testDb.none({
-                text: 'DROP TABLE events',
-            });
+        it('should update a channel id.', async (): Promise<void> => {
+            const a: Settings.Object = { ...settingsB, channelId: 'changed', };
+            const b: Settings.Object = await Db.upsertSettings(
+                a,
+                Db.testDb,
+            );
+            expect(b.guildId).to.be.equal(a.guildId);
+            expect(b.channelId).to.be.equal('changed');
         });
     });
+    describe('Fetch settings', async (): Promise<void> => {
+        it('should not return a settings.', async (): Promise<void> => {
+            const s: Settings.Object | null = await Db.fetchSettings(
+                'invalid',
+                Db.testDb,
+            );
+            expect(s).to.be.null;
+        });
+        it('should return correct settings.', async (): Promise<void> => {
+            const s: Settings.Object | null = await Db.fetchSettings(
+                'guild 1',
+                Db.testDb,
+            );
+            expect(s).to.not.be.null;
+            // @ts-ignore
+            expect(JSON.stringify(s)).to.be.equal(JSON.stringify(settingsA));
+        });
+    });
+    // describe('Clean up', async (): Promise<void> => {
+    //     it('should drop events table.', async (): Promise<void> => {
+    //         await Db.testDb.none({
+    //             text: 'DROP TABLE events, settings',
+    //         });
+    //     });
+    // });
 });

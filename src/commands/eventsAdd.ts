@@ -240,7 +240,7 @@ class EventAdd extends Conversation {
                         teams: [],
                         tracker: this.param.tracker as Event.Tracker,
                     };
-                    const obj = await Db.insertOrUpdateEvent(event);
+                    const obj = await Db.upsertEvent(event);
                     Utils.logger.trace(`Saved event id ${obj.id} to database.`);
                     this.confirmationMessage = 'Event successfully scheduled.';
                     this.state = CONVERSATION_STATE.DONE;

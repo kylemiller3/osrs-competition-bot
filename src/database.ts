@@ -244,7 +244,7 @@ export namespace Db {
         + `(${EVENTS_COL.EVENT}) `
         + 'VALUES '
         + '($1) '
-        + `RETURNING ${EVENTS_COL.ID}`,
+        + 'RETURNING *',
     });
     const updateEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'update event',
@@ -253,25 +253,27 @@ export namespace Db {
         + `${EVENTS_COL.EVENT} = $2 `
         + 'WHERE '
         + `${EVENTS_COL.ID} = $1::bigint `
-        + `RETURNING ${EVENTS_COL.ID}`,
+        + 'RETURNING *',
     });
-    export const insertOrUpdateEvent = (
+    export const upsertEvent = async (
         event: Event.Object,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<{id: number}> => {
+    ): Promise<Event.Object> => {
         if (event.id === undefined) {
-            return db.one(
+            const ret: {id: number; event: Event.Object} = await db.one(
                 insertNewEventStmt,
                 JSON.stringify(event),
             );
+            return { ...event, id: ret.id, };
         }
-        return db.one(
+        const ret: {id: number; event: Event.Object} = await db.one(
             updateEventStmt,
             [
                 event.id,
                 JSON.stringify(event),
             ],
         );
+        return { ...event, id: ret.id, };
     };
 
     const fetchAllEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -508,16 +510,54 @@ export namespace Db {
         + 'DO UPDATE '
         + 'SET '
         + `${SETTINGS_COL.CHANNEL_ID} = $2 `
-        + `RETURNING ${SETTINGS_COL.CHANNEL_ID}`,
+        + 'RETURNING *',
     });
-    export const upsertSettings = (
+    export const upsertSettings = async (
         settings: Settings.Object,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<{channelId: string}> => db.one(
-        upsertSettingsStmt,
-        [
-            settings.guildId,
-            settings.channelId,
-        ],
-    );
+    ): Promise<Settings.Object> => {
+        const ret: {
+            [SETTINGS_COL.GUILD_ID]: string
+            [SETTINGS_COL.CHANNEL_ID]: string
+        } = await db.one(
+            upsertSettingsStmt,
+            [
+                settings.guildId,
+                settings.channelId,
+            ],
+        );
+        return {
+            guildId: ret[SETTINGS_COL.GUILD_ID],
+            channelId: ret[SETTINGS_COL.CHANNEL_ID],
+        };
+    };
+
+    const fetchSettingsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch settings',
+        text: 'SELECT * FROM '
+        + `${TABLES.SETTINGS} `
+        + 'WHERE '
+        + `${SETTINGS_COL.GUILD_ID} = $1`,
+    });
+    export const fetchSettings = async (
+        guildId: string,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Settings.Object | null> => {
+        const ret: {
+            [SETTINGS_COL.GUILD_ID]: string
+            [SETTINGS_COL.CHANNEL_ID]: string
+        } | null = await db.oneOrNone(
+            fetchSettingsStmt,
+            [
+                guildId,
+            ],
+        );
+        if (ret !== null) {
+            return {
+                guildId: ret[SETTINGS_COL.GUILD_ID],
+                channelId: ret[SETTINGS_COL.CHANNEL_ID],
+            };
+        }
+        return null;
+    };
 }
