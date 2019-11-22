@@ -18,6 +18,7 @@
         "UNFINALIZED",
         "UNSIGNUP",
         "Unnotified",
+        "Upserted",
         "appenders",
         "bigint",
         "cast",

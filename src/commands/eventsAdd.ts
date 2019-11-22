@@ -4,9 +4,27 @@ import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
 import { Utils, } from '../utils';
-import { Db } from '../database';
+import { Db, } from '../database';
 
-class EventAdd extends Conversation {
+interface Info {
+    name: string | null
+    start: Date
+    end: Date
+    tracker: Event.Tracker
+    global: boolean
+}
+
+class EventAddConversation extends Conversation {
+    info: Info = {
+        name: null,
+        start: new Date(),
+        end: Utils.distantFuture,
+        tracker: {
+            tracking: Event.Tracking.NONE,
+        },
+        global: false,
+    };
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -18,25 +36,25 @@ class EventAdd extends Conversation {
             case CONVERSATION_STATE.Q2E:
                 return 'Failed to set date.';
             case CONVERSATION_STATE.Q2C:
-                return `Starting date is set for ${this.param.start.toString()}. Is this ok? y/N`;
+                return `Starting date is set for ${this.info.start.toString()}. Is this ok? y/N`;
             case CONVERSATION_STATE.Q3:
                 return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR tbd for long running event.';
             case CONVERSATION_STATE.Q3E:
                 return 'Failed to set date. Maybe your event end before it starts?';
             case CONVERSATION_STATE.Q3C:
-                return `Ending date is set for ${this.param.end.toString()}. Is this ok? y/N`;
+                return `Ending date is set for ${this.info.end.toString()}. Is this ok? y/N`;
             case CONVERSATION_STATE.Q4:
                 return 'Which type of event would you like?\nChoices are casual, skills with skill name list, bh with bh mode (rogue and/or hunter), lms, clues with clue difficulty list, or custom.';
             case CONVERSATION_STATE.Q4E:
                 return 'Could not set event type.';
             case CONVERSATION_STATE.Q4C:
-                return `Event will be of type ${(this.param.tracker as Event.Tracker).tracking} and track ${(this.param.tracker as Event.Tracker).what === undefined ? 'nothing' : (this.param.tracker as Event.Tracker).what}. Is this ok? y/N`;
+                return `Event will be of type ${(this.info.tracker as Event.Tracker).tracking} and track ${(this.info.tracker as Event.Tracker).what === undefined ? 'nothing' : (this.info.tracker as Event.Tracker).what}. Is this ok? y/N`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q5E:
                 return 'Could not set global flag. Try yes or no.';
             case CONVERSATION_STATE.CONFIRM:
-                return `The event looks like this:\n${JSON.stringify(this.param, null, 2)}\n\nIs this ok? y/N`;
+                return `The event looks like this:\n${JSON.stringify(this.info, null, 2)}\n\nIs this ok? y/N`;
             default:
                 return null;
         }
@@ -50,7 +68,7 @@ class EventAdd extends Conversation {
                 if (name.length === 0) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    this.param.name = name;
+                    this.info.name = name;
                     this.state = CONVERSATION_STATE.Q2;
                 }
                 break;
@@ -66,7 +84,7 @@ class EventAdd extends Conversation {
                 if (!Utils.isValidDate(start)) {
                     this.state = CONVERSATION_STATE.Q2E;
                 } else {
-                    this.param.start = start;
+                    this.info.start = start;
                     this.state = CONVERSATION_STATE.Q2C;
                 }
                 break;
@@ -87,11 +105,11 @@ class EventAdd extends Conversation {
                     ? new Date(
                         dateStr
                     )
-                    : new Date('9999-12-31Z');
-                if (!Utils.isValidDate(end) || this.param.start >= end) {
+                    : Utils.distantFuture;
+                if (!Utils.isValidDate(end) || this.info.start >= end) {
                     this.state = CONVERSATION_STATE.Q3E;
                 } else {
-                    this.param.end = end;
+                    this.info.end = end;
                     this.state = CONVERSATION_STATE.Q3C;
                 }
                 break;
@@ -196,7 +214,7 @@ class EventAdd extends Conversation {
                             what,
                         };
                     }
-                    this.param.tracker = tracker;
+                    this.info.tracker = tracker;
                     this.state = CONVERSATION_STATE.Q4C;
                 } else {
                     this.state = CONVERSATION_STATE.Q4E;
@@ -215,7 +233,7 @@ class EventAdd extends Conversation {
             case CONVERSATION_STATE.Q5:
             case CONVERSATION_STATE.Q5E: {
                 const global: string = qa.answer.content;
-                this.param.global = Utils.isYes(global);
+                this.info.global = Utils.isYes(global);
                 this.state = CONVERSATION_STATE.CONFIRM;
                 break;
             }
@@ -223,14 +241,14 @@ class EventAdd extends Conversation {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.state = CONVERSATION_STATE.DONE;
-                    this.confirmationMessage = 'Cancelled.';
+                    this.returnMessage = 'Cancelled.';
                 } else {
                     // save here
                     const event: Event.Object = {
-                        name: this.param.name as string,
+                        name: this.info.name as string,
                         when: {
-                            start: this.param.start as Date,
-                            end: this.param.end as Date,
+                            start: this.info.start as Date,
+                            end: this.info.end as Date,
                         },
                         guilds: {
                             creator: {
@@ -238,11 +256,11 @@ class EventAdd extends Conversation {
                             },
                         },
                         teams: [],
-                        tracker: this.param.tracker as Event.Tracker,
+                        tracker: this.info.tracker as Event.Tracker,
                     };
                     const obj = await Db.upsertEvent(event);
                     Utils.logger.trace(`Saved event id ${obj.id} to database.`);
-                    this.confirmationMessage = 'Event successfully scheduled.';
+                    this.returnMessage = 'Event successfully scheduled.';
                     this.state = CONVERSATION_STATE.DONE;
                 }
                 break;
@@ -256,47 +274,47 @@ class EventAdd extends Conversation {
 
 /**
  * Validates and prepares an event
- * @param msg the input Discord message
+ * @info msg the input Discord message
  */
 const eventsAdd = (
     msg: discord.Message
 ): void => {
-    const eventAddConversation = new EventAdd(msg);
+    const eventAddConversation = new EventAddConversation(
+        msg,
+    );
     ConversationManager.startNewConversation(
         msg,
         eventAddConversation
     );
 
-    // const params: Command.EventsAdd = Command.parseParameters(
-    //     Command.ALL.EVENTS_ADD,
-    //     msg.content,
-    // );
-
+    // probably too complicated to use
+    // just leave it commented
+    //
     // let errors: string[] = [];
-    // if (params.name === undefined) {
+    // if (infos.name === undefined) {
     //     errors = [
     //         ...errors,
     //         '\'name\' is required but was undefined.',
     //     ];
     // }
 
-    // if (params.type === undefined) {
+    // if (infos.type === undefined) {
     //     errors = [
     //         ...errors,
     //         '\'type\' is required but was undefined.',
     //     ];
     // }
 
-    // const start: Date = params.starting !== undefined
+    // const start: Date = infos.starting !== undefined
     //     ? new Date(
-    //         params.starting
+    //         infos.starting
     //     )
     //     : new Date();
-    // const end: Date = params.ending !== undefined
+    // const end: Date = infos.ending !== undefined
     //     ? new Date(
-    //         params.ending
+    //         infos.ending
     //     )
-    //     : new Date('9999-12-31Z');
+    //     : Utils.distantFuture;
 
     // if (!Utils.isValidDate(start)) {
     //     errors = [
@@ -332,7 +350,7 @@ const eventsAdd = (
     //     Event.Tracking
     // ).find(
     //     (value: string):
-    //     boolean => params.type
+    //     boolean => infos.type
     //         .toLowerCase()
     //         .trim()
     //         .startsWith(value)
@@ -340,7 +358,7 @@ const eventsAdd = (
 
     // let what: Event.BountyHunter[] | Event.Clues[] | Event.Skills[];
     // if (tracking !== undefined) {
-    //     const tracks: string = params.type
+    //     const tracks: string = infos.type
     //         .toLowerCase()
     //         .trim()
     //         .split(tracking)[1];
@@ -431,7 +449,7 @@ const eventsAdd = (
     //             discordId: msg.guild.id,
     //         },
     //     ],
-    //     name: params.name,
+    //     name: infos.name,
     //     when: {
     //         start,
     //         end,

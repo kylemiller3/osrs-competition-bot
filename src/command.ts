@@ -82,6 +82,7 @@ export namespace Command {
         ending: string
         type: string
         teams: boolean
+        global: boolean
     }
 
     /**
@@ -323,7 +324,7 @@ export namespace Command {
     export interface EventsSignup {
         id: number
         rsn: string
-        team: string
+        team?: string
     }
 
     /**

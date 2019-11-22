@@ -48,12 +48,12 @@ export abstract class Conversation {
     qa: Qa[];
     opMessage: discord.Message;
     uuid: string;
-    qaSub: Subscription
+    qaSub: Subscription | undefined
     nextQa$: Observable<Qa>;
     errorInjector$: Subject<Qa>;
-    param: Record<string, string | number | boolean | Date | {}>;
     state: CONVERSATION_STATE;
-    confirmationMessage: string;
+    returnMessage: string;
+    params: Record<string, any>;
 
     static parser = <T>(command: Command.ALL, paramName: string, answer: string):
     Record<string, T> => Command.parseParameters<Record<string, T>>(
@@ -63,15 +63,14 @@ export abstract class Conversation {
 
     constructor(
         opMessage: discord.Message,
-
+        params: Record<string, any> = {},
     ) {
+        this.params = params;
         this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
         this.errorInjector$ = new Subject<Qa>();
-        this.param = {};
-        this.state = CONVERSATION_STATE.Q1;
-        this.confirmationMessage = 'This shouldn\'t be visible!';
+        this.returnMessage = 'This shouldn\'t be visible!';
 
         const nextA$ = messageReceived$.pipe(
             // need op message state
@@ -126,13 +125,6 @@ export abstract class Conversation {
 
         const nextQa$ = nextA$.pipe(
             withLatestFrom(nextQ$),
-            // distinctUntilChanged(
-            //     (x, y): boolean => {
-            //         const xContent = x[0].content;
-            //         const yContent = y[0].content;
-            //         return xContent === yContent;
-            //     }
-            // ),
             map(
                 (value: [discord.Message, MessageWrapper.Response]):
                 Qa => ({
@@ -140,21 +132,6 @@ export abstract class Conversation {
                     questions: value[1].messages,
                 })
             ),
-            // tap(
-            //     (arr: [discord.Message, MessageWrapper.Response]):
-            //     void => {
-            //         if (this.qa[this.qa.length - 1]) {
-            //             // check to see if our question is distinct or assign
-            //             // this.qa[this.qa.length]
-            //             // DO I NEED THIS????
-            //         }
-            //         // DO I NEED THIS???
-            //         this.qa.push({
-            //             questions: arr[1].messages,
-            //             answer: arr[0],
-            //         });
-            //     }
-            // ),
             catchError(
                 (error: Error):
                 Observable<Qa> => {
@@ -187,19 +164,15 @@ export abstract class Conversation {
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
                 } else {
-                    const sendInfo: MessageWrapper.SendInfo = {
-                        message: this.opMessage,
-                        content: this.confirmationMessage,
-                        tag: this.uuid,
-                    };
-                    MessageWrapper.sendMessage$.next(sendInfo);
-                    Utils.logger.trace(`Conversation with ${this.opMessage.author.username} finished successfully.`);
-                    this.qaSub.unsubscribe();
+                    this.endConversation();
                 }
             },
             (error: Error): void => {
                 Utils.logger.trace(`Conversation ended ${error}`);
-                this.qaSub.unsubscribe();
+                if (this.qaSub !== undefined) {
+                    this.qaSub.unsubscribe();
+                    this.qaSub = undefined;
+                }
             },
         );
 
@@ -207,14 +180,35 @@ export abstract class Conversation {
         Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
     }
 
+    async init(): Promise<void> {
+        this.state = CONVERSATION_STATE.Q1;
+    }
+
     abstract async consumeQa(qa: Qa): Promise<void>;
     abstract produceQ(): string | null;
 
     stopConversation(): void {
-        this.errorInjector$.error(
-            new Error('Stop Conversation was called'),
-        );
-        this.qaSub.unsubscribe();
+        if (this.qaSub !== undefined) {
+            this.errorInjector$.error(
+                new Error('Stop Conversation was called'),
+            );
+            this.qaSub.unsubscribe();
+            this.qaSub = undefined;
+        }
+    }
+
+    endConversation(): void {
+        const sendInfo: MessageWrapper.SendInfo = {
+            message: this.opMessage,
+            content: this.returnMessage,
+            tag: this.uuid,
+        };
+        MessageWrapper.sendMessage$.next(sendInfo);
+        Utils.logger.trace(`Conversation with ${this.opMessage.author.username} finished successfully.`);
+        if (this.qaSub !== undefined) {
+            this.qaSub.unsubscribe();
+            this.qaSub = undefined;
+        }
     }
 }
 
@@ -222,10 +216,10 @@ export abstract class Conversation {
 export namespace ConversationManager {
     const allConversations: Record<string, Conversation> = {};
 
-    export const startNewConversation = (
+    export const startNewConversation = async (
         msg: discord.Message,
         newConversation: Conversation
-    ): void => {
+    ): Promise<void> => {
         const foundConversation: Conversation | undefined = allConversations[
             msg.author.id
         ];
@@ -233,12 +227,14 @@ export namespace ConversationManager {
         if (foundConversation) {
             foundConversation.stopConversation();
         }
-        allConversations[msg.author.id] = newConversation;
 
+        await newConversation.init();
         const question = newConversation.produceQ();
         if (question === null) {
             return;
         }
+
+        allConversations[msg.author.id] = newConversation;
         const sendInfo: MessageWrapper.SendInfo = {
             message: msg,
             content: question,

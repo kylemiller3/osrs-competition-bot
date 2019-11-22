@@ -25,12 +25,14 @@ import eventsSignup from './commands/eventsSignup';
 import eventsUnsignup from './commands/eventsUnsignup';
 import usersStats from './commands/usersStats';
 import help from './commands/help';
+import { Db, } from './database';
 
 /**
  * Global discord client
  * @category Global
  */
 export const gClient: discord.Client = new discord.Client();
+Db.createTables();
 
 /**
  * Observable of all Discord message events

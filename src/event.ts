@@ -112,7 +112,7 @@ export namespace Event {
      * @category Event
      */
     export interface Team {
-        name?: string
+        name: string
         participants: Participant[]
     }
 

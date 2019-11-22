@@ -72,6 +72,13 @@ export namespace Utils {
             date.getTime()
         );
 
+    /**
+     * A date far in the future
+     * @returns a new date far in the future
+     * @category Date
+     */
+    export const distantFuture: Date = new Date('9999-12-31Z');
+
     log4js.configure(
         {
             appenders: {

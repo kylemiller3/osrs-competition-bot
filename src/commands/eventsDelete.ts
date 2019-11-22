@@ -1,6 +1,6 @@
 import * as discord from 'discord.js';
 import { Command, } from '../command';
-import Error, { ERROR } from '../strings';
+import Error, { ERROR, } from '../strings';
 
 const eventsDelete = (
     msg: discord.Message

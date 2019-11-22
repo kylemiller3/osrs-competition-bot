@@ -18,6 +18,18 @@ export namespace Db {
         EVENT = 'event',
     }
 
+    interface EventRow {
+        id: number
+        event: Event.Object
+    }
+
+    const eventRowToEvent = (
+        eventRow: EventRow
+    ): Event.Object => ({
+        id: eventRow.id,
+        ...eventRow.event,
+    });
+
     enum SETTINGS_COL {
         GUILD_ID = 'guild_id',
         CHANNEL_ID = 'channel_id',
@@ -288,11 +300,15 @@ export namespace Db {
             + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp ASC, `
             + `${EVENTS_COL.ID} ASC`,
     });
-    export const fetchAllEvents = (
+    export const fetchAllEvents = async (
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object[]> => db.manyOrNone(
-        fetchAllEventsStmt,
-    );
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            fetchAllEventsStmt,
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    };
 
     const fetchEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch event',
@@ -304,13 +320,17 @@ export namespace Db {
             + 'WHERE '
             + `${EVENTS_COL.ID} = $1::bigint`,
     });
-    export const fetchEvent = (
+    export const fetchEvent = async (
         id: number,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object | null> => db.oneOrNone(
-        fetchEventStmt,
-        id,
-    );
+    ): Promise<Event.Object | null> => {
+        const ret: EventRow | null = await db.oneOrNone(
+            fetchEventStmt,
+            id,
+        );
+        if (ret === null) return null;
+        return eventRowToEvent(ret);
+    };
 
     const fetchAllCreatorsGuildStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all owned events',
@@ -322,13 +342,17 @@ export namespace Db {
             + 'WHERE '
             + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`,
     });
-    export const fetchCreatorEvents = (
+    export const fetchCreatorEvents = async (
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object[]> => db.manyOrNone(
-        fetchAllCreatorsGuildStmt,
-        guildId,
-    );
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            fetchAllCreatorsGuildStmt,
+            guildId,
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    };
 
     const fetchAllGuildEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all guild events',
@@ -344,15 +368,17 @@ export namespace Db {
             + 'ORDER BY '
             + `${EVENTS_COL.ID} DESC`,
     });
-    export const fetchAllGuildEvents = (
+    export const fetchAllGuildEvents = async (
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object[]> => db.manyOrNone(
-        fetchAllGuildEventsStmt,
-        [
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            fetchAllGuildEventsStmt,
             guildId,
-        ],
-    );
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    };
 
     // const fetchGuildIdAdjustedEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
     //     name: 'fetch owned event id adjusted',
@@ -407,13 +433,17 @@ export namespace Db {
             + 'WHERE '
             + 'teams->\'participants\' @> jsonb_build_array(jsonb_build_object(\'discordId\', $1::text))',
     });
-    export const fetchAllOfAParticipantsEvents = (
+    export const fetchAllOfAParticipantsEvents = async (
         discordId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object[]> => db.manyOrNone(
-        fetchAllOfAParticipantsEventsStmt,
-        discordId,
-    );
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            fetchAllOfAParticipantsEventsStmt,
+            discordId,
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    };
 
     const eventsBetweenDatesStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all between dates',
@@ -431,17 +461,21 @@ export namespace Db {
                 + '$1::timestamp, $2::timestamp'
             + ')',
     });
-    export const fetchEventsStartingBetweenDates = (
+    export const fetchEventsStartingBetweenDates = async (
         dateA: Date,
         dateB: Date,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object[]> => db.manyOrNone(
-        eventsBetweenDatesStmt,
-        [
-            dateA.toISOString(),
-            dateB.toISOString(),
-        ]
-    );
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            eventsBetweenDatesStmt,
+            [
+                dateA.toISOString(),
+                dateB.toISOString(),
+            ]
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    };
 
     const guildEventsBetweenDatesStmt: pgp.PreparedStatement = new PreparedStatement({
         name: 'fetch all guild events between dates',
@@ -467,19 +501,23 @@ export namespace Db {
                 + ')'
             + ')',
     });
-    export const fetchAllGuildEventsBetweenDates = (
+    export const fetchAllGuildEventsBetweenDates = async (
         guildId: string,
         dateA: Date,
         dateB: Date,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Object[]> => db.manyOrNone(
-        guildEventsBetweenDatesStmt,
-        [
-            guildId,
-            dateA.toISOString(),
-            dateB.toISOString(),
-        ],
-    );
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            guildEventsBetweenDatesStmt,
+            [
+                guildId,
+                dateA.toISOString(),
+                dateB.toISOString(),
+            ],
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    };
 
     const deleteEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'delete event',
@@ -552,12 +590,10 @@ export namespace Db {
                 guildId,
             ],
         );
-        if (ret !== null) {
-            return {
-                guildId: ret[SETTINGS_COL.GUILD_ID],
-                channelId: ret[SETTINGS_COL.CHANNEL_ID],
-            };
-        }
-        return null;
+        if (ret === null) return null;
+        return {
+            guildId: ret[SETTINGS_COL.GUILD_ID],
+            channelId: ret[SETTINGS_COL.CHANNEL_ID],
+        };
     };
 }

@@ -589,6 +589,7 @@ describe('Postgres Database', (): void => {
     describe('Fetch all events', async (): Promise<void> => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllEvents(Db.testDb);
         });
         it('should have two events.', (): void => {
@@ -619,6 +620,7 @@ describe('Postgres Database', (): void => {
     describe('Fetching owned guild events', async (): Promise<void> => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchCreatorEvents(
                 'testA',
                 Db.testDb,
@@ -636,6 +638,7 @@ describe('Postgres Database', (): void => {
     describe('Fetch all guild events', async (): Promise<void> => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEvents(
                 'testA',
                 Db.testDb
@@ -655,6 +658,7 @@ describe('Postgres Database', (): void => {
     describe('Fetching all participant\'s events', async (): Promise<void> => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllOfAParticipantsEvents(
                 'discord1',
                 Db.testDb
@@ -667,6 +671,7 @@ describe('Postgres Database', (): void => {
     describe('Fetch all events between dates', async (): Promise<void> => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchEventsStartingBetweenDates(
                 new Date('1970-01-01T01:00:00.000Z'),
                 new Date('9999-12-31T01:00:00.000Z'),
@@ -677,6 +682,7 @@ describe('Postgres Database', (): void => {
             expect(fetchedEvents.length).to.equal(1);
         });
         it('should return two events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchEventsStartingBetweenDates(
                 new Date('1970-01-01T00:00:00.000Z'),
                 new Date('9999-12-31T23:59:59.999Z'),
@@ -688,6 +694,7 @@ describe('Postgres Database', (): void => {
     describe('Fetch all guild events between dates', async (): Promise<void> => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEventsBetweenDates(
                 'testA',
                 new Date('9999-12-31T00:00:00.000Z'),
@@ -699,6 +706,7 @@ describe('Postgres Database', (): void => {
             expect(fetchedEvents.length).to.equal(1);
         });
         it('should return no events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEventsBetweenDates(
                 'testA',
                 new Date('9999-12-31T23:59:58.999Z'),
@@ -708,6 +716,7 @@ describe('Postgres Database', (): void => {
             expect(fetchedEvents.length).to.equal(0);
         });
         it('should return one event.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEventsBetweenDates(
                 'testE',
                 new Date('1970-01-01T00:00:00.000Z'),
@@ -717,6 +726,7 @@ describe('Postgres Database', (): void => {
             expect(fetchedEvents.length).to.equal(1);
         });
         it('should return two events.', async (): Promise<void> => {
+            // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEventsBetweenDates(
                 'testA',
                 new Date('1970-01-01T00:00:00.000Z'),
