@@ -22,34 +22,27 @@ class AmISignedUpConversation extends Conversation {
         return signedUp;
     }
 
-    async init(): Promise<void> {
-        const events: Event.Object[] | null = await Db.fetchAllGuildEvents(
-            this.opMessage.guild.id
-        );
-        if (events !== null) {
-            this.events = events;
-        } else {
-            this.state = CONVERSATION_STATE.DONE;
-            this.returnMessage = 'This guild has no events';
-            return;
-        }
+    // async initAndParseParams(): Promise<void> {
+    //     // parsed parameters
 
-        if (this.params.id !== undefined && this.params.id !== null) {
-            this.state = CONVERSATION_STATE.DONE;
-            const foundEvent: Event.Object | undefined = this.events.find(
-                (event: Event.Object):
-                boolean => event.id === this.params.id
-            );
-            if (foundEvent === undefined) {
-                this.returnMessage = 'Could not find event. Hint: find the event id with the list events command.';
-            } else {
-                this.returnMessage = `You are ${AmISignedUpConversation.isSignedUp(foundEvent, this.opMessage.author.id) ? '' : 'not '}signed up.`;
-            }
-            this.endConversation();
-        } else {
-            this.state = CONVERSATION_STATE.Q1;
-        }
-    }
+    //     // is this code valid anymore?
+    //     // if (this.params.id !== undefined && this.params.id !== null) {
+    //     //     this.state = CONVERSATION_STATE.DONE;
+    //     //     const foundEvent: Event.Object | undefined = this.events.find(
+    //     //         (event: Event.Object):
+    //     //         boolean => event.id === this.params.id
+    //     //     );
+    //     //     if (foundEvent === undefined) {
+    //     //         this.returnMessage = 'Could not find event. Hint: find the event id with the list events command.';
+    //     //     } else {
+    //     //         this.returnMessage = `You are ${AmISignedUpConversation.isSignedUp(foundEvent, this.opMessage.author.id) ? '' : 'not '}signed up.`;
+    //     //     }
+    //     //     this.conversationDidEnd();
+    //     // } else {
+    //     //     this.state = CONVERSATION_STATE.Q1;
+    //     // }
+    //     this.state = CONVERSATION_STATE.Q1;
+    // }
 
     produceQ(): string | null {
         switch (this.state) {
@@ -66,20 +59,16 @@ class AmISignedUpConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
-                const eventIdStr: string = qa.answer.content;
-                const eventId: number = Number.parseInt(eventIdStr, 10);
+                const eventId: number = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const foundEvent: Event.Object | undefined = this.events.find(
-                        (event: Event.Object):
-                        boolean => event.id === eventId
-                    );
-                    if (foundEvent === undefined) {
+                    const event: Event.Object | null = await Db.fetchEvent(eventId);
+                    if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
                         this.state = CONVERSATION_STATE.DONE;
-                        this.returnMessage = `You are ${AmISignedUpConversation.isSignedUp(foundEvent, this.opMessage.author.id) ? '' : 'not '}signed up.`;
+                        this.returnMessage = `You are ${AmISignedUpConversation.isSignedUp(event, this.opMessage.author.id) ? '' : 'not '}signed up.`;
                     }
                 }
                 break;

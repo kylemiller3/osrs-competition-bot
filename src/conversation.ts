@@ -70,7 +70,7 @@ export abstract class Conversation {
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
         this.errorInjector$ = new Subject<Qa>();
-        this.returnMessage = 'This shouldn\'t be visible!';
+        this.returnMessage = 'Conversation state error!';
 
         const nextA$ = messageReceived$.pipe(
             // need op message state
@@ -164,7 +164,7 @@ export abstract class Conversation {
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
                 } else {
-                    this.endConversation();
+                    this.conversationDidEnd();
                 }
             },
             (error: Error): void => {
@@ -180,7 +180,7 @@ export abstract class Conversation {
         Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
     }
 
-    async init(): Promise<void> {
+    async initAndParseParams(): Promise<void> {
         this.state = CONVERSATION_STATE.Q1;
     }
 
@@ -197,7 +197,7 @@ export abstract class Conversation {
         }
     }
 
-    endConversation(): void {
+    conversationDidEnd(): void {
         const sendInfo: MessageWrapper.SendInfo = {
             message: this.opMessage,
             content: this.returnMessage,
@@ -228,7 +228,7 @@ export namespace ConversationManager {
             foundConversation.stopConversation();
         }
 
-        await newConversation.init();
+        await newConversation.initAndParseParams();
         const question = newConversation.produceQ();
         if (question === null) {
             return;

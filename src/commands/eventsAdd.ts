@@ -5,26 +5,9 @@ import {
 } from '../conversation';
 import { Utils, } from '../utils';
 import { Db, } from '../database';
-
-interface Info {
-    name: string | null
-    start: Date
-    end: Date
-    tracker: Event.Tracker
-    global: boolean
-}
+import { Command, } from '../command';
 
 class EventAddConversation extends Conversation {
-    info: Info = {
-        name: null,
-        start: new Date(),
-        end: Utils.distantFuture,
-        tracker: {
-            tracking: Event.Tracking.NONE,
-        },
-        global: false,
-    };
-
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -36,25 +19,25 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q2E:
                 return 'Failed to set date.';
             case CONVERSATION_STATE.Q2C:
-                return `Starting date is set for ${this.info.start.toString()}. Is this ok? y/N`;
+                return `Starting date is set for ${this.params.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3:
                 return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR tbd for long running event.';
             case CONVERSATION_STATE.Q3E:
-                return 'Failed to set date. Maybe your event end before it starts?';
+                return 'Failed to set date. Maybe your event ends before it starts?';
             case CONVERSATION_STATE.Q3C:
-                return `Ending date is set for ${this.info.end.toString()}. Is this ok? y/N`;
+                return `Ending date is set for ${this.params.end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
                 return 'Which type of event would you like?\nChoices are casual, skills with skill name list, bh with bh mode (rogue and/or hunter), lms, clues with clue difficulty list, or custom.';
             case CONVERSATION_STATE.Q4E:
                 return 'Could not set event type.';
             case CONVERSATION_STATE.Q4C:
-                return `Event will be of type ${(this.info.tracker as Event.Tracker).tracking} and track ${(this.info.tracker as Event.Tracker).what === undefined ? 'nothing' : (this.info.tracker as Event.Tracker).what}. Is this ok? y/N`;
+                return `Event will be of type ${(this.params.tracker as Event.Tracker).tracking} and track ${(this.params.tracker as Event.Tracker).what === undefined ? 'nothing' : (this.params.tracker as Event.Tracker).what}. Is this ok?`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q5E:
                 return 'Could not set global flag. Try yes or no.';
             case CONVERSATION_STATE.CONFIRM:
-                return `The event looks like this:\n${JSON.stringify(this.info, null, 2)}\n\nIs this ok? y/N`;
+                return `The event looks like this:\n${JSON.stringify(this.params, null, 2)}\n\nIs this ok?`;
             default:
                 return null;
         }
@@ -68,7 +51,7 @@ class EventAddConversation extends Conversation {
                 if (name.length === 0) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    this.info.name = name;
+                    this.params.name = name;
                     this.state = CONVERSATION_STATE.Q2;
                 }
                 break;
@@ -84,7 +67,7 @@ class EventAddConversation extends Conversation {
                 if (!Utils.isValidDate(start)) {
                     this.state = CONVERSATION_STATE.Q2E;
                 } else {
-                    this.info.start = start;
+                    this.params.start = start;
                     this.state = CONVERSATION_STATE.Q2C;
                 }
                 break;
@@ -106,10 +89,10 @@ class EventAddConversation extends Conversation {
                         dateStr
                     )
                     : Utils.distantFuture;
-                if (!Utils.isValidDate(end) || this.info.start >= end) {
+                if (!Utils.isValidDate(end) || this.params.start >= end) {
                     this.state = CONVERSATION_STATE.Q3E;
                 } else {
-                    this.info.end = end;
+                    this.params.end = end;
                     this.state = CONVERSATION_STATE.Q3C;
                 }
                 break;
@@ -214,7 +197,7 @@ class EventAddConversation extends Conversation {
                             what,
                         };
                     }
-                    this.info.tracker = tracker;
+                    this.params.tracker = tracker;
                     this.state = CONVERSATION_STATE.Q4C;
                 } else {
                     this.state = CONVERSATION_STATE.Q4E;
@@ -233,22 +216,21 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q5:
             case CONVERSATION_STATE.Q5E: {
                 const global: string = qa.answer.content;
-                this.info.global = Utils.isYes(global);
+                this.params.global = Utils.isYes(global);
                 this.state = CONVERSATION_STATE.CONFIRM;
                 break;
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.state = CONVERSATION_STATE.DONE;
                     this.returnMessage = 'Cancelled.';
                 } else {
                     // save here
                     const event: Event.Object = {
-                        name: this.info.name as string,
+                        name: this.params.name as string,
                         when: {
-                            start: this.info.start as Date,
-                            end: this.info.end as Date,
+                            start: this.params.start as Date,
+                            end: this.params.end as Date,
                         },
                         guilds: {
                             creator: {
@@ -256,13 +238,13 @@ class EventAddConversation extends Conversation {
                             },
                         },
                         teams: [],
-                        tracker: this.info.tracker as Event.Tracker,
+                        tracker: this.params.tracker as Event.Tracker,
                     };
                     const obj = await Db.upsertEvent(event);
                     Utils.logger.trace(`Saved event id ${obj.id} to database.`);
                     this.returnMessage = 'Event successfully scheduled.';
-                    this.state = CONVERSATION_STATE.DONE;
                 }
+                this.state = CONVERSATION_STATE.DONE;
                 break;
             }
             default:
@@ -279,8 +261,14 @@ class EventAddConversation extends Conversation {
 const eventsAdd = (
     msg: discord.Message
 ): void => {
+    const params: Command.EventsAdd = Command.parseParameters(
+        Command.ALL.EVENTS_ADD,
+        msg.content,
+    );
+
     const eventAddConversation = new EventAddConversation(
         msg,
+        params,
     );
     ConversationManager.startNewConversation(
         msg,

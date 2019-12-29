@@ -2,6 +2,7 @@ import * as log4js from 'log4js';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
+
     /**
      * Checks to see if a string is a yes answer
      * @param input The string to check

@@ -49,7 +49,7 @@ export namespace Db {
             Utils.logger.debug(event.query);
         },
         receive(data: unknown): void {
-            Utils.logger.debug(data);
+            Utils.logger.debug(JSON.stringify(data, null, 2));
         },
         task(event: pgp.IEventContext): void {
             if (event.ctx.finish) {

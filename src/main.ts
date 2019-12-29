@@ -26,6 +26,7 @@ import eventsUnsignup from './commands/eventsUnsignup';
 import usersStats from './commands/usersStats';
 import help from './commands/help';
 import { Db, } from './database';
+import eventsEdit from './commands/eventsEdit';
 
 /**
  * Global discord client
@@ -205,7 +206,7 @@ gClient.login(privateKey);
 commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
 commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
 commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
-// commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
+commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
 commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
 commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
 commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);

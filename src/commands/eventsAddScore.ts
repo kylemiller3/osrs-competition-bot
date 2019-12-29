@@ -2,8 +2,128 @@ import * as discord from 'discord.js';
 import { Command, } from '../command';
 import { Utils, } from '../utils';
 import { Event, } from '../event';
-import { getDisplayNameFromDiscordId, } from '../main';
-import Error from '../strings';
+import {
+    Conversation, CONVERSATION_STATE, Qa, ConversationManager,
+} from '../conversation';
+import { Db, } from '../database';
+
+class AddScoreConversation extends Conversation {
+    // async initAndParseParams(): Promise<void> {
+    //     // we should probably standardize this
+    //     // try to parse and if failed end conversation
+    //     // leave a return message about the error
+
+    //     // do we have a user mention?
+    //     // const userMentions = this.opMessage.mentions.users;
+    //     // if (userMentions.array().length === 0) {
+    //     //     this.state = CONVERSATION_STATE.Q1;
+    //     //     return;
+    //     // }
+
+    //     // params
+    //     // if (this.params.score !== undefined && this.params.score !== null) {
+    //     // }
+    //     this.state = CONVERSATION_STATE.Q1;
+    // }
+
+    produceQ(): string | null {
+        switch (this.state) {
+            case CONVERSATION_STATE.Q1:
+                return 'Add score to which event?';
+            case CONVERSATION_STATE.Q1E:
+                return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
+            case CONVERSATION_STATE.Q2:
+                return 'Add score to which discord user?';
+            case CONVERSATION_STATE.Q2E:
+                return 'Could not find discord user mention.';
+            case CONVERSATION_STATE.Q3:
+                return 'How many points to add?';
+            case CONVERSATION_STATE.Q3E:
+                return 'Could not parse number.';
+            case CONVERSATION_STATE.Q4:
+                return 'Add a note to this score for record keeping?';
+            case CONVERSATION_STATE.Q4O:
+                return 'Enter your note.';
+            case CONVERSATION_STATE.Q4E:
+                return 'Could not add a note.';
+            case CONVERSATION_STATE.CONFIRM:
+                return `Add ${this.params.score} to user ${this.params.user ? this.params.user.username : '(ERROR)'} for event ${this.params.event ? this.params.event.name : '(ERROR)'}?`;
+            default:
+                return null;
+        }
+    }
+
+    async consumeQa(qa: Qa): Promise<void> {
+        switch (this.state) {
+            case CONVERSATION_STATE.Q1:
+            case CONVERSATION_STATE.Q1E: {
+                const eventId = Number.parseInt(qa.answer.content, 10);
+                if (Number.isNaN(eventId)) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                } else {
+                    const event: Event.Object | null = await Db.fetchEvent(eventId);
+                    if (event === null) {
+                        this.state = CONVERSATION_STATE.Q1E;
+                    } else {
+                        this.params.event = event;
+                        this.state = CONVERSATION_STATE.Q2;
+                    }
+                }
+                break;
+            }
+            case CONVERSATION_STATE.Q2:
+            case CONVERSATION_STATE.Q2E: {
+                const userMentions = qa.answer.mentions.users;
+                if (userMentions.array().length === 0) {
+                    this.state = CONVERSATION_STATE.Q2E;
+                } else {
+                    this.params.user = userMentions.array()[0];
+                    this.state = CONVERSATION_STATE.Q3;
+                }
+                break;
+            }
+            case CONVERSATION_STATE.Q3:
+            case CONVERSATION_STATE.Q3E: {
+                const scoreToAdd = Number.parseInt(qa.answer.content, 10);
+                if (Number.isNaN(scoreToAdd)) {
+                    this.state = CONVERSATION_STATE.Q3E;
+                } else {
+                    this.params.score = scoreToAdd;
+                    this.state = CONVERSATION_STATE.Q4;
+                }
+                break;
+            }
+            case CONVERSATION_STATE.Q4: {
+                const answer: string = qa.answer.content;
+                if (!Utils.isYes(answer)) {
+                    this.state = CONVERSATION_STATE.CONFIRM;
+                } else {
+                    this.state = CONVERSATION_STATE.Q4O;
+                }
+                break;
+            }
+            case CONVERSATION_STATE.Q4O:
+            case CONVERSATION_STATE.Q4E: {
+                const msg: string = qa.answer.content;
+                this.params.note = msg;
+                this.state = CONVERSATION_STATE.CONFIRM;
+                break;
+            }
+            case CONVERSATION_STATE.CONFIRM: {
+                const answer: string = qa.answer.content;
+                if (!Utils.isYes(answer)) {
+                    this.returnMessage = 'Cancelled.';
+                } else {
+                    this.returnMessage = 'Updated score.';
+                }
+                this.state = CONVERSATION_STATE.DONE;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
 
 const eventsAddScore = (
     msg: discord.Message
@@ -11,6 +131,15 @@ const eventsAddScore = (
     const params: Command.EventsAddScore = Command.parseParameters(
         Command.ALL.EVENTS_ADD_SCORE,
         msg.content,
+    );
+
+    const eventAddScoreConversation = new AddScoreConversation(
+        msg,
+        params
+    );
+    ConversationManager.startNewConversation(
+        msg,
+        eventAddScoreConversation
     );
 
     /*

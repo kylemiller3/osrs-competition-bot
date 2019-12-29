@@ -96,7 +96,7 @@ export namespace Command {
         params: {
             name: {
                 description: 'The event\'s name.',
-                usage: 'event id',
+                usage: 'event name',
                 expectedType: ParamType.STRING,
                 required: true,
             },
@@ -178,6 +178,17 @@ export namespace Command {
     };
 
     /**
+     * The resulting dictionary after parsing [[ALL.EVENTS_EDIT]]
+     * @category Parsing Interfaces
+     */
+    export interface EventsEdit {
+        id: number
+        name: string
+        starting: string
+        ending: string
+    }
+
+    /**
      * Implementation of the edit event command description
      * @category Event Implementations
      */
@@ -191,6 +202,27 @@ export namespace Command {
                 usage: 'event id',
                 expectedType: ParamType.NUMBER,
                 required: true,
+            },
+            name: {
+                description: 'The event\'s name.',
+                usage: 'event name',
+                expectedType: ParamType.STRING,
+                required: false,
+                default: undefined,
+            },
+            starting: {
+                description: 'A date in ISO 8601 format of when to start.',
+                usage: 'start date',
+                expectedType: ParamType.STRING,
+                required: false,
+                default: undefined,
+            },
+            ending: {
+                description: 'A date in ISO 8601 format of when to end.',
+                usage: 'end date',
+                expectedType: ParamType.STRING,
+                required: false,
+                default: undefined,
             },
         },
     };
@@ -285,12 +317,13 @@ export namespace Command {
     };
 
     /**
-     * The resulting dictionary after parsing [[ALL.EVENTS_DELETE]]
+     * The resulting dictionary after parsing [[ALL.EVENTS_ADD_SCORE]]
      * @category Parsing Interfaces
      */
     export interface EventsAddScore {
         id: number
         score: number
+        note: string
     }
 
     /**
@@ -313,6 +346,12 @@ export namespace Command {
                 usage: '+/-score',
                 expectedType: ParamType.NUMBER,
                 required: true,
+            },
+            note: {
+                description: 'A record-keeping note.',
+                usage: '(string)',
+                expectedType: ParamType.STRING,
+                required: false,
             },
         },
     };
