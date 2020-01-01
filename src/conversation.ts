@@ -44,7 +44,7 @@ export interface Qa {
     answer: discord.Message // and answers
 }
 
-export abstract class Conversation {
+export abstract class Conversation<T> {
     qa: Qa[];
     opMessage: discord.Message;
     uuid: string;
@@ -53,23 +53,25 @@ export abstract class Conversation {
     errorInjector$: Subject<Qa>;
     state: CONVERSATION_STATE;
     returnMessage: string;
+    returnOptions: discord.MessageOptions | undefined;
     params: Record<string, any>;
 
-    static parser = <T>(command: Command.ALL, paramName: string, answer: string):
-    Record<string, T> => Command.parseParameters<Record<string, T>>(
+    static parser = <U>(command: Command.ALL, paramName: string, answer: string):
+    Record<string, U> => Command.parseParameters<Record<string, U>>(
         command,
         `${paramName}=${answer}`
     );
 
     constructor(
         opMessage: discord.Message,
-        params: Record<string, any> = {},
+        params: T = Object(),
     ) {
         this.params = params;
         this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
         this.errorInjector$ = new Subject<Qa>();
+        this.returnOptions = undefined;
         this.returnMessage = 'Conversation state error!';
 
         const nextA$ = messageReceived$.pipe(
@@ -201,6 +203,7 @@ export abstract class Conversation {
         const sendInfo: MessageWrapper.SendInfo = {
             message: this.opMessage,
             content: this.returnMessage,
+            options: this.returnOptions,
             tag: this.uuid,
         };
         MessageWrapper.sendMessage$.next(sendInfo);
@@ -214,13 +217,13 @@ export abstract class Conversation {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace ConversationManager {
-    const allConversations: Record<string, Conversation> = {};
+    const allConversations: Record<string, Conversation<unknown>> = {};
 
     export const startNewConversation = async (
         msg: discord.Message,
-        newConversation: Conversation
+        newConversation: Conversation<unknown>
     ): Promise<void> => {
-        const foundConversation: Conversation | undefined = allConversations[
+        const foundConversation: Conversation<unknown> | undefined = allConversations[
             msg.author.id
         ];
 

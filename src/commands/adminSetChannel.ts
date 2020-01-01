@@ -5,7 +5,7 @@ import {
 import { Db, } from '../database';
 import { Utils, } from '../utils';
 
-class AdminSetChannelConversation extends Conversation {
+class AdminSetChannelConversation extends Conversation<unknown> {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:

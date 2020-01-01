@@ -7,7 +7,7 @@ import {
 import { Db, } from '../database';
 import { Utils, } from '../utils';
 
-class EventDeleteConversation extends Conversation {
+class EventDeleteConversation extends Conversation<Command.EventsDelete> {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:

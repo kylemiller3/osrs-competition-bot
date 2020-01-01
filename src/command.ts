@@ -138,7 +138,7 @@ export namespace Command {
     const eventsListAll: Description = {
         description: 'Lists all events.',
         accessControl: anyUser,
-        command: '!f events list all',
+        command: '!f events listall',
     };
 
     /**
@@ -148,7 +148,7 @@ export namespace Command {
     const eventsListActive: Description = {
         description: 'Lists active events.',
         accessControl: anyUser,
-        command: '!f events list active',
+        command: '!f events listactive',
     };
 
     /**
@@ -231,7 +231,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_END_EVENT]]
      * @category Parsing Interfaces
      */
-    export interface EventsEndEvent {
+    export interface EventsEnd {
         id: number
     }
 
@@ -260,7 +260,7 @@ export namespace Command {
     const eventsForceSignup: Description = {
         description: 'Forces a user to sign up for an event.',
         accessControl: onlyAdmin,
-        command: '!f events force signup',
+        command: '!f events forcesignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -298,7 +298,7 @@ export namespace Command {
     const eventsForceUnsignup: Description = {
         description: 'Forces a user to un-sign up for an event.',
         accessControl: onlyAdmin,
-        command: '!f events force unsignup',
+        command: '!f events forceunsignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -333,7 +333,7 @@ export namespace Command {
     const eventsAddScore: Description = {
         description: 'Adds to a user\'s score.',
         accessControl: onlyAdmin,
-        command: '!f events update score',
+        command: '!f events updatescore',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -438,7 +438,7 @@ export namespace Command {
     const eventsListParticipants: Description = {
         description: 'Lists all users signed up for an event.',
         accessControl: anyUser,
-        command: '!f users list participants',
+        command: '!f events listparticipants',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -464,7 +464,7 @@ export namespace Command {
     const eventsAmISignedUp: Description = {
         description: 'Tells you if you are signed up for an event.',
         accessControl: anyUser,
-        command: '!f users amisignedup',
+        command: '!f events amisignedup',
         params: {
             id: {
                 description: 'The event\'s unique id.',

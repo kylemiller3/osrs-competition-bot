@@ -461,7 +461,7 @@ export namespace Db {
                 + '$1::timestamp, $2::timestamp'
             + ')',
     });
-    export const fetchEventsStartingBetweenDates = async (
+    export const fetchEventsBetweenDates = async (
         dateA: Date,
         dateB: Date,
         db: pgp.IDatabase<unknown> = Db.mainDb,

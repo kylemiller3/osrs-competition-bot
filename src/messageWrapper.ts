@@ -54,12 +54,16 @@ export namespace MessageWrapper {
             Observable<[string, (discord.Message | null)[]]> => {
                 const chunks: string[] = input.content.match(regex) || [];
                 const requests: Observable<(discord.Message | null)[]>[] = chunks.map(
-                    (chunk: string):
+                    (chunk: string, idx: number):
                     Observable<(discord.Message | null)[]> => {
+                        const clonedOptions: discord.MessageOptions = { ...input.options, };
+                        if (idx !== 0) {
+                            clonedOptions.reply = undefined;
+                        }
                         const bound = input.message.channel.send.bind(
                             input.message.channel,
                             chunk,
-                            input.options,
+                            clonedOptions,
                         );
                         // eslint-disable-next-line max-len
                         return Network.genericNetworkFetch$<discord.Message | discord.Message[]>(

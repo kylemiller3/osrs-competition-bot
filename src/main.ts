@@ -2,7 +2,7 @@ import * as discord from 'discord.js';
 
 import { EventEmitter, } from 'events';
 import {
-    fromEvent, Observable, Subject, merge,
+    fromEvent, Observable, Subject, merge, Subscription,
 } from 'rxjs';
 import {
     filter, tap,
@@ -27,6 +27,7 @@ import usersStats from './commands/usersStats';
 import help from './commands/help';
 import { Db, } from './database';
 import eventsEdit from './commands/eventsEdit';
+import { MessageWrapper, } from './messageWrapper';
 
 /**
  * Global discord client
@@ -96,7 +97,7 @@ export const isAdmin = (
 export const getDisplayNameFromDiscordId = (
     guildId: string,
     discordId: string
-): string => {
+): string | null => {
     const guild: discord.Guild = gClient.guilds.get(
         guildId
     ) as discord.Guild;
@@ -105,7 +106,7 @@ export const getDisplayNameFromDiscordId = (
         (member: discord.GuildMember):
         boolean => member.id === discordId
     );
-    if (foundMember === null) return '(unknown)';
+    if (foundMember === null) return null;
     return foundMember.displayName;
 };
 
@@ -221,3 +222,15 @@ commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
 commandReceived$(Command.ALL.HELP).subscribe(help);
 
 // willSaveToDb$.subscribe(Db.willHandleSave);
+
+const messagesSentSub: Subscription = MessageWrapper.sentMessages$.subscribe(
+    (response: MessageWrapper.Response): void => {
+        Utils.logger.trace(`Message with tag ${response.tag} sent.`);
+    },
+    (err: Error): void => {
+        Utils.logError(err);
+    },
+    (): void => {
+        Utils.logger.trace('Finished sending messages.');
+    }
+);

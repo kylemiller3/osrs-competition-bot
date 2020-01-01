@@ -7,7 +7,7 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 
-class AddScoreConversation extends Conversation {
+class AddScoreConversation extends Conversation<Command.EventsAddScore> {
     // async initAndParseParams(): Promise<void> {
     //     // we should probably standardize this
     //     // try to parse and if failed end conversation

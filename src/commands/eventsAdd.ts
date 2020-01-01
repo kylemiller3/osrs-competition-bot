@@ -7,7 +7,7 @@ import { Utils, } from '../utils';
 import { Db, } from '../database';
 import { Command, } from '../command';
 
-class EventAddConversation extends Conversation {
+class EventAddConversation extends Conversation<Command.EventsAdd> {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:

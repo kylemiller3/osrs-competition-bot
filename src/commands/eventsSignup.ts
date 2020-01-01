@@ -9,7 +9,7 @@ import { Command, } from '../command';
 import { Event, } from '../event';
 import { Db, } from '../database';
 
-class EventsSignupConversation extends Conversation {
+class EventsSignupConversation extends Conversation<Command.EventsSignup> {
     event: Event.Object;
     hiscore: hiscores.LookupResponse;
     command: Command.EventsSignup = {
@@ -168,6 +168,11 @@ class EventsSignupConversation extends Conversation {
 const eventsSignup = (
     msg: discord.Message
 ): void => {
+    const params: Command.EventsSignup = Command.parseParameters(
+        Command.ALL.EVENTS_SIGNUP,
+        msg.content,
+    );
+
     const eventsSignupConversation = new EventsSignupConversation(msg);
     ConversationManager.startNewConversation(
         msg,

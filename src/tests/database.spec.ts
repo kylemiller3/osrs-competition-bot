@@ -672,7 +672,7 @@ describe('Postgres Database', (): void => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
-            fetchedEvents = await Db.fetchEventsStartingBetweenDates(
+            fetchedEvents = await Db.fetchEventsBetweenDates(
                 new Date('1970-01-01T01:00:00.000Z'),
                 new Date('9999-12-31T01:00:00.000Z'),
                 Db.testDb,
@@ -683,7 +683,7 @@ describe('Postgres Database', (): void => {
         });
         it('should return two events.', async (): Promise<void> => {
             // @ts-ignore
-            fetchedEvents = await Db.fetchEventsStartingBetweenDates(
+            fetchedEvents = await Db.fetchEventsBetweenDates(
                 new Date('1970-01-01T00:00:00.000Z'),
                 new Date('9999-12-31T23:59:59.999Z'),
                 Db.testDb,
