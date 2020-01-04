@@ -373,7 +373,7 @@ export namespace Command {
     const eventsSignup: Description = {
         description: 'Signs up a user for an event.',
         accessControl: anyUser,
-        command: '!f users signup',
+        command: '!f events signup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -412,7 +412,7 @@ export namespace Command {
     const eventsUnsignup: Description = {
         description: 'Un-signs up a user for an event.',
         accessControl: anyUser,
-        command: '!f users unsignup',
+        command: '!f events unsignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',

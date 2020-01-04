@@ -8,6 +8,16 @@ import { Db, } from '../database';
 import { Command, } from '../command';
 
 class EventAddConversation extends Conversation<Command.EventsAdd> {
+    event: Event.Object;
+    tracker: Event.Tracker;
+    start: Date;
+    end: Date;
+
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -19,25 +29,25 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
             case CONVERSATION_STATE.Q2E:
                 return 'Failed to set date.';
             case CONVERSATION_STATE.Q2C:
-                return `Starting date is set for ${this.params.start.toString()}. Is this ok?`;
+                return `Starting date is set for ${this.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3:
                 return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR tbd for long running event.';
             case CONVERSATION_STATE.Q3E:
                 return 'Failed to set date. Maybe your event ends before it starts?';
             case CONVERSATION_STATE.Q3C:
-                return `Ending date is set for ${this.params.end.toString()}. Is this ok?`;
+                return `Ending date is set for ${this.end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
                 return 'Which type of event would you like?\nChoices are casual, skills with skill name list, bh with bh mode (rogue and/or hunter), lms, clues with clue difficulty list, or custom.';
             case CONVERSATION_STATE.Q4E:
                 return 'Could not set event type.';
             case CONVERSATION_STATE.Q4C:
-                return `Event will be of type ${(this.params.tracker as Event.Tracker).tracking} and track ${(this.params.tracker as Event.Tracker).what === undefined ? 'nothing' : (this.params.tracker as Event.Tracker).what}. Is this ok?`;
+                return `Event will be of type ${this.tracker.tracking} and track ${this.tracker.what === undefined ? 'nothing' : this.tracker.what}. Is this ok?`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q5E:
                 return 'Could not set global flag. Try yes or no.';
             case CONVERSATION_STATE.CONFIRM:
-                return `The event looks like this:\n${JSON.stringify(this.params, null, 2)}\n\nIs this ok?`;
+                return `The event looks like this:\n\`\`\`json\n${JSON.stringify(this.event, null, 2)}\n\`\`\`\nIs this ok?`;
             default:
                 return null;
         }
@@ -67,7 +77,7 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
                 if (!Utils.isValidDate(start)) {
                     this.state = CONVERSATION_STATE.Q2E;
                 } else {
-                    this.params.start = start;
+                    this.start = start;
                     this.state = CONVERSATION_STATE.Q2C;
                 }
                 break;
@@ -89,10 +99,10 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
                         dateStr
                     )
                     : Utils.distantFuture;
-                if (!Utils.isValidDate(end) || this.params.start >= end) {
+                if (!Utils.isValidDate(end) || this.start >= end) {
                     this.state = CONVERSATION_STATE.Q3E;
                 } else {
-                    this.params.end = end;
+                    this.end = end;
                     this.state = CONVERSATION_STATE.Q3C;
                 }
                 break;
@@ -197,7 +207,7 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
                             what,
                         };
                     }
-                    this.params.tracker = tracker;
+                    this.tracker = tracker;
                     this.state = CONVERSATION_STATE.Q4C;
                 } else {
                     this.state = CONVERSATION_STATE.Q4E;
@@ -217,6 +227,20 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
             case CONVERSATION_STATE.Q5E: {
                 const global: string = qa.answer.content;
                 this.params.global = Utils.isYes(global);
+                this.event = {
+                    name: this.params.name as string,
+                    when: {
+                        start: this.start as Date,
+                        end: this.end as Date,
+                    },
+                    guilds: {
+                        creator: {
+                            discordId: qa.answer.guild.id,
+                        },
+                    },
+                    teams: [],
+                    tracker: this.tracker as Event.Tracker,
+                };
                 this.state = CONVERSATION_STATE.CONFIRM;
                 break;
             }
@@ -226,21 +250,7 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
                     this.returnMessage = 'Cancelled.';
                 } else {
                     // save here
-                    const event: Event.Object = {
-                        name: this.params.name as string,
-                        when: {
-                            start: this.params.start as Date,
-                            end: this.params.end as Date,
-                        },
-                        guilds: {
-                            creator: {
-                                discordId: qa.answer.guild.id,
-                            },
-                        },
-                        teams: [],
-                        tracker: this.params.tracker as Event.Tracker,
-                    };
-                    const obj = await Db.upsertEvent(event);
+                    const obj = await Db.upsertEvent(this.event);
                     Utils.logger.trace(`Saved event id ${obj.id} to database.`);
                     this.returnMessage = 'Event successfully scheduled.';
                 }

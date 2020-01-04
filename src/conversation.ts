@@ -54,7 +54,7 @@ export abstract class Conversation<T> {
     state: CONVERSATION_STATE;
     returnMessage: string;
     returnOptions: discord.MessageOptions | undefined;
-    params: Record<string, any>;
+    params: Record<string, string | number | boolean>;
 
     static parser = <U>(command: Command.ALL, paramName: string, answer: string):
     Record<string, U> => Command.parseParameters<Record<string, U>>(
@@ -66,12 +66,14 @@ export abstract class Conversation<T> {
         opMessage: discord.Message,
         params: T = Object(),
     ) {
-        this.params = params;
+        this.params = params as unknown as Record<string, string | number | boolean>;
         this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
         this.errorInjector$ = new Subject<Qa>();
-        this.returnOptions = undefined;
+        this.returnOptions = {
+            reply: opMessage.author,
+        };
         this.returnMessage = 'Conversation state error!';
 
         const nextA$ = messageReceived$.pipe(
@@ -140,6 +142,7 @@ export abstract class Conversation<T> {
                     const sendInfo: MessageWrapper.SendInfo = {
                         message: this.opMessage,
                         content: 'Meowbe later.',
+                        options: this.returnOptions,
                         tag: this.uuid,
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
@@ -162,11 +165,12 @@ export abstract class Conversation<T> {
                     const sendInfo: MessageWrapper.SendInfo = {
                         message: this.opMessage,
                         content: question,
+                        options: this.returnOptions,
                         tag: this.uuid,
                     };
                     MessageWrapper.sendMessage$.next(sendInfo);
                 } else {
-                    this.conversationDidEnd();
+                    this.conversationDidEndSuccessfully();
                 }
             },
             (error: Error): void => {
@@ -180,12 +184,10 @@ export abstract class Conversation<T> {
 
         // start conversation
         Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
-    }
-
-    async initAndParseParams(): Promise<void> {
         this.state = CONVERSATION_STATE.Q1;
     }
 
+    abstract async init(): Promise<void>;
     abstract async consumeQa(qa: Qa): Promise<void>;
     abstract produceQ(): string | null;
 
@@ -199,7 +201,7 @@ export abstract class Conversation<T> {
         }
     }
 
-    conversationDidEnd(): void {
+    conversationDidEndSuccessfully(): void {
         const sendInfo: MessageWrapper.SendInfo = {
             message: this.opMessage,
             content: this.returnMessage,
@@ -231,7 +233,7 @@ export namespace ConversationManager {
             foundConversation.stopConversation();
         }
 
-        await newConversation.initAndParseParams();
+        await newConversation.init();
         const question = newConversation.produceQ();
         if (question === null) {
             return;
@@ -241,6 +243,9 @@ export namespace ConversationManager {
         const sendInfo: MessageWrapper.SendInfo = {
             message: msg,
             content: question,
+            options: {
+                reply: msg.author,
+            },
             tag: newConversation.uuid,
         };
         MessageWrapper.sendMessage$.next(

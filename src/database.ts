@@ -247,6 +247,7 @@ export namespace Db {
                         + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? ((@.teams.type() == "array" && @.teams.size() == 0) || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
                     + ')',
             });
+            // TODO: add constraint that checks for unique rsn?
         }
     );
 

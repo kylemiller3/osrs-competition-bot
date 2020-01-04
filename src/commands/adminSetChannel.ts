@@ -6,6 +6,11 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 
 class AdminSetChannelConversation extends Conversation<unknown> {
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:

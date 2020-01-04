@@ -9,6 +9,12 @@ import { Utils, } from '../utils';
 import { getDisplayNameFromDiscordId, } from '../main';
 
 class ListParticipantsConversation extends Conversation<Command.EventsListParticipants> {
+    event: Event.Object;
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -58,7 +64,7 @@ class ListParticipantsConversation extends Conversation<Command.EventsListPartic
                         );
                         const retMsgs: string[] = await Promise.all(retMsgsResolver);
 
-                        this.params.event = event;
+                        this.event = event;
                         this.state = CONVERSATION_STATE.DONE;
                         this.returnOptions = {
                             code: true,

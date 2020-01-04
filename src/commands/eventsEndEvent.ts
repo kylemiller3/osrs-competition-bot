@@ -8,6 +8,12 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 
 class EventEndConversation extends Conversation<Command.EventsEnd> {
+    event: Event.Object;
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -15,7 +21,7 @@ class EventEndConversation extends Conversation<Command.EventsEnd> {
             case CONVERSATION_STATE.Q1E:
                 return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to end ${this.params.event ? this.params.event.name : 'ERROR'} now? This cannot be undone.`;
+                return `Are you sure you want to end ${this.event.name} now? This cannot be undone.`;
             default:
                 return null;
         }
@@ -33,7 +39,7 @@ class EventEndConversation extends Conversation<Command.EventsEnd> {
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
-                        this.params.event = event;
+                        this.event = event;
                         this.state = CONVERSATION_STATE.CONFIRM;
                     }
                 }

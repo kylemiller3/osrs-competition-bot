@@ -8,6 +8,8 @@ import {
 import { Db, } from '../database';
 
 class AddScoreConversation extends Conversation<Command.EventsAddScore> {
+    event: Event.Object;
+    user: discord.User;
     // async initAndParseParams(): Promise<void> {
     //     // we should probably standardize this
     //     // try to parse and if failed end conversation
@@ -25,6 +27,11 @@ class AddScoreConversation extends Conversation<Command.EventsAddScore> {
     //     // }
     //     this.state = CONVERSATION_STATE.Q1;
     // }
+
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
 
     produceQ(): string | null {
         switch (this.state) {
@@ -47,7 +54,7 @@ class AddScoreConversation extends Conversation<Command.EventsAddScore> {
             case CONVERSATION_STATE.Q4E:
                 return 'Could not add a note.';
             case CONVERSATION_STATE.CONFIRM:
-                return `Add ${this.params.score} to user ${this.params.user ? this.params.user.username : '(ERROR)'} for event ${this.params.event ? this.params.event.name : '(ERROR)'}?`;
+                return `Add ${this.params.score} to user ${this.user.username} for event ${this.event.name}?`;
             default:
                 return null;
         }
@@ -65,7 +72,7 @@ class AddScoreConversation extends Conversation<Command.EventsAddScore> {
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
-                        this.params.event = event;
+                        this.event = event;
                         this.state = CONVERSATION_STATE.Q2;
                     }
                 }
@@ -77,7 +84,7 @@ class AddScoreConversation extends Conversation<Command.EventsAddScore> {
                 if (userMentions.array().length === 0) {
                     this.state = CONVERSATION_STATE.Q2E;
                 } else {
-                    this.params.user = userMentions.array()[0];
+                    this.user = userMentions.array()[0];
                     this.state = CONVERSATION_STATE.Q3;
                 }
                 break;

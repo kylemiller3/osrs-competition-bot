@@ -8,6 +8,13 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 
 class EventEditConversation extends Conversation<Command.EventsEdit> {
+    event: Event.Object;
+
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -27,7 +34,7 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
             case CONVERSATION_STATE.Q3E:
                 return 'Failed to set date.';
             case CONVERSATION_STATE.Q3C:
-                return `Starting date is set for ${this.params.start.toString()}. Is this ok?`;
+                return `Starting date is set for ${this.event.when.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
                 return 'Would you like to update the ending date of the event?';
             case CONVERSATION_STATE.Q4O:
@@ -35,9 +42,9 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
             case CONVERSATION_STATE.Q4E:
                 return 'Failed to set date. Maybe your event ends before it starts?';
             case CONVERSATION_STATE.Q4C:
-                return `Ending date is set for ${this.params.end.toString()}. Is this ok?`;
+                return `Ending date is set for ${this.event.when.end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to update this event ${this.params.event ? this.params.event.name : '(ERROR)'}? This cannot be undone.`;
+                return `Are you sure you want to update this event ${this.event.name}? This cannot be undone.`;
             default:
                 return null;
         }
@@ -55,7 +62,7 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
-                        this.params.event = event;
+                        this.event = event;
                         this.state = CONVERSATION_STATE.Q2;
                     }
                 }
@@ -76,7 +83,7 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
                 if (name.length === 0) {
                     this.state = CONVERSATION_STATE.Q2E;
                 } else {
-                    this.params.event.name = name;
+                    this.event.name = name;
                     this.state = CONVERSATION_STATE.Q3;
                 }
                 break;
@@ -101,7 +108,7 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
                 if (!Utils.isValidDate(start)) {
                     this.state = CONVERSATION_STATE.Q3E;
                 } else {
-                    this.params.event.start = start;
+                    this.event.when.start = start;
                     this.state = CONVERSATION_STATE.Q3C;
                 }
                 break;
@@ -132,10 +139,10 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
                         dateStr
                     )
                     : Utils.distantFuture;
-                if (!Utils.isValidDate(end) || this.params.event.start >= end) {
+                if (!Utils.isValidDate(end) || this.event.when.start >= end) {
                     this.state = CONVERSATION_STATE.Q3E;
                 } else {
-                    this.params.event.end = end;
+                    this.event.when.end = end;
                     this.state = CONVERSATION_STATE.Q3C;
                 }
                 break;
@@ -155,7 +162,7 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
                     this.returnMessage = 'Cancelled.';
                 } else {
                     // save here
-                    const obj = await Db.upsertEvent(this.params.event);
+                    const obj = await Db.upsertEvent(this.event);
                     Utils.logger.trace(`Saved event id ${obj.id} to database.`);
                     this.returnMessage = 'Event successfully updated.';
                 }

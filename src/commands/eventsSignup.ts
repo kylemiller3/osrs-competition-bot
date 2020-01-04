@@ -11,11 +11,13 @@ import { Db, } from '../database';
 
 class EventsSignupConversation extends Conversation<Command.EventsSignup> {
     event: Event.Object;
+    rsn: string;
     hiscore: hiscores.LookupResponse;
-    command: Command.EventsSignup = {
-        id: -1,
-        rsn: '',
-    };
+
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
 
     produceQ(): string | null {
         switch (this.state) {
@@ -28,8 +30,6 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
             case CONVERSATION_STATE.Q2E:
                 return 'Cannot find Runescape name on hiscores.';
             case CONVERSATION_STATE.Q3:
-                return 'Would you like to join a team?';
-            case CONVERSATION_STATE.Q3O:
                 return 'Which team would you like to join?';
             case CONVERSATION_STATE.Q3E:
                 return 'Could not parse team name.';
@@ -47,85 +47,125 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    this.command.id = eventId;
                     const event: Event.Object | null = await Db.fetchEvent(eventId);
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
-                        this.state = CONVERSATION_STATE.Q2;
                         this.event = event;
+                        this.state = CONVERSATION_STATE.Q2;
                     }
                 }
                 break;
             }
             case CONVERSATION_STATE.Q2:
             case CONVERSATION_STATE.Q2E: {
-                const rsn: string = qa.answer.content;
+                this.rsn = qa.answer.content;
+
+                const findRsn = (participant: Event.Participant):
+                boolean => participant.runescapeAccounts.some(
+                    (account: Event.Account):
+                    boolean => account.rsn.toLowerCase() === this.rsn.toLowerCase()
+                );
+
+                const rsnIdx: number = this.event.teams.findIndex(
+                    (team: Event.Team):
+                    boolean => team.participants.some(
+                        findRsn
+                    )
+                );
+
+                const rsnJdx: number = rsnIdx !== -1
+                    ? this.event.teams[rsnIdx].participants.findIndex(
+                        findRsn
+                    ) : -1;
+
+                if (rsnIdx !== -1 && rsnJdx !== -1) {
+                    // we found the rsn in use already
+                    const participant: Event.Participant = this.event.teams[rsnIdx]
+                        .participants[rsnJdx];
+                    const user: discord.User = await this.opMessage.client
+                        .fetchUser(participant.discordId);
+                    this.returnMessage = `This rsn is already signed up by ${user.tag}`;
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
+                }
+
                 const hiscore: hiscores.LookupResponse | null = await Network.hiscoresFetch$(
-                    rsn,
+                    this.rsn,
                     false
                 ).toPromise();
+
                 if (hiscore === null) {
                     this.state = CONVERSATION_STATE.Q2E;
+                    break;
+                }
+
+                // is the user already on a team?
+                // use that team
+                const findUser = (participant: Event.Participant):
+                boolean => participant.discordId.toLowerCase()
+                    === this.opMessage.author.id.toLowerCase();
+
+                const userIdx: number = this.event.teams.findIndex(
+                    (team: Event.Team):
+                    boolean => team.participants.some(
+                        findUser
+                    )
+                );
+                const userJdx: number = userIdx !== -1
+                    ? this.event.teams[userIdx].participants.findIndex(
+                        findUser
+                    ) : -1;
+
+                if (userIdx !== -1 && userJdx !== -1) {
+                    // we found the user
+                    // add to the participant rsn accounts and finish
+                    const newAccount: Event.CompetitiveAccount = {
+                        rsn: this.rsn,
+                        starting: hiscore,
+                        ending: hiscore,
+                    };
+
+                    const newAccounts: Event.Account[] = this.event
+                        .teams[userIdx]
+                        .participants[userJdx]
+                        .runescapeAccounts
+                        .concat(
+                            newAccount,
+                        );
+                    this.event.teams[userIdx].participants[userJdx].runescapeAccounts = newAccounts;
+
+                    await Db.upsertEvent(this.event);
+                    this.state = CONVERSATION_STATE.DONE;
+                    this.returnMessage = 'Signed up for team';
                 } else {
                     this.state = CONVERSATION_STATE.Q3;
-                    this.command.rsn = rsn;
-                    this.hiscore = hiscore;
                 }
                 break;
             }
-            case CONVERSATION_STATE.Q3: {
-                const answer: string = qa.answer.content;
-                if (!Utils.isYes(answer)) {
-                    this.state = CONVERSATION_STATE.DONE;
-                    this.returnMessage = 'Signed up for event';
-                    const team: Event.Team = {
-                        name: this.command.rsn,
-                        participants: [
-                            {
-                                discordId: this.opMessage.author.id,
-                                customScore: 0,
-                                runescapeAccounts: [
-                                    {
-                                        rsn: this.command.rsn,
-                                        starting: this.hiscore,
-                                        ending: this.hiscore,
-                                    } as Event.CompetitiveAccount,
-                                ],
-                            },
-                        ],
-                    };
-                    const newTeams: Event.Team[] = this.event.teams.concat(team);
-                    this.event.teams = newTeams;
-                    await Db.upsertEvent(this.event);
-                } else {
-                    this.state = CONVERSATION_STATE.Q3O;
-                }
-                break;
-            }
-            case CONVERSATION_STATE.Q3O:
+            case CONVERSATION_STATE.Q3:
             case CONVERSATION_STATE.Q3E: {
-                const teamStr: string = qa.answer.content;
-                this.command.team = teamStr;
+                const teamName: string = qa.answer.content;
 
-                let foundTeam: Event.Team | undefined;
-                const foundIndex: number = this.event.teams.findIndex(
+                const teamIdx: number = this.event.teams.findIndex(
                     (team: Event.Team):
-                    boolean => team.name.toLowerCase() === teamStr.toLowerCase()
+                    boolean => team.name.toLowerCase() === teamName.toLowerCase()
                 );
-                if (foundIndex !== -1) {
-                    foundTeam = this.event.teams[foundIndex];
-                }
+                const foundTeam: Event.Team | undefined = teamIdx !== -1
+                    ? this.event.teams[teamIdx]
+                    : undefined;
                 if (foundTeam === undefined) {
+                    // if we didn't find the team
+                    // create a new team
                     const team: Event.Team = {
-                        name: teamStr,
+                        name: teamName,
                         participants: [
                             {
                                 discordId: this.opMessage.author.id,
                                 customScore: 0,
                                 runescapeAccounts: [
                                     {
-                                        rsn: this.command.rsn,
+                                        rsn: this.rsn,
                                         starting: this.hiscore,
                                         ending: this.hiscore,
                                     } as Event.CompetitiveAccount,
@@ -133,30 +173,34 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
                             },
                         ],
                     };
-                    const newTeams: Event.Team[] = this.event.teams.concat(team);
-                    this.event.teams = newTeams;
+                    this.event.teams = this.event.teams.concat(team);
                 } else {
+                    // we found the team
+                    // so add the participant to the new team
                     const participant: Event.Participant = {
                         discordId: this.opMessage.author.id,
                         customScore: 0,
                         runescapeAccounts: [
                             {
-                                rsn: this.command.rsn,
+                                rsn: this.rsn,
                                 starting: this.hiscore,
                                 ending: this.hiscore,
                             } as Event.CompetitiveAccount,
                         ],
                     };
-                    const newTeam: Event.Team = { ...foundTeam, };
-                    const newParticipants: Event.Participant[] = newTeam.participants.concat(
-                        participant
-                    );
-                    newTeam.participants = newParticipants;
-                    this.event.teams[foundIndex] = newTeam;
+                    this.event
+                        .teams[teamIdx]
+                        .participants = this.event
+                            .teams[teamIdx]
+                            .participants.concat(
+                                participant
+                            );
                 }
+
+                // save event
+                await Db.upsertEvent(this.event);
                 this.state = CONVERSATION_STATE.DONE;
                 this.returnMessage = 'Signed up for team';
-                await Db.upsertEvent(this.event);
                 break;
             }
             default:

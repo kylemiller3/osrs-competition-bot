@@ -8,6 +8,13 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 
 class EventDeleteConversation extends Conversation<Command.EventsDelete> {
+    event: Event.Object;
+
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
+
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
@@ -15,7 +22,7 @@ class EventDeleteConversation extends Conversation<Command.EventsDelete> {
             case CONVERSATION_STATE.Q1E:
                 return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to delete event ${this.params.event ? this.params.event.name : '(ERROR)'}? This cannot be undone.`;
+                return `Are you sure you want to delete event ${this.event.name}? This cannot be undone.`;
             default:
                 return null;
         }
@@ -33,7 +40,7 @@ class EventDeleteConversation extends Conversation<Command.EventsDelete> {
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
-                        this.params.event = event;
+                        this.event = event;
                         this.state = CONVERSATION_STATE.CONFIRM;
                     }
                 }

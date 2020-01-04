@@ -43,6 +43,10 @@ class AmISignedUpConversation extends Conversation<Command.EventsAmISignedUp> {
     //     // }
     //     this.state = CONVERSATION_STATE.Q1;
     // }
+    // eslint-disable-next-line class-methods-use-this
+    async init(): Promise<void> {
+        return Promise.resolve();
+    }
 
     produceQ(): string | null {
         switch (this.state) {
