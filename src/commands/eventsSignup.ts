@@ -12,7 +12,7 @@ import { Db, } from '../database';
 class EventsSignupConversation extends Conversation<Command.EventsSignup> {
     event: Event.Object;
     rsn: string;
-    hiscore: hiscores.LookupResponse;
+    hiscore: hiscores.Player;
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<void> {
@@ -90,7 +90,7 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
                     break;
                 }
 
-                const hiscore: hiscores.LookupResponse | null = await Network.hiscoresFetch$(
+                const hiscore: hiscores.Player | null = await Network.hiscoresFetch$(
                     this.rsn,
                     false
                 ).toPromise();

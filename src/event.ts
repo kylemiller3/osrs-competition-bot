@@ -89,8 +89,8 @@ export namespace Event {
      * @category Event
      */
     export interface CompetitiveAccount extends Account {
-        starting: hiscores.LookupResponse
-        ending: hiscores.LookupResponse
+        starting: hiscores.Player
+        ending: hiscores.Player
     }
 
     /**

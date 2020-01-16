@@ -45,7 +45,7 @@ export namespace Network {
      * @ignore
      */
     interface HiscoreCache {
-        observable: Observable<hiscores.LookupResponse | null>
+        observable: Observable<hiscores.Player | null>
         date: Date
     }
 
@@ -58,7 +58,7 @@ export namespace Network {
 
     /**
     * Fetches the supplied rsn from RuneScape API hiscores or cache.
-    * Cache invalidates every 20 minutes. See [[hiscores.LookupResponse]]
+    * Cache invalidates every 20 minutes. See [[hiscores.Player]]
     * @param rsn The rsn to lookup on hiscores
     * @param pullNew Forces a cache miss
     * @returns Observable of the RuneScape web API response
@@ -67,7 +67,7 @@ export namespace Network {
     export const hiscoresFetch$ = (
         rsn: string,
         pullNew: boolean
-    ): Observable<hiscores.LookupResponse | null> => {
+    ): Observable<hiscores.Player | null> => {
         // eslint-disable-next-line no-control-regex
         const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
         Utils.logger.trace(`Looking up rsn '${asciiRsn}'`);
@@ -88,7 +88,7 @@ export namespace Network {
                 undefined,
                 asciiRsn,
             );
-            const obs: Observable<hiscores.LookupResponse | null> = genericNetworkFetch$(
+            const obs: Observable<hiscores.Player | null> = genericNetworkFetch$(
                 bound,
                 (error: Error): boolean => {
                     if (
@@ -104,7 +104,7 @@ export namespace Network {
                 publishReplay(1),
                 refCount(),
                 tap(
-                    (response: hiscores.LookupResponse):
+                    (response: hiscores.Player):
                     void => {
                         if (response === null) {
                             Utils.logger.error(`Could not find rsn '${asciiRsn}'`);
