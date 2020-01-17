@@ -6,8 +6,9 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
+import { willStartEvent$, willEndEvent$, } from '../main';
 
-class EventEditConversation extends Conversation<Command.EventsEdit> {
+class EventEditConversation extends Conversation {
     event: Event.Object;
 
     // eslint-disable-next-line class-methods-use-this
@@ -165,6 +166,13 @@ class EventEditConversation extends Conversation<Command.EventsEdit> {
                     const obj = await Db.upsertEvent(this.event);
                     Utils.logger.trace(`Saved event id ${obj.id} to database.`);
                     this.returnMessage = 'Event successfully updated.';
+
+                    if (Utils.isInPast(this.event.when.start)) {
+                        willStartEvent$.next(this.event);
+                    }
+                    if (Utils.isInPast(this.event.when.end)) {
+                        willEndEvent$.next(this.event);
+                    }
                 }
                 this.state = CONVERSATION_STATE.DONE;
                 break;

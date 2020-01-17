@@ -6,7 +6,7 @@ import {
 import { Db, } from '../database';
 import { Command, } from '../command';
 
-class AmISignedUpConversation extends Conversation<Command.EventsAmISignedUp> {
+class AmISignedUpConversation extends Conversation {
     events: Event.Object[] = [];
     static isSignedUp(
         event: Event.Object,

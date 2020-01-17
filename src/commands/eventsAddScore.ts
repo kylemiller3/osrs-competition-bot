@@ -7,7 +7,7 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 
-class AddScoreConversation extends Conversation<Command.EventsAddScore> {
+class AddScoreConversation extends Conversation {
     event: Event.Object;
     user: discord.User;
     // async initAndParseParams(): Promise<void> {

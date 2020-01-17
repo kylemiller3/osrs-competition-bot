@@ -25,15 +25,15 @@ const getParticipantScore = (
                 (account: Event.CompetitiveAccount): number => {
                     if (account.starting === undefined || account.ending === undefined) return NaN;
                     const skillsComponents:
-                    hiscores.SkillComponent[][] = keys.map(
+                    hiscores.RankLevelXpObject[][] = keys.map(
                         (key: string):
-                        hiscores.SkillComponent[] => [
+                        hiscores.RankLevelXpObject[] => [
                             account.starting[tracking][key],
                             account.ending[tracking][key],
                         ]
                     );
                     const xpDiff = skillsComponents.map(
-                        (startEnd: hiscores.SkillComponent[]):
+                        (startEnd: hiscores.RankLevelXpObject[]):
                         number => startEnd[1].xp - startEnd[0].xp
                     );
                     const xpGain = xpDiff.reduce(
@@ -55,15 +55,15 @@ const getParticipantScore = (
                     if (account.starting === undefined
                             || account.ending === undefined) return NaN;
                     const rankAndScoreComponents:
-                    hiscores.RankAndScoreComponent[][] = keys.map(
+                    hiscores.RankScoreObject[][] = keys.map(
                         (key: string):
-                        hiscores.RankAndScoreComponent[] => [
+                        hiscores.RankScoreObject[] => [
                             account.starting.bh[key],
                             account.ending.bh[key],
                         ]
                     );
                     const bhDiff = rankAndScoreComponents.map(
-                        (startEnd: hiscores.RankAndScoreComponent[]):
+                        (startEnd: hiscores.RankScoreObject[]):
                         number => startEnd[1].score - startEnd[0].score
                     );
                     const bhGain = bhDiff.reduce(
@@ -85,15 +85,15 @@ const getParticipantScore = (
                     if (account.starting === undefined
                         || account.ending === undefined) return NaN;
                     const rankAndScoreComponents:
-                    hiscores.RankAndScoreComponent[][] = keys.map(
+                    hiscores.RankScoreObject[][] = keys.map(
                         (key: string):
-                        hiscores.RankAndScoreComponent[] => [
+                        hiscores.RankScoreObject[] => [
                             account.starting.clues[key],
                             account.ending.clues[key],
                         ]
                     );
                     const clueDiff = rankAndScoreComponents.map(
-                        (startEnd: hiscores.RankAndScoreComponent[]):
+                        (startEnd: hiscores.RankScoreObject[]):
                         number => startEnd[1].score - startEnd[0].score
                     );
                     const clueGain = clueDiff.reduce(

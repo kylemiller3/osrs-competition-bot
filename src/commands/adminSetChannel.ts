@@ -4,8 +4,9 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
+import { Command, } from '../command';
 
-class AdminSetChannelConversation extends Conversation<unknown> {
+class AdminSetChannelConversation extends Conversation {
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<void> {
         return Promise.resolve();
@@ -53,7 +54,12 @@ class AdminSetChannelConversation extends Conversation<unknown> {
 const adminSetChannel = (
     msg: discord.Message,
 ): void => {
-    const adminSetChannelConversation = new AdminSetChannelConversation(msg);
+    const params: Command.AdminSetChannel = Command.parseParameters(
+        Command.ALL.ADMIN_SET_CHANNEL,
+        msg.content,
+    );
+
+    const adminSetChannelConversation = new AdminSetChannelConversation(msg, params);
     ConversationManager.startNewConversation(
         msg,
         adminSetChannelConversation

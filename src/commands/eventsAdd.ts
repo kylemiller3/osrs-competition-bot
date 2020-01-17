@@ -6,8 +6,9 @@ import {
 import { Utils, } from '../utils';
 import { Db, } from '../database';
 import { Command, } from '../command';
+import { willStartEvent$, willEndEvent$, willAddEvent$, } from '../main';
 
-class EventAddConversation extends Conversation<Command.EventsAdd> {
+class EventAddConversation extends Conversation {
     event: Event.Object;
     tracker: Event.Tracker;
     start: Date;
@@ -25,19 +26,19 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
             case CONVERSATION_STATE.Q1E:
                 return 'Failed to name the event.\nExample: Runecrafting Event #1.';
             case CONVERSATION_STATE.Q2:
-                return 'When would you like to start the event?\nExample: 2019-12-20T14:00-05:00 - (which is December 20th, 2019 at 2:00pm ET) OR now for right now.';
+                return 'When would you like to start the event?\nExample: 2019-12-20T14:00-05:00 - (which is December 20th, 2019 at 2:00pm ET) OR \'now\' for right now.';
             case CONVERSATION_STATE.Q2E:
                 return 'Failed to set date.';
             case CONVERSATION_STATE.Q2C:
                 return `Starting date is set for ${this.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3:
-                return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR tbd for long running event.';
+                return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR \'tbd\' for long running event.';
             case CONVERSATION_STATE.Q3E:
                 return 'Failed to set date. Maybe your event ends before it starts?';
             case CONVERSATION_STATE.Q3C:
                 return `Ending date is set for ${this.end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
-                return 'Which type of event would you like?\nChoices are casual, skills with skill name list, bh with bh mode (rogue and/or hunter), lms, clues with clue difficulty list, or custom.';
+                return 'Which type of event would you like?\nChoices are casual, \'skills\' with skill name list, \'bh\' with bh mode (\'rogue\' and/or \'hunter\'), \'lms\', \'clues\' with clue difficulty list, or \'custom\'.';
             case CONVERSATION_STATE.Q4E:
                 return 'Could not set event type.';
             case CONVERSATION_STATE.Q4C:
@@ -250,8 +251,9 @@ class EventAddConversation extends Conversation<Command.EventsAdd> {
                     this.returnMessage = 'Cancelled.';
                 } else {
                     // save here
-                    const obj = await Db.upsertEvent(this.event);
-                    Utils.logger.trace(`Saved event id ${obj.id} to database.`);
+                    const savedEvent: Event.Object = await Db.upsertEvent(this.event);
+                    willAddEvent$.next(savedEvent);
+                    Utils.logger.trace(`Saved event id ${savedEvent.id} to database.`);
                     this.returnMessage = 'Event successfully scheduled.';
                 }
                 this.state = CONVERSATION_STATE.DONE;

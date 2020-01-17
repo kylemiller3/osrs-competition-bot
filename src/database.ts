@@ -4,6 +4,7 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
+import { async } from 'rxjs/internal/scheduler/async';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -28,6 +29,10 @@ export namespace Db {
     ): Event.Object => ({
         id: eventRow.id,
         ...eventRow.event,
+        when: {
+            start: new Date(eventRow.event.when.start),
+            end: new Date(eventRow.event.when.end),
+        },
     });
 
     enum SETTINGS_COL {
@@ -289,7 +294,7 @@ export namespace Db {
         return { ...event, id: ret.id, };
     };
 
-    const fetchAllEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    const fetchAllEventsStartAscStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all events',
         text: 'SELECT '
             + `${EVENTS_COL.ID}, `
@@ -298,14 +303,25 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'ORDER BY '
             + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp ASC, `
+            + `${EVENTS_COL.ID} ASC`,
+    });
+    const fetchAllEventsEndAscStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch all events',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'ORDER BY '
             + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp ASC, `
             + `${EVENTS_COL.ID} ASC`,
     });
     export const fetchAllEvents = async (
         db: pgp.IDatabase<unknown> = Db.mainDb,
+        startAsc: boolean = true,
     ): Promise<Event.Object[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
-            fetchAllEventsStmt,
+            startAsc ? fetchAllEventsStartAscStmt : fetchAllEventsEndAscStmt,
         );
         if (ret === null) return null;
         return ret.map(eventRowToEvent);
@@ -462,7 +478,7 @@ export namespace Db {
                 + '$1::timestamp, $2::timestamp'
             + ')',
     });
-    export const fetchEventsBetweenDates = async (
+    export const fetchAllEventsBetweenDates = async (
         dateA: Date,
         dateB: Date,
         db: pgp.IDatabase<unknown> = Db.mainDb,
@@ -477,6 +493,30 @@ export namespace Db {
         if (ret === null) return null;
         return ret.map(eventRowToEvent);
     };
+
+    const eventsCurrentlyRunningStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch all running events',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + '('
+                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp <= current_timestamp `
+                + 'AND '
+                + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp > current_timestamp`
+            + ')',
+    });
+    export const fetchAllCurrentlyRunningEvents = async (
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object[] | null> => {
+        const ret: EventRow[] | null = await db.manyOrNone(
+            eventsCurrentlyRunningStmt,
+        );
+        if (ret === null) return null;
+        return ret.map(eventRowToEvent);
+    }
 
     const guildEventsBetweenDatesStmt: pgp.PreparedStatement = new PreparedStatement({
         name: 'fetch all guild events between dates',

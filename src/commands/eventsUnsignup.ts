@@ -7,7 +7,7 @@ import { Event, } from '../event';
 import { Utils, } from '../utils';
 import { Db, } from '../database';
 
-class EventDeleteConversation extends Conversation<Command.EventsDelete> {
+class EventDeleteConversation extends Conversation {
     event: Event.Object;
     userIdx: number;
     userJdx: number;
@@ -57,6 +57,13 @@ class EventDeleteConversation extends Conversation<Command.EventsDelete> {
                             ? event.teams[this.userIdx].participants.findIndex(
                                 findUser
                             ) : -1;
+                        if (this.userJdx === -1) {
+                            // not found
+                            this.state = CONVERSATION_STATE.DONE;
+                            this.returnMessage = 'You weren\'t signed up anyway';
+                            return;
+                        }
+
                         this.event = event;
                         this.state = CONVERSATION_STATE.CONFIRM;
                     }

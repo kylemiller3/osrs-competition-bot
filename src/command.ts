@@ -76,7 +76,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_ADD]]
      * @category Parsing Interfaces
      */
-    export interface EventsAdd {
+    export interface EventsAdd extends Record<string, string | number | boolean> {
         name: string
         starting: string
         ending: string
@@ -155,7 +155,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_DELETE]]
      * @category Parsing Interfaces
      */
-    export interface EventsDelete {
+    export interface EventsDelete extends Record<string, string | number | boolean> {
         id: number
     }
 
@@ -181,7 +181,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_EDIT]]
      * @category Parsing Interfaces
      */
-    export interface EventsEdit {
+    export interface EventsEdit extends Record<string, string | number | boolean> {
         id: number
         name: string
         starting: string
@@ -231,7 +231,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_END_EVENT]]
      * @category Parsing Interfaces
      */
-    export interface EventsEnd {
+    export interface EventsEnd extends Record<string, string | number | boolean> {
         id: number
     }
 
@@ -320,7 +320,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_ADD_SCORE]]
      * @category Parsing Interfaces
      */
-    export interface EventsAddScore {
+    export interface EventsAddScore extends Record<string, string | number | boolean> {
         id: number
         score: number
         note: string
@@ -360,10 +360,10 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_SIGNUP]]
      * @category Parsing Interfaces
      */
-    export interface EventsSignup {
+    export interface EventsSignup extends Record<string, string | number | boolean> {
         id: number
         rsn: string
-        team?: string
+        team: string
     }
 
     /**
@@ -401,7 +401,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_UNSIGNUP]]
      * @category Parsing Interfaces
      */
-    export interface EventsUnsignup {
+    export interface EventsUnsignup extends Record<string, string | number | boolean> {
         id: number
     }
 
@@ -427,7 +427,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_LIST_PARTICIPANTS]]
      * @category Parsing Interfaces
      */
-    export interface EventsListParticipants {
+    export interface EventsListParticipants extends Record<string, string | number | boolean> {
         id: number
     }
 
@@ -453,7 +453,7 @@ export namespace Command {
      * The resulting dictionary after parsing [[ALL.EVENTS_AMISIGNEDUP]]
      * @category Parsing Interfaces
      */
-    export interface EventsAmISignedUp {
+    export interface EventsAmISignedUp extends Record<string, string | number | boolean> {
         id: number
     }
 
@@ -493,6 +493,14 @@ export namespace Command {
             },
         },
     };
+
+    /**
+     * The resulting dictionary after parsing [[ALL.ADMIN_SET_CHANNEL]]
+     * @category Parsing Interfaces
+     */
+    export interface AdminSetChannel extends Record<string, string | number | boolean> {
+        channel: string
+    }
 
     /**
      * Implementation of the set channel command description

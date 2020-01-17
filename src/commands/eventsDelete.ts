@@ -7,7 +7,7 @@ import {
 import { Db, } from '../database';
 import { Utils, } from '../utils';
 
-class EventDeleteConversation extends Conversation<Command.EventsDelete> {
+class EventDeleteConversation extends Conversation {
     event: Event.Object;
 
     // eslint-disable-next-line class-methods-use-this
@@ -48,9 +48,10 @@ class EventDeleteConversation extends Conversation<Command.EventsDelete> {
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
-                if (!Utils.isYes(answer)) {
+                if (!Utils.isYes(answer) || this.event.id === undefined) {
                     this.returnMessage = 'Cancelled.';
                 } else {
+                    Db.deleteEvent(this.event.id);
                     this.returnMessage = 'Event deleted.';
                 }
                 this.state = CONVERSATION_STATE.DONE;

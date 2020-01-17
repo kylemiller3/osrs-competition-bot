@@ -8,7 +8,7 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 import { getDisplayNameFromDiscordId, } from '../main';
 
-class ListParticipantsConversation extends Conversation<Command.EventsListParticipants> {
+class ListParticipantsConversation extends Conversation {
     event: Event.Object;
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<void> {

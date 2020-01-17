@@ -7,7 +7,7 @@ import {
 import { Db, } from '../database';
 import { Utils, } from '../utils';
 
-class EventEndConversation extends Conversation<Command.EventsEnd> {
+class EventEndConversation extends Conversation {
     event: Event.Object;
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<void> {

@@ -8,8 +8,9 @@ import { Network, } from '../network';
 import { Command, } from '../command';
 import { Event, } from '../event';
 import { Db, } from '../database';
+import { willSignUpPlayer$ } from '../main';
 
-class EventsSignupConversation extends Conversation<Command.EventsSignup> {
+class EventsSignupConversation extends Conversation {
     event: Event.Object;
     rsn: string;
     hiscore: hiscores.Player;
@@ -120,10 +121,8 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
                 if (userIdx !== -1 && userJdx !== -1) {
                     // we found the user
                     // add to the participant rsn accounts and finish
-                    const newAccount: Event.CompetitiveAccount = {
+                    const newAccount: Event.Account = {
                         rsn: this.rsn,
-                        starting: hiscore,
-                        ending: hiscore,
                     };
 
                     const newAccounts: Event.Account[] = this.event
@@ -133,7 +132,10 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
                         .concat(
                             newAccount,
                         );
-                    this.event.teams[userIdx].participants[userJdx].runescapeAccounts = newAccounts;
+                    this.event
+                        .teams[userIdx]
+                        .participants[userJdx]
+                        .runescapeAccounts = newAccounts;
 
                     await Db.upsertEvent(this.event);
                     this.state = CONVERSATION_STATE.DONE;
@@ -198,6 +200,7 @@ class EventsSignupConversation extends Conversation<Command.EventsSignup> {
                 }
 
                 // save event
+                willSignUpPlayer$.next(this.event);
                 await Db.upsertEvent(this.event);
                 this.state = CONVERSATION_STATE.DONE;
                 this.returnMessage = 'Signed up for team';

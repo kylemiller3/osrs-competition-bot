@@ -11,6 +11,180 @@ import { Settings, } from '../settings';
 const accountA: Event.CompetitiveAccount = {
     rsn: 'rsn1',
     starting: {
+        bosses: {
+            'Abyssal Sire': {
+                rank: -1,
+                score: 66,
+            },
+            'Alchemical Hydra': {
+                rank: -1,
+                score: 66,
+            },
+            'Barrows Chests': {
+                rank: -1,
+                score: 66,
+            },
+            Bryophyta: {
+                rank: -1,
+                score: 66,
+            },
+            Callisto: {
+                rank: -1,
+                score: 66,
+            },
+            Cerberus: {
+                rank: -1,
+                score: 66,
+            },
+            'Chambers of Xeric': {
+                rank: -1,
+                score: 66,
+            },
+            'Chambers of Xeric: Challenge Mode': {
+                rank: -1,
+                score: 66,
+            },
+            'Chaos Elemental': {
+                rank: -1,
+                score: 66,
+            },
+            'Chaos Fanatic': {
+                rank: -1,
+                score: 66,
+            },
+            'Commander Zilyana': {
+                rank: -1,
+                score: 66,
+            },
+            'Corporeal Beast': {
+                rank: -1,
+                score: 66,
+            },
+            'Crazy Archaeologist': {
+                rank: -1,
+                score: 66,
+            },
+            'Dagannoth Prime': {
+                rank: -1,
+                score: 66,
+            },
+            'Dagannoth Rex': {
+                rank: -1,
+                score: 66,
+            },
+            'Dagannoth Supreme': {
+                rank: -1,
+                score: 66,
+            },
+            'Deranged Archaeologist': {
+                rank: -1,
+                score: 66,
+            },
+            'General Graardor': {
+                rank: -1,
+                score: 66,
+            },
+            'Giant Mole': {
+                rank: -1,
+                score: 66,
+            },
+            'Grotesque Guardians': {
+                rank: -1,
+                score: 66,
+            },
+            Hespori: {
+                rank: -1,
+                score: 66,
+            },
+            'Kalphite Queen': {
+                rank: -1,
+                score: 66,
+            },
+            'King Black Dragon': {
+                rank: -1,
+                score: 66,
+            },
+            Kraken: {
+                rank: -1,
+                score: 66,
+            },
+            'Kree\'Arra': {
+                rank: -1,
+                score: 66,
+            },
+            'K\'ril Tsutsaroth': {
+                rank: -1,
+                score: 66,
+            },
+            Mimic: {
+                rank: -1,
+                score: 66,
+            },
+            Obor: {
+                rank: -1,
+                score: 66,
+            },
+            Sarachnis: {
+                rank: -1,
+                score: 66,
+            },
+            Scorpia: {
+                rank: -1,
+                score: 66,
+            },
+            Skotizo: {
+                rank: -1,
+                score: 66,
+            },
+            'The Gauntlet': {
+                rank: -1,
+                score: 66,
+            },
+            'The Corrupted Gauntlet': {
+                rank: -1,
+                score: 66,
+            },
+            'Theatre of Blood': {
+                rank: -1,
+                score: 66,
+            },
+            'Thermonuclear Smoke Devil': {
+                rank: -1,
+                score: 66,
+            },
+            'TzKal-Zuk': {
+                rank: -1,
+                score: 66,
+            },
+            'TzTok-Jad': {
+                rank: -1,
+                score: 66,
+            },
+            Venenatis: {
+                rank: -1,
+                score: 66,
+            },
+            'Vet\'ion': {
+                rank: -1,
+                score: 66,
+            },
+            Vorkath: {
+                rank: -1,
+                score: 66,
+            },
+            Wintertodt: {
+                rank: -1,
+                score: 66,
+            },
+            Zalcano: {
+                rank: -1,
+                score: 66,
+            },
+            Zulrah: {
+                rank: -1,
+                score: 66,
+            },
+        },
         skills: {
             overall: {
                 rank: '-1',
@@ -345,6 +519,180 @@ const accountA: Event.CompetitiveAccount = {
                 score: 66,
             },
         },
+        bosses: {
+            'Abyssal Sire': {
+                rank: -1,
+                score: 66,
+            },
+            'Alchemical Hydra': {
+                rank: -1,
+                score: 66,
+            },
+            'Barrows Chests': {
+                rank: -1,
+                score: 66,
+            },
+            Bryophyta: {
+                rank: -1,
+                score: 66,
+            },
+            Callisto: {
+                rank: -1,
+                score: 66,
+            },
+            Cerberus: {
+                rank: -1,
+                score: 66,
+            },
+            'Chambers of Xeric': {
+                rank: -1,
+                score: 66,
+            },
+            'Chambers of Xeric: Challenge Mode': {
+                rank: -1,
+                score: 66,
+            },
+            'Chaos Elemental': {
+                rank: -1,
+                score: 66,
+            },
+            'Chaos Fanatic': {
+                rank: -1,
+                score: 66,
+            },
+            'Commander Zilyana': {
+                rank: -1,
+                score: 66,
+            },
+            'Corporeal Beast': {
+                rank: -1,
+                score: 66,
+            },
+            'Crazy Archaeologist': {
+                rank: -1,
+                score: 66,
+            },
+            'Dagannoth Prime': {
+                rank: -1,
+                score: 66,
+            },
+            'Dagannoth Rex': {
+                rank: -1,
+                score: 66,
+            },
+            'Dagannoth Supreme': {
+                rank: -1,
+                score: 66,
+            },
+            'Deranged Archaeologist': {
+                rank: -1,
+                score: 66,
+            },
+            'General Graardor': {
+                rank: -1,
+                score: 66,
+            },
+            'Giant Mole': {
+                rank: -1,
+                score: 66,
+            },
+            'Grotesque Guardians': {
+                rank: -1,
+                score: 66,
+            },
+            Hespori: {
+                rank: -1,
+                score: 66,
+            },
+            'Kalphite Queen': {
+                rank: -1,
+                score: 66,
+            },
+            'King Black Dragon': {
+                rank: -1,
+                score: 66,
+            },
+            Kraken: {
+                rank: -1,
+                score: 66,
+            },
+            'Kree\'Arra': {
+                rank: -1,
+                score: 66,
+            },
+            'K\'ril Tsutsaroth': {
+                rank: -1,
+                score: 66,
+            },
+            Mimic: {
+                rank: -1,
+                score: 66,
+            },
+            Obor: {
+                rank: -1,
+                score: 66,
+            },
+            Sarachnis: {
+                rank: -1,
+                score: 66,
+            },
+            Scorpia: {
+                rank: -1,
+                score: 66,
+            },
+            Skotizo: {
+                rank: -1,
+                score: 66,
+            },
+            'The Gauntlet': {
+                rank: -1,
+                score: 66,
+            },
+            'The Corrupted Gauntlet': {
+                rank: -1,
+                score: 66,
+            },
+            'Theatre of Blood': {
+                rank: -1,
+                score: 66,
+            },
+            'Thermonuclear Smoke Devil': {
+                rank: -1,
+                score: 66,
+            },
+            'TzKal-Zuk': {
+                rank: -1,
+                score: 66,
+            },
+            'TzTok-Jad': {
+                rank: -1,
+                score: 66,
+            },
+            Venenatis: {
+                rank: -1,
+                score: 66,
+            },
+            'Vet\'ion': {
+                rank: -1,
+                score: 66,
+            },
+            Vorkath: {
+                rank: -1,
+                score: 66,
+            },
+            Wintertodt: {
+                rank: -1,
+                score: 66,
+            },
+            Zalcano: {
+                rank: -1,
+                score: 66,
+            },
+            Zulrah: {
+                rank: -1,
+                score: 66,
+            },
+        },
     },
 };
 
@@ -672,7 +1020,7 @@ describe('Postgres Database', (): void => {
         let fetchedEvents: Event.Object[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
-            fetchedEvents = await Db.fetchEventsBetweenDates(
+            fetchedEvents = await Db.fetchAllEventsBetweenDates(
                 new Date('1970-01-01T01:00:00.000Z'),
                 new Date('9999-12-31T01:00:00.000Z'),
                 Db.testDb,
@@ -683,7 +1031,7 @@ describe('Postgres Database', (): void => {
         });
         it('should return two events.', async (): Promise<void> => {
             // @ts-ignore
-            fetchedEvents = await Db.fetchEventsBetweenDates(
+            fetchedEvents = await Db.fetchAllEventsBetweenDates(
                 new Date('1970-01-01T00:00:00.000Z'),
                 new Date('9999-12-31T23:59:59.999Z'),
                 Db.testDb,

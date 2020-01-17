@@ -44,7 +44,7 @@ export interface Qa {
     answer: discord.Message // and answers
 }
 
-export abstract class Conversation<T> {
+export abstract class Conversation {
     qa: Qa[];
     opMessage: discord.Message;
     uuid: string;
@@ -64,7 +64,7 @@ export abstract class Conversation<T> {
 
     constructor(
         opMessage: discord.Message,
-        params: T = Object(),
+        params: Record<string, string | number | boolean> = Object(),
     ) {
         this.params = params as unknown as Record<string, string | number | boolean>;
         this.qa = [];
@@ -219,13 +219,13 @@ export abstract class Conversation<T> {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace ConversationManager {
-    const allConversations: Record<string, Conversation<unknown>> = {};
+    const allConversations: Record<string, Conversation> = {};
 
     export const startNewConversation = async (
         msg: discord.Message,
-        newConversation: Conversation<unknown>
+        newConversation: Conversation
     ): Promise<void> => {
-        const foundConversation: Conversation<unknown> | undefined = allConversations[
+        const foundConversation: Conversation | undefined = allConversations[
             msg.author.id
         ];
 

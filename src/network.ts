@@ -58,7 +58,7 @@ export namespace Network {
 
     /**
     * Fetches the supplied rsn from RuneScape API hiscores or cache.
-    * Cache invalidates every 20 minutes. See [[hiscores.Player]]
+    * Cache invalidates every 10 minutes. See [[hiscores.Player]]
     * @param rsn The rsn to lookup on hiscores
     * @param pullNew Forces a cache miss
     * @returns Observable of the RuneScape web API response
@@ -75,7 +75,7 @@ export namespace Network {
         if (cachedRsn !== undefined) {
             const date: Date = new Date(cachedRsn.date);
             date.setMinutes(
-                date.getMinutes() + 20
+                date.getMinutes() + 10
             );
             if (Utils.isInPast(date) || pullNew) {
                 hiscoreCache[asciiRsn] = undefined;
