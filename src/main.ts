@@ -650,13 +650,15 @@ const init = async (): Promise<void> => {
             );
 
             // save event
-            Db.upsertEvent(newEvent);
+            await Db.upsertEvent(newEvent);
+            didStartEvent$.next(newEvent);
             willUpdateScores$.next(event);
         }
     );
 
     didStartEvent$.subscribe(
         (event: Event.Object): void => {
+            Utils.logger.debug(`Event ${event.id} did start.`);
         }
     );
 

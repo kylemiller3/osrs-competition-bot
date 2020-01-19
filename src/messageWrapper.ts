@@ -225,7 +225,7 @@ export namespace MessageWrapper {
             : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
             (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
-                const sub = sentMessages$.pipe(
+                const sub = deletedMessages$.pipe(
                     filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
                 ).subscribe(
                     (response: Response): void => {
@@ -253,7 +253,7 @@ export namespace MessageWrapper {
             : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
             (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
-                const sub = sentMessages$.pipe(
+                const sub = editedMessage$.pipe(
                     filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
                 ).subscribe(
                     (response: Response): void => {
