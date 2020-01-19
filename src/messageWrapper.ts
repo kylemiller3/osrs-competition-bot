@@ -3,8 +3,9 @@ import {
     Observable, of, Subject, forkJoin, from,
 } from 'rxjs';
 import {
-    mergeMap, map, share,
+    mergeMap, map, share, filter,
 } from 'rxjs/operators';
+import { rejects, } from 'assert';
 import { Network, } from './network';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -190,17 +191,25 @@ export namespace MessageWrapper {
     export const sendMessage = (
         sendInfo: SendInfo
     ): Promise<Response> => {
+        const taggedInfo: SendInfo = { ...sendInfo, };
+        taggedInfo.tag = taggedInfo.tag !== undefined
+            ? taggedInfo.tag
+            : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
-            (resolver: (response: Response) => void): void => {
-                const sub = sentMessages$.subscribe(
+            (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
+                const sub = sentMessages$.pipe(
+                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
+                ).subscribe(
                     (response: Response): void => {
                         resolver(response);
                         sub.unsubscribe();
+                    }, (error: Error): void => {
+                        rejector(error);
                     }
                 );
             }
         );
-        sendMessages$.next(sendInfo);
+        sendMessages$.next(taggedInfo);
         return p;
     };
 
@@ -210,17 +219,25 @@ export namespace MessageWrapper {
     export const deleteMessage = (
         deleteInfo: DeleteInfo
     ): Promise<Response> => {
+        const taggedInfo: DeleteInfo = { ...deleteInfo, };
+        taggedInfo.tag = taggedInfo.tag !== undefined
+            ? taggedInfo.tag
+            : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
-            (resolver: (response: Response) => void): void => {
-                const sub = deletedMessages$.subscribe(
+            (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
+                const sub = sentMessages$.pipe(
+                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
+                ).subscribe(
                     (response: Response): void => {
                         resolver(response);
                         sub.unsubscribe();
+                    }, (error: Error): void => {
+                        rejector(error);
                     }
                 );
             }
         );
-        deleteMessages$.next(deleteInfo);
+        deleteMessages$.next(taggedInfo);
         return p;
     };
 
@@ -230,17 +247,25 @@ export namespace MessageWrapper {
     export const editMessage = (
         editInfo: EditInfo
     ): Promise<Response> => {
+        const taggedInfo: EditInfo = { ...editInfo, };
+        taggedInfo.tag = taggedInfo.tag !== undefined
+            ? taggedInfo.tag
+            : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
-            (resolver: (response: Response) => void): void => {
-                const sub = editedMessage$.subscribe(
+            (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
+                const sub = sentMessages$.pipe(
+                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
+                ).subscribe(
                     (response: Response): void => {
                         resolver(response);
                         sub.unsubscribe();
+                    }, (error: Error): void => {
+                        rejector(error);
                     }
                 );
             }
         );
-        editMessage$.next(editInfo);
+        editMessage$.next(taggedInfo);
         return p;
     };
 

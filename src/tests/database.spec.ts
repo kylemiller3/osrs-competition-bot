@@ -720,29 +720,33 @@ const insertEventB: Event.Object = {
     guilds: {
         creator: {
             discordId: 'testE',
-            scoreboardMessages: [
-                {
-                    channelId: 'testB',
-                    messageId: 'testC',
-                },
-            ],
+            scoreboardMessage: {
+                channelId: 'testB',
+                messagesId: [
+                    'testC',
+                ],
+            },
             statusMessage: {
                 channelId: 'testB',
-                messageId: 'testD',
+                messagesId: [
+                    'testD',
+                ],
             },
         },
         others: [
             {
                 discordId: 'testA',
-                scoreboardMessages: [
-                    {
-                        channelId: 'testB',
-                        messageId: 'testE',
-                    },
-                ],
+                scoreboardMessage: {
+                    channelId: 'testB',
+                    messagesId: [
+                        'testE',
+                    ],
+                },
                 statusMessage: {
                     channelId: 'testB',
-                    messageId: 'testF',
+                    messagesId: [
+                        'testF',
+                    ],
                 },
             },
         ],

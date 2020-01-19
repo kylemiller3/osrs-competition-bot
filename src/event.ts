@@ -174,7 +174,7 @@ export namespace Event {
      */
     export interface ChannelMessage {
         channelId: string
-        messageId: string
+        messagesId: string[]
     }
 
     /**
@@ -184,7 +184,7 @@ export namespace Event {
     export interface Guild {
         discordId: string
         statusMessage?: ChannelMessage
-        scoreboardMessages?: ChannelMessage[]
+        scoreboardMessage?: ChannelMessage
     }
 
     export interface CompetingGuilds {

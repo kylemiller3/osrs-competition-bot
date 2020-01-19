@@ -379,7 +379,55 @@ const resumeRunningEvents = async (): Promise<void> => {
     );
 };
 
+const deleteMessages = async (
+    guild: discord.Guild,
+    eventMessage: Event.ChannelMessage,
+): Promise<void> => {
+    if (!guild.available) {
+        return;
+    }
+
+    const channel: discord.TextChannel | null = getTextChannelFromId(
+        guild,
+        eventMessage.channelId,
+    );
+    if (channel === null) {
+        return;
+    }
+
+    // get message objects
+    const discordMessagesPromises:
+    Promise<discord.Message | null>[] = eventMessage.messagesId.map(
+        (messageId: string):
+        Promise<discord.Message | null> => channel.fetchMessage(
+            messageId,
+        ).catch(
+            (error: Error): null => {
+                Utils.logger.warn(`Error fetching messages: ${error.message}`);
+                return null;
+            }
+        )
+    );
+    const discordMessages: (discord.Message | null)[] = await Promise.all(
+        discordMessagesPromises
+    );
+
+    // delete the old messages
+    const validDiscordMessages: discord.Message[] = discordMessages.filter(
+        Utils.isDefinedFilter
+    );
+    validDiscordMessages.forEach(
+        (message: discord.Message): void => {
+            MessageWrapper.deleteMessage({
+                message,
+            });
+        }
+    );
+};
+
 const init = async (): Promise<void> => {
+    await gClient.login(privateKey);
+
     commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
     commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
     commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
@@ -402,7 +450,7 @@ const init = async (): Promise<void> => {
             Utils.logger.trace(`Message with tag ${response.tag} sent.`);
         },
         (err: Error): void => {
-            Utils.logError(err);
+            Utils.logger.error(`Message sending error: ${err.message}`);
         },
         (): void => {
             Utils.logger.trace('Finished sending messages.');
@@ -410,7 +458,7 @@ const init = async (): Promise<void> => {
     );
 
     willStartEvent$.subscribe(
-        (event: Event.Object): void => {
+        async (event: Event.Object): Promise<void> => {
             Utils.logger.debug(`Event ${event.id} is starting.`);
             if (event.id === undefined) {
                 throw new Error('event id is undefined');
@@ -421,29 +469,14 @@ const init = async (): Promise<void> => {
                 && !Event.isEventCustom(event)) {
                 // auto score update
                 Utils.logger.trace('Event is auto tracking score');
-
-                // start after update
-                const sub: Subscription = didUpdateScores$.subscribe(
-                    (e: Event.Object): void => {
-                        didStartEvent$.next(e);
-                        sub.unsubscribe();
-                    }
-                );
-                willUpdateScores$.next(event);
                 updateTimers[event.id] = setInterval(
                     (): void => {
                         willUpdateScores$.next(event);
                     }, 1000 * 60 * 10
                 );
-            } else {
-                // otherwise start immediately
-                didStartEvent$.next(event);
             }
-        }
-    );
 
-    didStartEvent$.subscribe(
-        async (event: Event.Object): Promise<void> => {
+            // main logic
             // print/update scoreboard
             Utils.logger.debug(`Event ${event.id} has started.`);
             const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
@@ -455,13 +488,17 @@ const init = async (): Promise<void> => {
                     event.guilds.creator,
                 ];
 
+            // update status and scoreboard
             const guildMessagesPromises:
             Promise<[
                 Event.ChannelMessage | null,
-                (Event.ChannelMessage | null)[] | null
+                Event.ChannelMessage | null,
             ]>[] = eventGuilds.map(
                 async (eventGuild: Event.Guild):
-                Promise<[Event.ChannelMessage | null, (Event.ChannelMessage | null)[] | null]> => {
+                Promise<[
+                    Event.ChannelMessage | null,
+                    Event.ChannelMessage | null,
+                ]> => {
                     // sanity checks
                     const settings: Settings.Object | null = await Db.fetchSettings(
                         eventGuild.discordId,
@@ -474,134 +511,99 @@ const init = async (): Promise<void> => {
                         ];
                     }
 
-                    const discordGuild: discord.Guild | null = getGuildFromId(
+                    const guild: discord.Guild | null = getGuildFromId(
                         gClient,
                         settings.guildId,
                     );
-                    if (discordGuild === null) {
-                        Utils.logger.warn('Guild is unavailable');
+
+                    if (guild === null) {
+                        Utils.logger.warn('Discord guild not available');
                         return [
                             null,
                             null,
                         ];
                     }
 
-                    const settingsChannel: discord.TextChannel | null = getTextChannelFromId(
-                        discordGuild,
+                    const channelToPostTo: discord.TextChannel | null = getTextChannelFromId(
+                        guild,
                         settings.channelId,
                     );
-                    if (settingsChannel === null) {
-                        Utils.logger.info(`Looks like ${eventGuild.discordId} has not set their channel.`);
+
+                    if (channelToPostTo === null) {
                         return [
                             null,
                             null,
                         ];
                     }
 
-                    const settingsDummy: discord.Message = new discord.Message(
-                        settingsChannel,
+                    if (eventGuild.statusMessage !== undefined) {
+                        await deleteMessages(
+                            guild,
+                            eventGuild.statusMessage
+                        );
+                    }
+
+                    if (eventGuild.scoreboardMessage !== undefined) {
+                        await deleteMessages(
+                            guild,
+                            eventGuild.scoreboardMessage
+                        );
+                    }
+
+                    const statusMessage: discord.Message = new discord.Message(
+                        channelToPostTo,
                         null as unknown as Record<string, unknown>,
                         gClient,
                     );
-
-                    // fetch old messages
-                    if (eventGuild.statusMessage !== undefined) {
-                        const statusChannel: discord.TextChannel | null = getTextChannelFromId(
-                            discordGuild,
-                            eventGuild.statusMessage.channelId
-                        );
-
-                        if (statusChannel !== null) {
-                            if (eventGuild.statusMessage !== undefined) {
-                                const statusMessage:
-                                discord.Message | null = await statusChannel.fetchMessage(
-                                    eventGuild.statusMessage.messageId
-                                ).catch(
-                                    (error: Error): null => {
-                                        Utils.logError(error);
-                                        return null;
-                                    }
-                                );
-                                if (statusMessage !== null) {
-                                    MessageWrapper.deleteMessage({
-                                        message: statusMessage,
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    // send new status
-                    const statusResponse:
-                    MessageWrapper.Response = await MessageWrapper.sendMessage({
-                        message: settingsDummy,
-                        content: 'status a',
+                    const statusPromise: Promise<
+                    MessageWrapper.Response | null
+                    > = MessageWrapper.sendMessage({
+                        message: statusMessage,
+                        content: 'test 123',
                     });
 
-                    if (eventGuild.scoreboardMessages !== undefined) {
-                        eventGuild.scoreboardMessages.forEach(
-                            async (channelMessage: Event.ChannelMessage): Promise<void> => {
-                                const scoreboardChannel:
-                                discord.TextChannel | null = getTextChannelFromId(
-                                    discordGuild,
-                                    channelMessage.channelId
-                                );
-                                if (scoreboardChannel !== null) {
-                                    const scoreboardMessage:
-                                    discord.Message | null = await scoreboardChannel
-                                        .fetchMessage(
-                                            channelMessage.messageId
-                                        ).catch(
-                                            (error: Error): null => {
-                                                Utils.logError(error);
-                                                return null;
-                                            }
-                                        );
-                                    if (scoreboardMessage !== null) {
-                                        MessageWrapper.deleteMessage({
-                                            message: scoreboardMessage,
-                                        });
-                                    }
-                                }
-                            }
-                        );
-                    }
-
-                    // send new scoreboard
-                    const scoreboardResponse:
-                    MessageWrapper.Response = await MessageWrapper.sendMessage({
-                        message: settingsDummy,
-                        content: 'scoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard\n LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGLONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard\n LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGLONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGLONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGLONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGLONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONGscoreboard LONG',
+                    const scoreboardMessage: discord.Message = new discord.Message(
+                        channelToPostTo,
+                        null as unknown as Record<string, unknown>,
+                        gClient,
+                    );
+                    const scoreboardPromise: Promise<
+                    MessageWrapper.Response | null
+                    > = MessageWrapper.sendMessage({
+                        message: scoreboardMessage,
+                        content: 'scoreboard 123',
                         options: {
                             code: true,
                         },
                     });
 
-                    const statusMessage: discord.Message | null = statusResponse.messages[0];
-                    let statusPart: Event.ChannelMessage | null;
-                    if (statusMessage === null) {
-                        Utils.logger.error('Status message could not be posted');
-                        statusPart = null;
-                    } else {
+                    const responses: [
+                        MessageWrapper.Response | null,
+                        MessageWrapper.Response | null
+                    ] = await Promise.all([
+                        statusPromise,
+                        scoreboardPromise,
+                    ]);
+
+                    let statusPart: Event.ChannelMessage | null = null;
+                    if (responses[0] !== null) {
                         statusPart = {
-                            channelId: statusMessage.channel.id,
-                            messageId: statusMessage.id,
+                            channelId: settings.channelId,
+                            messagesId: responses[0].messages
+                                .filter(Utils.isDefinedFilter)
+                                .map((msg: discord.Message): string => msg.id),
                         };
                     }
 
-                    const scoreboardPart:
-                    (Event.ChannelMessage | null)[] = scoreboardResponse.messages.map(
-                        (message: discord.Message | null): Event.ChannelMessage | null => {
-                            if (message === null) {
-                                Utils.logger.error('Some scoreboard message could not be posted');
-                                return null;
-                            }
-                            return {
-                                channelId: settingsChannel.id,
-                                messageId: message.id,
-                            };
-                        }
-                    );
+                    let scoreboardPart: Event.ChannelMessage | null = null;
+                    if (responses[1] !== null) {
+                        scoreboardPart = {
+                            channelId: settings.channelId,
+                            messagesId: responses[1].messages
+                                .filter(Utils.isDefinedFilter)
+                                .map((msg: discord.Message): string => msg.id),
+                        };
+                    }
 
                     return [
                         statusPart,
@@ -609,38 +611,39 @@ const init = async (): Promise<void> => {
                     ];
                 }
             );
+
             const guildMessages: [
                 Event.ChannelMessage | null,
-                (Event.ChannelMessage | null)[] | null
-            ][] = await Promise.all(
-                guildMessagesPromises
-            );
+                Event.ChannelMessage | null,
+            ][] = await Promise.all(guildMessagesPromises);
 
             // map these messages back to the original guild objects
             const newEvent: Event.Object = { ...event, };
+
+            // first message belongs to the owner
             newEvent.guilds.creator.statusMessage = guildMessages[0][0] !== null
                 ? guildMessages[0][0]
                 : undefined;
-            newEvent.guilds.creator.scoreboardMessages = guildMessages[0][1] !== null
-                ? guildMessages[0][1].filter(Utils.isDefinedFilter)
+            newEvent.guilds.creator.scoreboardMessage = guildMessages[0][1] !== null
+                ? guildMessages[0][1]
                 : undefined;
 
+            // create others guild message array
             const othersMessages: [
                 Event.ChannelMessage | null,
-                (Event.ChannelMessage | null)[] | null
+                Event.ChannelMessage | null,
             ][] = guildMessages.slice(1);
-
             othersMessages.forEach(
-                (otherMessages: [
+                (otherMessage: [
                     Event.ChannelMessage | null,
-                    (Event.ChannelMessage | null)[] | null
+                    Event.ChannelMessage | null,
                 ], idx: number): void => {
                     if (newEvent.guilds.others !== undefined) {
-                        newEvent.guilds.others[idx].statusMessage = otherMessages[0] !== null
-                            ? otherMessages[0]
+                        newEvent.guilds.others[idx].statusMessage = otherMessage[0] !== null
+                            ? otherMessage[0]
                             : undefined;
-                        newEvent.guilds.others[idx].scoreboardMessages = otherMessages[1] !== null
-                            ? otherMessages[1].filter(Utils.isDefinedFilter)
+                        newEvent.guilds.others[idx].scoreboardMessage = otherMessage[1] !== null
+                            ? otherMessage[1]
                             : undefined;
                     }
                 }
@@ -648,6 +651,12 @@ const init = async (): Promise<void> => {
 
             // save event
             Db.upsertEvent(newEvent);
+            willUpdateScores$.next(event);
+        }
+    );
+
+    didStartEvent$.subscribe(
+        (event: Event.Object): void => {
         }
     );
 
@@ -711,6 +720,10 @@ const init = async (): Promise<void> => {
                     false,
                 )
             );
+            if (observables.length === 0) {
+                didUpdateScores$.next(event);
+                return;
+            }
 
             // un-flatmap
             let idx = 0;
@@ -808,6 +821,5 @@ const init = async (): Promise<void> => {
         scheduleEventsTimers,
         1000 * 60 * 60 * 24,
     );
-    await gClient.login(privateKey);
 };
 init();

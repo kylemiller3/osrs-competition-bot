@@ -119,17 +119,6 @@ export namespace Utils {
      */
     export const logger = log4js.getLogger();
 
-    /**
-    * Error logger helper function
-    * @param error The error to log
-    */
-    export const logError = (
-        error: Error
-    ): void => {
-        logger.error('Unexpected error');
-        logger.error(error.message);
-    };
-
     // process.on('exit', (): void => {
 
     // });
