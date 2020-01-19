@@ -4,66 +4,101 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
+
+    /**
+     * All possible RuneScape Bosses to track
+     * @category Tracking
+     */
+    export type Bosses = 'Abyssal Sire'
+    | 'Alchemical Hydra'
+    | 'Barrows Chests'
+    | 'Bryophyta'
+    | 'Callisto'
+    | 'Cerberus'
+    | 'Chambers of Xeric'
+    | 'Chambers of Xeric: Challenge Mode'
+    | 'Chaos Elemental'
+    | 'Chaos Fanatic'
+    | 'Commander Zilyana'
+    | 'Corporeal Beast'
+    | 'Crazy Archaeologist'
+    | 'Dagannoth Prime'
+    | 'Dagannoth Rex'
+    | 'Dagannoth Supreme'
+    | 'Deranged Archaeologist'
+    | 'General Graardor'
+    | 'Giant Mole'
+    | 'Grotesque Guardians'
+    | 'Hespori'
+    | 'Kalphite Queen'
+    | 'King Black Dragon'
+    | 'Kraken'
+    | 'Kree\'Arra'
+    | 'K\'ril Tsutsaroth'
+    | 'Mimic'
+    | 'Obor'
+    | 'Sarachnis'
+    | 'Scorpia'
+    | 'Skotizo'
+    | 'The Gauntlet'
+    | 'The Corrupted Gauntlet'
+    | 'Theatre of Blood'
+    | 'Thermonuclear Smoke Devil'
+    | 'TzKal-Zuk'
+    | 'TzTok-Jad'
+    | 'Venenatis'
+    | 'Vet\'ion'
+    | 'Vorkath'
+    | 'Wintertodt'
+    | 'Zalcano'
+    | 'Zulrah'
+
     /**
      * All possible RuneScape Skills to track
      * @category Tracking
      */
-    export enum Skills {
-        ATTACK = 'attack',
-        STRENGTH = 'strength',
-        DEFENSE = 'defense',
-        RANGED = 'ranged',
-        PRAYER = 'prayer',
-        MAGIC = 'magic',
-        RUNECRAFT = 'runecraft',
-        CONSTRUCTION = 'construction',
-        HITPOINTS = 'hitpoints',
-        AGILITY = 'agility',
-        HERBLORE = 'herblore',
-        THIEVING = 'thieving',
-        CRAFTING = 'crafting',
-        FLETCHING = 'fletching',
-        SLAYER = 'slayer',
-        HUNTER = 'hunter',
-        MINING = 'mining',
-        SMITHING = 'smithing',
-        FISHING = 'fishing',
-        COOKING = 'cooking',
-        FIREMAKING = 'firemaking',
-        WOODCUTTING = 'woodcutting',
-        FARMING = 'farming',
-    }
+    export type Skills = 'attack'
+    | 'strength'
+    | 'defense'
+    | 'ranged'
+    | 'prayer'
+    | 'magic'
+    | 'runecraft'
+    | 'construction'
+    | 'hitpoints'
+    | 'agility'
+    | 'herblore'
+    | 'thieving'
+    | 'crafting'
+    | 'fletching'
+    | 'slayer'
+    | 'hunter'
+    | 'mining'
+    | 'smithing'
+    | 'fishing'
+    | 'cooking'
+    | 'firemaking'
+    | 'woodcutting'
+    | 'farming'
 
     /**
      * All possible Bounty Hunter stats to track
      * @category Tracking
      */
-    export enum BountyHunter {
-        ROGUE = 'rogue',
-        HUNTER = 'hunter',
-    }
-
-    /**
-     * All possible Last Man Standing stats to track
-     * @category Tracking
-     */
-    export enum LastManStanding {
-        LMS = 'lms',
-    }
+    export type BountyHunter = 'rogue'
+    | 'hunter'
 
     /**
      * All possible Clue stats to track
      * @category Tracking
      */
-    export enum Clues {
-        ALL = 'all',
-        BEGINNER = 'beginner',
-        EASY = 'easy',
-        MEDIUM = 'medium',
-        HARD = 'hard',
-        ELITE = 'elite',
-        MASTER = 'master',
-    }
+    export type Clues = 'all'
+    | 'beginner'
+    | 'easy'
+    | 'medium'
+    | 'hard'
+    | 'elite'
+    | 'master'
 
     /**
      * Contract for an [[Event]]'s participant
@@ -97,14 +132,13 @@ export namespace Event {
      * Enum of all possible [[Tracking]] options
      * @category Tracking
      */
-    export enum Tracking {
-        NONE = 'casual',
-        SKILLS = 'skills',
-        BH = 'bh',
-        LMS = 'lms',
-        CLUES = 'clues',
-        CUSTOM = 'custom',
-    }
+    export type TrackingCategory = 'casual'
+    | 'skills'
+    | 'bh'
+    | 'lms'
+    | 'clues'
+    | 'custom'
+    | 'bosses'
 
     /**
      * Contract for information on a Team
@@ -130,8 +164,8 @@ export namespace Event {
      * @category Event
      */
     export interface Tracker {
-        tracking: Tracking
-        what?: BountyHunter[] | Clues[] | Skills[]
+        tracking: TrackingCategory
+        what: BountyHunter[] | Clues[] | Skills[] | Bosses[] | undefined
     }
 
     /**
@@ -144,21 +178,13 @@ export namespace Event {
     }
 
     /**
-     * Contract for tracked status messages
-     * @category Event
-     */
-    export interface GuildMessages {
-        scoreboardMessages?: ChannelMessage[]
-        statusMessage: ChannelMessage
-    }
-
-    /**
      * Contract of the information necessary to track a guild
      * @category Event
      */
     export interface Guild {
         discordId: string
-        guildMessages?: GuildMessages
+        statusMessage?: ChannelMessage
+        scoreboardMessages?: ChannelMessage[]
     }
 
     export interface CompetingGuilds {
@@ -187,8 +213,8 @@ export namespace Event {
      */
     export const getEventTracking = (
         event: Event.Object
-    ): Tracking => {
-        if (event.tracker === undefined) return Tracking.NONE;
+    ): TrackingCategory => {
+        if (event.tracker === undefined) return 'casual';
         return event.tracker.tracking;
     };
 
@@ -218,7 +244,7 @@ export namespace Event {
      */
     export const isEventCasual = (
         event: Event.Object,
-    ): boolean => getEventTracking(event) === Tracking.NONE;
+    ): boolean => getEventTracking(event) === 'casual';
 
     /**
      * Checks an event to see if it is a [[EventType.CUSTOM]] type
@@ -228,7 +254,7 @@ export namespace Event {
      */
     export const isEventCustom = (
         event: Event.Object
-    ): boolean => getEventTracking(event) === Tracking.CUSTOM;
+    ): boolean => getEventTracking(event) === 'custom';
 
     /**
      * Searches the events array for a specific [[Event]]

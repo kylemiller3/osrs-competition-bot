@@ -14,10 +14,9 @@ const eventsListActive = async (
         Db.mainDb
     );
     if (events === null) {
-        MessageWrapper.sendMessage$.next({
+        MessageWrapper.sendMessage({
             message: msg,
             content: 'No active events.',
-            tag: 'eventsListActive',
         });
     } else {
         const content: string = events.map(
@@ -25,10 +24,9 @@ const eventsListActive = async (
             string => `${event.id}. ${event.name}`
         ).join('\n');
 
-        MessageWrapper.sendMessage$.next({
+        MessageWrapper.sendMessage({
             message: msg,
             content,
-            tag: 'eventsListActive',
         });
     }
 };

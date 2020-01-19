@@ -509,7 +509,7 @@ export namespace Command {
     const adminSetChannel: Description = {
         description: 'Sets the announcements channel to the first channel mentioned.',
         accessControl: onlyAdmin,
-        command: '!f admin set channel',
+        command: '!f admin setchannel',
         params: {
             channel: {
                 description: 'Mention of the channel to use.',

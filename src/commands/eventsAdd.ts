@@ -6,7 +6,7 @@ import {
 import { Utils, } from '../utils';
 import { Db, } from '../database';
 import { Command, } from '../command';
-import { willStartEvent$, willEndEvent$, willAddEvent$, } from '../main';
+import { willAddEvent$, } from '../main';
 
 class EventAddConversation extends Conversation {
     event: Event.Object;
@@ -120,99 +120,189 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q4:
             case CONVERSATION_STATE.Q4E: {
                 const type: string = qa.answer.content;
-                let tracker: Event.Tracker = {
-                    tracking: Event.Tracking.NONE,
-                };
-                const tracking: Event.Tracking | undefined = Object.values(
-                    Event.Tracking
-                ).find(
-                    (value: string):
-                    boolean => type
-                        .toLowerCase()
-                        .trim()
-                        .startsWith(value)
-                );
-
-                let what: Event.BountyHunter[] | Event.Clues[] | Event.Skills[] | undefined;
-                if (tracking !== undefined) {
-                    const tracks: string = type
-                        .toLowerCase()
-                        .trim()
-                        .split(tracking)[1];
-                    const keys: string[] = tracks.split(' ');
-                    const filteredKeys = keys.filter(
-                        (key: string):
-                        boolean => key !== ''
-                    );
-
-                    // our enum keys are in upper case
-                    switch (tracking) {
-                        case Event.Tracking.BH:
-                            what = filteredKeys
-                                .map(
-                                    (key: string):
-                                    Event.BountyHunter => Event.BountyHunter[key.toUpperCase()]
-                                )
-                                .filter(
-                                    (value: string):
-                                    boolean => value !== undefined
-                                );
-                            // default HUNTER
-                            if (what.length === 0) {
-                                what = [
-                                    Event.BountyHunter.HUNTER,
-                                ];
-                            }
-                            break;
-                        case Event.Tracking.CLUES:
-                            what = filteredKeys
-                                .map(
-                                    (key: string):
-                                    Event.Clues => Event.Clues[key.toUpperCase()]
-                                )
-                                .filter(
-                                    (value: string):
-                                    boolean => value !== undefined
-                                );
-                            // default ALL
-                            if (what.length === 0) {
-                                what = [
-                                    Event.Clues.ALL,
-                                ];
-                            }
-                            break;
-                        case Event.Tracking.SKILLS: {
-                            what = filteredKeys
-                                .map(
-                                    (key: string):
-                                    Event.Skills => Event.Skills[key.toUpperCase()]
-                                )
-                                .filter(
-                                    (value: string):
-                                    boolean => value !== undefined
-                                );
-                            // default undefined
-                            if (what.length === 0) {
-                                this.state = CONVERSATION_STATE.Q4E;
-                                return Promise.resolve();
-                            }
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-
-                    if (tracking !== Event.Tracking.NONE) {
-                        tracker = {
-                            tracking,
-                            what,
-                        };
-                    }
-                    this.tracker = tracker;
-                    this.state = CONVERSATION_STATE.Q4C;
-                } else {
-                    this.state = CONVERSATION_STATE.Q4E;
+                const trackingStr: string = type
+                    .toLowerCase()
+                    .trim()
+                    .split(' ', 1)[0];
+                let tracking: Event.TrackingCategory;
+                switch (trackingStr) {
+                    case 'casual':
+                    case 'custom':
+                    case 'skills':
+                    case 'bh':
+                    case 'lms':
+                    case 'clues':
+                    case 'bosses':
+                        tracking = trackingStr;
+                        break;
+                    default:
+                        this.state = CONVERSATION_STATE.Q4E;
+                        return;
                 }
+
+                let what: Event.BountyHunter[]
+                | Event.Clues[]
+                | Event.Skills[]
+                | Event.Bosses[]
+                | undefined;
+
+                const keyStrs: string[] = type
+                    .trim()
+                    .split(' ')
+                    .slice(1)
+                    .join(' ')
+                    .split(',')
+                    .map(
+                        (str: string): string => str.trim()
+                    );
+                switch (tracking) {
+                    case 'casual':
+                    case 'custom':
+                    case 'lms': {
+                        what = undefined;
+                        break;
+                    }
+                    case 'bh': {
+                        what = keyStrs.map(
+                            (keyStr: string):
+                            Event.BountyHunter | null => {
+                                switch (keyStr) {
+                                    case 'hunter':
+                                    case 'rogue':
+                                        return keyStr;
+                                    default:
+                                        return null;
+                                }
+                            }
+                        ).filter(Utils.isDefinedFilter);
+                        break;
+                    }
+                    case 'clues': {
+                        what = keyStrs.map(
+                            (keyStr: string):
+                            Event.Clues | null => {
+                                switch (keyStr) {
+                                    case 'all':
+                                    case 'beginner':
+                                    case 'easy':
+                                    case 'medium':
+                                    case 'hard':
+                                    case 'elite':
+                                    case 'master':
+                                        return keyStr;
+                                    default:
+                                        return null;
+                                }
+                            }
+                        ).filter(Utils.isDefinedFilter);
+                        break;
+                    }
+                    case 'skills': {
+                        what = keyStrs.map(
+                            (keyStr: string):
+                            Event.Skills | null => {
+                                switch (keyStr) {
+                                    case 'attack':
+                                    case 'strength':
+                                    case 'defense':
+                                    case 'ranged':
+                                    case 'prayer':
+                                    case 'magic':
+                                    case 'runecraft':
+                                    case 'construction':
+                                    case 'hitpoints':
+                                    case 'agility':
+                                    case 'herblore':
+                                    case 'thieving':
+                                    case 'crafting':
+                                    case 'fletching':
+                                    case 'slayer':
+                                    case 'hunter':
+                                    case 'mining':
+                                    case 'smithing':
+                                    case 'fishing':
+                                    case 'cooking':
+                                    case 'firemaking':
+                                    case 'woodcutting':
+                                    case 'farming':
+                                        return keyStr;
+                                    default:
+                                        return null;
+                                }
+                            }
+                        ).filter(Utils.isDefinedFilter);
+                        break;
+                    }
+                    case 'bosses': {
+                        what = keyStrs.map(
+                            (keyStr: string):
+                            Event.Bosses | null => {
+                                switch (keyStr) {
+                                    case 'Abyssal Sire':
+                                    case 'Alchemical Hydra':
+                                    case 'Barrows Chests':
+                                    case 'Bryophyta':
+                                    case 'Callisto':
+                                    case 'Cerberus':
+                                    case 'Chambers of Xeric':
+                                    case 'Chambers of Xeric: Challenge Mode':
+                                    case 'Chaos Elemental':
+                                    case 'Chaos Fanatic':
+                                    case 'Commander Zilyana':
+                                    case 'Corporeal Beast':
+                                    case 'Crazy Archaeologist':
+                                    case 'Dagannoth Prime':
+                                    case 'Dagannoth Rex':
+                                    case 'Dagannoth Supreme':
+                                    case 'Deranged Archaeologist':
+                                    case 'General Graardor':
+                                    case 'Giant Mole':
+                                    case 'Grotesque Guardians':
+                                    case 'Hespori':
+                                    case 'Kalphite Queen':
+                                    case 'King Black Dragon':
+                                    case 'Kraken':
+                                    case 'Kree\'Arra':
+                                    case 'K\'ril Tsutsaroth':
+                                    case 'Mimic':
+                                    case 'Obor':
+                                    case 'Sarachnis':
+                                    case 'Scorpia':
+                                    case 'Skotizo':
+                                    case 'The Gauntlet':
+                                    case 'The Corrupted Gauntlet':
+                                    case 'Theatre of Blood':
+                                    case 'Thermonuclear Smoke Devil':
+                                    case 'TzKal-Zuk':
+                                    case 'TzTok-Jad':
+                                    case 'Venenatis':
+                                    case 'Vet\'ion':
+                                    case 'Vorkath':
+                                    case 'Wintertodt':
+                                    case 'Zalcano':
+                                    case 'Zulrah':
+                                        return keyStr;
+                                    default:
+                                        return null;
+                                }
+                            }
+                        ).filter(Utils.isDefinedFilter);
+                        break;
+                    }
+                    default: {
+                        what = undefined;
+                        break;
+                    }
+                }
+                if (what !== undefined && what.length !== keyStrs.length) {
+                    this.state = CONVERSATION_STATE.Q4E;
+                    return;
+                }
+                this.tracker = {
+                    tracking,
+                    what,
+                };
+                this.state = CONVERSATION_STATE.Q5;
                 break;
             }
             case CONVERSATION_STATE.Q4C: {
@@ -262,7 +352,6 @@ class EventAddConversation extends Conversation {
             default:
                 break;
         }
-        return Promise.resolve();
     }
 }
 

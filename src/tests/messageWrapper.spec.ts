@@ -2,29 +2,21 @@
 /* eslint-disable func-names */
 /* eslint-disable no-unused-expressions */
 import {
-    describe, it, beforeEach, afterEach, before, after, utils,
+    describe, it, afterEach, before, after,
 } from 'mocha';
-import { assert, expect, } from 'chai';
-import pgp from 'pg-promise';
+import { expect, } from 'chai';
 import sinon from 'sinon';
 import * as discord from 'discord.js';
-import { async, } from 'rxjs/internal/scheduler/async';
 import {
-    take, last, tap, observeOn, map, toArray,
-} from 'rxjs/operators';
-import Rx, {
-    Subscription, defer, concat, Observable, of, from, observable, Subject,
+    Subscription, defer, Observable,
 } from 'rxjs';
-import { observe, DoneFunction, marbles, } from 'rxjs-marbles/mocha';
-import { Event, } from '../event';
-import { Db, } from '../database';
+import { observe, DoneFunction, } from 'rxjs-marbles/mocha';
 import { Utils, } from '../utils';
 import { MessageWrapper, } from '../messageWrapper';
-import { Network, } from '../network';
 
 
 const longStr = 'Denote simple fat denied add worthy little use. As some he so high down am week. Conduct esteems by cottage to pasture we winding. On assistance he cultivated considered frequently. Person how having tended direct own day man. Saw sufficient indulgence one own you inquietude sympathize. '
-+ 'Both rest of know draw fond post as. It agreement defective to excellent. Feebly do engage of narrow. Extensive repulsive belonging depending if promotion be zealously as. Preference inquietude ask now are dispatched led appearance. Small meant in so doubt hopes. Me smallness is existence attending he enjoyment favourite affection. Delivered is to ye belonging enjoyment preferred. Astonished and acceptance men two discretion. Law education recommend did objection how old.\n'
++ 'Both rest of know draw fond post as. It agreement defective to excellent. Feebly do engage of narrow. Extensive repulsive belonging depending if promotion be zealously as. Preference inquietude ask now are dispatched led appearance. Small meant in so doubt hopes. Me smallness is existence attending he enjoyment favorite affection. Delivered is to ye belonging enjoyment preferred. Astonished and acceptance men two discretion. Law education recommend did objection how old.\n'
 + 'Arrived totally in as between private. Favour of so as on pretty though elinor direct. Reasonable estimating be alteration we themselves entreaties me of reasonably. Direct wished so be expect polite valley. Whose asked stand it sense no spoil to. Prudent you too his conduct feeling limited and. Side he lose paid as hope so face upon be. Goodness did suitable learning put.\n'
 + 'However venture pursuit he am mr cordial. Forming musical am hearing studied be luckily. Ourselves for determine attending how led gentleman sincerity. Valley afford uneasy joy she thrown though bed set. In me forming general prudent on country carried. Behaved an or suppose justice. Seemed whence how son rather easily and change missed. Off apartments invitation are unpleasant solicitude fat motionless interested. Hardly suffer wisdom wishes valley as an. As friendship advantages resolution it alteration stimulated he or increasing.\n'
 + 'Throwing consider dwelling bachelor joy her proposal laughter. Raptures returned disposed one entirely her men ham. By to admire vanity county an mutual as roused. Of an thrown am warmly merely result depart supply. Required honoured trifling eat pleasure man relation. Assurance yet bed was improving furniture man. Distrusts delighted she listening mrs extensive admitting far.\n'
@@ -32,7 +24,7 @@ const longStr = 'Denote simple fat denied add worthy little use. As some he so h
 + 'He share of first to worse. Weddings and any opinions suitable smallest nay. My he houses or months settle remove ladies appear. Engrossed suffering supposing he recommend do eagerness. Commanded no of depending extremity recommend attention tolerably. Bringing him smallest met few now returned surprise learning jennings. Objection delivered eagerness he exquisite at do in. Warmly up he nearer mr merely me.\n'
 + 'Of recommend residence education be on difficult repulsive offending. Judge views had mirth table seems great him for her. Alone all happy asked begin fully stand own get. Excuse ye seeing result of we. See scale dried songs old may not. Promotion did disposing you household any instantly. Hills we do under times at first short an.\n'
 + 'Her old collecting she considered discovered. So at parties he warrant oh staying. Square new horses and put better end. Sincerity collected happiness do is contented. Sigh ever way now many. Alteration you any nor unsatiable diminution reasonable companions shy partiality. Leaf by left deal mile oh if easy. Added woman first get led joy not early jokes.\n'
-+ 'Up is opinion message manners correct hearing husband my. Disposing commanded dashwoods cordially depending at at. Its strangers who you certainty earnestly resources suffering she. Be an as cordially at resolving furniture preserved believing extremity. Easy mr pain felt in. Too northward affection additions nay. He no an nature ye talent houses wisdom vanity denied.';
++ 'Up is opinion message manners correct hearing husband my. Disposing commanded dash woods cordially depending at at. Its strangers who you certainty earnestly resources suffering she. Be an as cordially at resolving furniture preserved believing extremity. Easy mr pain felt in. Too northward affection additions nay. He no an nature ye talent houses wisdom vanity denied.';
 
 describe('Message Wrapper', (): void => {
     Utils.logger.level = 'fatal';
@@ -75,7 +67,7 @@ describe('Message Wrapper', (): void => {
                 ...testMessage,
                 content: 'msg1',
             });
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: testMessage.content,
                 tag: 'any',
@@ -99,7 +91,7 @@ describe('Message Wrapper', (): void => {
                 }
             );
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: testMessage.content,
                 tag: 'snowflake',
@@ -123,7 +115,7 @@ describe('Message Wrapper', (): void => {
                 }
             );
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: testMessage.content,
                 tag: 'any',
@@ -153,7 +145,7 @@ describe('Message Wrapper', (): void => {
                 }
             );
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: longStr,
                 tag: 'any',
@@ -216,7 +208,7 @@ describe('Message Wrapper', (): void => {
                 }
             );
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: longStr,
                 tag: 'tag',
@@ -392,19 +384,19 @@ describe('Message Wrapper', (): void => {
                 },
             );
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: longStr,
                 tag: 'tag',
             });
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: longStr,
                 tag: 'tag',
             });
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: longStr,
                 tag: 'tag',
@@ -416,7 +408,7 @@ describe('Message Wrapper', (): void => {
         //     this.timeout(35000);
         //     sendStub.rejects({
         //         ...testMessage,
-        //         content: 'rejectedx',
+        //         content: 'rejected x',
         //     });
         //     sendStub.onFirstCall().resolves({
         //         ...testMessage,
@@ -496,7 +488,7 @@ describe('Message Wrapper', (): void => {
                 },
             );
 
-            MessageWrapper.sendMessage$.next({
+            MessageWrapper.sendMessages$.next({
                 message: testMessage,
                 content: longStr,
                 tag: 'tag',
@@ -572,7 +564,7 @@ describe('Message Wrapper', (): void => {
                 ...testMessage,
                 content: 'msg1 edit',
             });
-            MessageWrapper.editMessages$.next(
+            MessageWrapper.editMessage$.next(
                 {
                     message: testMessage,
                     newContent: 'msg1 edit',
@@ -590,7 +582,7 @@ describe('Message Wrapper', (): void => {
                 }
             );
 
-            const sub = MessageWrapper.editedMessages$.subscribe(
+            const sub = MessageWrapper.editedMessage$.subscribe(
                 (response: MessageWrapper.Response): void => {
                     expect(response.tag).to.be.equal('snowflake');
                     sub.unsubscribe();
@@ -598,7 +590,7 @@ describe('Message Wrapper', (): void => {
                 }
             );
 
-            MessageWrapper.editMessages$.next(
+            MessageWrapper.editMessage$.next(
                 {
                     message: testMessage,
                     newContent: 'msg1 edited',
@@ -613,7 +605,7 @@ describe('Message Wrapper', (): void => {
                 ...testMessage,
                 content: 'msg1 edit',
             });
-            const sub = MessageWrapper.editedMessages$.subscribe(
+            const sub = MessageWrapper.editedMessage$.subscribe(
                 (msgs: MessageWrapper.Response): void => {
                     // @ts-ignore
                     expect(msgs.messages[0].content).to.be.equal('msg1 edit');
@@ -622,7 +614,7 @@ describe('Message Wrapper', (): void => {
                     done();
                 }
             );
-            MessageWrapper.editMessages$.next(
+            MessageWrapper.editMessage$.next(
                 {
                     message: testMessage,
                     newContent: 'msg1 edit',
@@ -642,7 +634,7 @@ describe('Message Wrapper', (): void => {
         delStub = MessageWrapper.deletedMessages$.subscribe(
             // (msgs: discord.Message[]): void => Utils.logger.fatal(msgs)
         );
-        editSub = MessageWrapper.editedMessages$.subscribe(
+        editSub = MessageWrapper.editedMessage$.subscribe(
             // (msgs: discord.Message[]): void => Utils.logger.fatal(msgs)
         );
     });

@@ -6,7 +6,6 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
-import { getDisplayNameFromDiscordId, } from '../main';
 
 class ListParticipantsConversation extends Conversation {
     event: Event.Object;
@@ -41,22 +40,34 @@ class ListParticipantsConversation extends Conversation {
                         const retMsgsResolver: Promise<string>[] = event.teams.map(
                             async (team: Event.Team): Promise<string> => {
                                 const participantResolver:
-                                Promise<discord.User>[] = team.participants.map(
+                                Promise<discord.User | string>[] = team.participants.map(
                                     (participant: Event.Participant):
-                                    Promise<discord.User> => this.opMessage.client.fetchUser(
-                                        participant.discordId
-                                    )
+                                    Promise<discord.User | string> => this.opMessage
+                                        .client
+                                        .fetchUser(
+                                            participant.discordId
+                                        ).catch(
+                                            (error: Error): string => {
+                                                Utils.logError(error);
+                                                return participant.discordId;
+                                            }
+                                        )
                                 );
-                                const discordUsers: discord.User[] = await Promise.all(
+                                const discordUsers: (discord.User | string)[] = await Promise.all(
                                     participantResolver
                                 );
+
                                 const participantStr: string = discordUsers.map(
-                                    (user: discord.User, idx: number): string => {
-                                        const participant: Event.Participant = team.participants[idx];
+                                    (user: discord.User | string, idx: number): string => {
+                                        const participant:
+                                        Event.Participant = team.participants[idx];
                                         const rsnStrs: string = participant.runescapeAccounts.map(
                                             (account: Event.Account): string => `\t\trsn: ${account.rsn}`
                                         ).join('\n');
-                                        return `\tDiscord: ${user.tag}\n${rsnStrs}\n`;
+                                        if (user instanceof discord.User) {
+                                            return `\tDiscord: ${user.tag}\n${rsnStrs}\n`;
+                                        }
+                                        return `\tError: Discord Id: ${user}\n${rsnStrs}\n`;
                                     }
                                 ).join('\n');
                                 return `Team ${team.name}:\n${participantStr}`;

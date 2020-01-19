@@ -87,13 +87,13 @@ export abstract class Conversation {
             tap(
                 (msg: discord.Message):
                 void => {
-                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.username}' continued with answer ${msg.content}`);
+                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
                 }
             ),
             catchError(
                 (error: Error):
                 Observable<discord.Message> => {
-                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.username}' will end because they did not reply '${error}'`);
+                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
                     throw (error);
                 }
             ),
@@ -115,13 +115,13 @@ export abstract class Conversation {
                             return '(NULL)';
                         }
                     ).join('\n');
-                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.username}' continued with question '${content}'`);
+                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with question '${content}'`);
                 }
             ),
             catchError(
                 (error: Error):
                 Observable<MessageWrapper.Response> => {
-                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.username}' will end because the question did not send '${error}'`);
+                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because the question did not send '${error}'`);
                     throw (error);
                 }
             ),
@@ -145,7 +145,7 @@ export abstract class Conversation {
                         options: this.returnOptions,
                         tag: this.uuid,
                     };
-                    MessageWrapper.sendMessage$.next(sendInfo);
+                    MessageWrapper.sendMessages$.next(sendInfo);
                     throw (error);
                 }
             ),
@@ -168,7 +168,7 @@ export abstract class Conversation {
                         options: this.returnOptions,
                         tag: this.uuid,
                     };
-                    MessageWrapper.sendMessage$.next(sendInfo);
+                    MessageWrapper.sendMessages$.next(sendInfo);
                 } else {
                     this.conversationDidEndSuccessfully();
                 }
@@ -183,7 +183,7 @@ export abstract class Conversation {
         );
 
         // start conversation
-        Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.username}'`);
+        Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.tag}'`);
         this.state = CONVERSATION_STATE.Q1;
     }
 
@@ -196,8 +196,6 @@ export abstract class Conversation {
             this.errorInjector$.error(
                 new Error('Stop Conversation was called'),
             );
-            this.qaSub.unsubscribe();
-            this.qaSub = undefined;
         }
     }
 
@@ -208,8 +206,8 @@ export abstract class Conversation {
             options: this.returnOptions,
             tag: this.uuid,
         };
-        MessageWrapper.sendMessage$.next(sendInfo);
-        Utils.logger.trace(`Conversation with ${this.opMessage.author.username} finished successfully.`);
+        MessageWrapper.sendMessages$.next(sendInfo);
+        Utils.logger.trace(`Conversation with ${this.opMessage.author.tag} finished successfully.`);
         if (this.qaSub !== undefined) {
             this.qaSub.unsubscribe();
             this.qaSub = undefined;
@@ -248,7 +246,7 @@ export namespace ConversationManager {
             },
             tag: newConversation.uuid,
         };
-        MessageWrapper.sendMessage$.next(
+        MessageWrapper.sendMessages$.next(
             sendInfo
         );
     };
@@ -501,7 +499,7 @@ export namespace ConversationManager {
 //     //                             this.messageIn.reply('An error occurred. Please try again later.').catch(
 //     //                                 (err: Error): void => Utils.logError(err)
 //     //                             );
-//     //                             Utils.logger.info(`A conversation with ${this.messageIn.author.username} was interrupted due to errors.`);
+//     //                             Utils.logger.info(`A conversation with ${this.messageIn.author.tag} was interrupted due to errors.`);
 //     //                             reject();
 //     //                         } else {
 //     //                             resolve();

@@ -54,7 +54,7 @@ class AddScoreConversation extends Conversation {
             case CONVERSATION_STATE.Q4E:
                 return 'Could not add a note.';
             case CONVERSATION_STATE.CONFIRM:
-                return `Add ${this.params.score} to user ${this.user.username} for event ${this.event.name}?`;
+                return `Add ${this.params.score} to user ${this.user.tag} for event ${this.event.name}?`;
             default:
                 return null;
         }

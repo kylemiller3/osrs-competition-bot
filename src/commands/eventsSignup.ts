@@ -1,6 +1,5 @@
 import * as discord from 'discord.js';
 import { hiscores, } from 'osrs-json-api';
-import { Utils, } from '../utils';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
@@ -8,7 +7,7 @@ import { Network, } from '../network';
 import { Command, } from '../command';
 import { Event, } from '../event';
 import { Db, } from '../database';
-import { willSignUpPlayer$ } from '../main';
+import { willSignUpPlayer$, } from '../main';
 
 class EventsSignupConversation extends Conversation {
     event: Event.Object;
@@ -137,7 +136,8 @@ class EventsSignupConversation extends Conversation {
                         .participants[userJdx]
                         .runescapeAccounts = newAccounts;
 
-                    await Db.upsertEvent(this.event);
+                    const savedEvent: Event.Object = await Db.upsertEvent(this.event);
+                    willSignUpPlayer$.next(savedEvent);
                     this.state = CONVERSATION_STATE.DONE;
                     this.returnMessage = 'Signed up for team';
                 } else {
@@ -220,7 +220,10 @@ const eventsSignup = (
         msg.content,
     );
 
-    const eventsSignupConversation = new EventsSignupConversation(msg);
+    const eventsSignupConversation = new EventsSignupConversation(
+        msg,
+        params,
+    );
     ConversationManager.startNewConversation(
         msg,
         eventsSignupConversation

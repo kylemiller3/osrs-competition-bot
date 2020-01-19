@@ -16,16 +16,16 @@ export namespace MessageWrapper {
         message: discord.Message
         content: string
         options?: discord.MessageOptions
-        tag: string
+        tag?: string
     }
-    export const sendMessage$: Subject<SendInfo> = new Subject();
+    export const sendMessages$: Subject<SendInfo> = new Subject();
 
     /**
      * Contract of the message information to delete
      */
     export interface DeleteInfo {
         message: discord.Message
-        tag: string
+        tag?: string
     }
     export const deleteMessages$: Subject<DeleteInfo> = new Subject();
 
@@ -36,8 +36,10 @@ export namespace MessageWrapper {
         message: discord.Message
         newContent: string
         options?: discord.MessageOptions
-        tag: string
+        tag?: string
     }
+    export const editMessage$: Subject<EditInfo> = new Subject();
+
     /**
      * Contract of the messages that were received
      */
@@ -45,13 +47,16 @@ export namespace MessageWrapper {
         messages: (discord.Message | null)[]
         tag: string
     }
-    export const editMessages$: Subject<EditInfo> = new Subject();
 
     const regex = /[\s\S]{1,1980}(?:\n|$)/g;
-    export const sentMessages$ = sendMessage$.pipe(
+    export const sentMessages$ = sendMessages$.pipe(
         mergeMap(
-            (input: SendInfo):
+            (sendInfo: SendInfo):
             Observable<[string, (discord.Message | null)[]]> => {
+                const input: SendInfo = { ...sendInfo, };
+                input.tag = input.tag
+                    ? input.tag
+                    : `${Math.random()}`;
                 const chunks: string[] = input.content.match(regex) || [];
                 const requests: Observable<(discord.Message | null)[]>[] = chunks.map(
                     (chunk: string, idx: number):
@@ -69,10 +74,13 @@ export namespace MessageWrapper {
                         return Network.genericNetworkFetch$<discord.Message | discord.Message[]>(
                             bound,
                         ).pipe(
-                            // eslint-disable-next-line comma-dangle
-                            map((x: discord.Message | discord.Message[] | null): (discord.Message | null)[] => [x].flatMap(
+                            map((x: discord.Message | discord.Message[] | null):
+                            (discord.Message | null)[] => [
+                                x,
+                            ].flatMap(
                                 // @ts-ignore
-                                (t: discord.Message | discord.Message[] | null): (discord.Message | discord.Message[] | null) => t
+                                (t: discord.Message | discord.Message[] | null):
+                                (discord.Message | discord.Message[] | null) => t
                             ))
                         );
                     }
@@ -113,8 +121,12 @@ export namespace MessageWrapper {
 
     export const deletedMessages$ = deleteMessages$.pipe(
         mergeMap(
-            (input: DeleteInfo):
+            (deleteInfo: DeleteInfo):
             Observable<[string, discord.Message | null]> => {
+                const input: DeleteInfo = { ...deleteInfo, };
+                input.tag = input.tag
+                    ? input.tag
+                    : `${Math.random()}`;
                 const bound = input.message.delete.bind(
                     input.message,
                 );
@@ -138,10 +150,15 @@ export namespace MessageWrapper {
         share(),
     );
 
-    export const editedMessages$ = editMessages$.pipe(
+    export const editedMessage$ = editMessage$.pipe(
         mergeMap(
-            (input: EditInfo):
+            (editInfo: EditInfo):
             Observable<[string, discord.Message | null]> => {
+                const input: EditInfo = { ...editInfo, };
+                input.tag = input.tag
+                    ? input.tag
+                    : `${Math.random()}`;
+
                 const bound = input.message.edit.bind(
                     input.message,
                     input.newContent,
@@ -166,4 +183,65 @@ export namespace MessageWrapper {
         ),
         share(),
     );
+
+    /**
+     * Send Message promise wrapper
+     */
+    export const sendMessage = (
+        sendInfo: SendInfo
+    ): Promise<Response> => {
+        const p: Promise<Response> = new Promise(
+            (resolver: (response: Response) => void): void => {
+                const sub = sentMessages$.subscribe(
+                    (response: Response): void => {
+                        resolver(response);
+                        sub.unsubscribe();
+                    }
+                );
+            }
+        );
+        sendMessages$.next(sendInfo);
+        return p;
+    };
+
+    /**
+     * Delete Message promise wrapper
+     */
+    export const deleteMessage = (
+        deleteInfo: DeleteInfo
+    ): Promise<Response> => {
+        const p: Promise<Response> = new Promise(
+            (resolver: (response: Response) => void): void => {
+                const sub = deletedMessages$.subscribe(
+                    (response: Response): void => {
+                        resolver(response);
+                        sub.unsubscribe();
+                    }
+                );
+            }
+        );
+        deleteMessages$.next(deleteInfo);
+        return p;
+    };
+
+    /**
+     * Edit Message promise wrapper
+     */
+    export const editMessage = (
+        editInfo: EditInfo
+    ): Promise<Response> => {
+        const p: Promise<Response> = new Promise(
+            (resolver: (response: Response) => void): void => {
+                const sub = editedMessage$.subscribe(
+                    (response: Response): void => {
+                        resolver(response);
+                        sub.unsubscribe();
+                    }
+                );
+            }
+        );
+        editMessage$.next(editInfo);
+        return p;
+    };
+
 }

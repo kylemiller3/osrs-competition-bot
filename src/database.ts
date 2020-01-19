@@ -4,7 +4,6 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
-import { async } from 'rxjs/internal/scheduler/async';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -54,7 +53,7 @@ export namespace Db {
             Utils.logger.debug(event.query);
         },
         receive(data: unknown): void {
-            Utils.logger.debug(JSON.stringify(data, null, 2));
+            Utils.logger.debug(JSON.stringify(data));
         },
         task(event: pgp.IEventContext): void {
             if (event.ctx.finish) {
@@ -224,9 +223,7 @@ export namespace Db {
                     + 'ADD CONSTRAINT valid_dates CHECK '
                     + '('
                         + '('
-                            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp < ((${EVENTS_COL.EVENT}->'when'->>'end')::timestamp + (60 || 'minutes')::interval)`
-                            + 'AND '
-                            + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp > NOW()`
+                            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
                         + ')'
                         + ' AND '
                         + '('
@@ -302,7 +299,7 @@ export namespace Db {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'ORDER BY '
-            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp ASC, `
+            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz ASC, `
             + `${EVENTS_COL.ID} ASC`,
     });
     const fetchAllEventsEndAscStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -313,7 +310,7 @@ export namespace Db {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'ORDER BY '
-            + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp ASC, `
+            + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz ASC, `
             + `${EVENTS_COL.ID} ASC`,
     });
     export const fetchAllEvents = async (
@@ -471,11 +468,11 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamp`
+                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
             + ')'
                 + ' OVERLAPS '
             + '('
-                + '$1::timestamp, $2::timestamp'
+                + '$1::timestamptz, $2::timestamptz'
             + ')',
     });
     export const fetchAllEventsBetweenDates = async (
@@ -503,9 +500,9 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp <= current_timestamp `
+                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= current_timestamp `
                 + 'AND '
-                + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamp > current_timestamp`
+                + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz > current_timestamp`
             + ')',
     });
     export const fetchAllCurrentlyRunningEvents = async (
@@ -516,7 +513,7 @@ export namespace Db {
         );
         if (ret === null) return null;
         return ret.map(eventRowToEvent);
-    }
+    };
 
     const guildEventsBetweenDatesStmt: pgp.PreparedStatement = new PreparedStatement({
         name: 'fetch all guild events between dates',
@@ -534,11 +531,11 @@ export namespace Db {
             + 'AND '
             + '('
                 + '('
-                    + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamp, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamp`
+                    + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
                 + ')'
                 + ' OVERLAPS '
                 + '('
-                    + '$2::timestamp, $3::timestamp'
+                    + '$2::timestamptz, $3::timestamptz'
                 + ')'
             + ')',
     });

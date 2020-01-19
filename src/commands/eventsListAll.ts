@@ -6,16 +6,15 @@ import { Db, } from '../database';
 const eventsListAll = async (
     msg: discord.Message
 ): Promise<void> => {
-    const now: Date = new Date();
+    // const now: Date = new Date();
     const events: Event.Object[] | null = await Db.fetchAllGuildEvents(
         msg.guild.id,
         Db.mainDb
     );
     if (events === null) {
-        MessageWrapper.sendMessage$.next({
+        MessageWrapper.sendMessage({
             message: msg,
             content: 'No events.',
-            tag: 'eventsListAll',
         });
     } else {
         const content: string = events.map(
@@ -23,10 +22,9 @@ const eventsListAll = async (
             string => `${event.id}. ${event.name}`
         ).join('\n');
 
-        MessageWrapper.sendMessage$.next({
+        MessageWrapper.sendMessage({
             message: msg,
             content,
-            tag: 'eventsListAll',
         });
     }
 };

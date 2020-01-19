@@ -12,121 +12,121 @@ import { Event, } from '../event';
  * @returns Total gain (in xp, clues, etc.)
  * @category Stats
  */
-const getParticipantScore = (
-    participant: Event.Participant,
-    event: Event.Object,
-    tracking: Event.Tracking,
-): number => {
-    const keys: string[] = event.tracker.what as string[];
-    switch (tracking) {
-        case Event.Tracking.SKILLS: {
-            if (Event.getEventTracking(event) !== Event.Tracking.SKILLS) return 0;
-            const xps: number[] = participant.runescapeAccounts.map(
-                (account: Event.CompetitiveAccount): number => {
-                    if (account.starting === undefined || account.ending === undefined) return NaN;
-                    const skillsComponents:
-                    hiscores.RankLevelXpObject[][] = keys.map(
-                        (key: string):
-                        hiscores.RankLevelXpObject[] => [
-                            account.starting[tracking][key],
-                            account.ending[tracking][key],
-                        ]
-                    );
-                    const xpDiff = skillsComponents.map(
-                        (startEnd: hiscores.RankLevelXpObject[]):
-                        number => startEnd[1].xp - startEnd[0].xp
-                    );
-                    const xpGain = xpDiff.reduce(
-                        (acc, x): number => acc + x
-                    );
-                    return xpGain;
-                }
-            );
-            const xp = xps.reduce(
-                (acc: number, x: number): number => acc + x
-            );
-            return xp;
-        }
+// const getParticipantScore = (
+//     participant: Event.Participant,
+//     event: Event.Object,
+//     tracking: Event.TrackingCategory,
+// ): number => {
+//     const keys: string[] = event.tracker.what as string[];
+//     switch (tracking) {
+//         case Event.Tracking.SKILLS: {
+//             if (Event.getEventTracking(event) !== Event.Tracking.SKILLS) return 0;
+//             const xps: number[] = participant.runescapeAccounts.map(
+//                 (account: Event.CompetitiveAccount): number => {
+//                     if (account.starting === undefined || account.ending === undefined) return NaN;
+//                     const skillsComponents:
+//                     hiscores.RankLevelXpObject[][] = keys.map(
+//                         (key: string):
+//                         hiscores.RankLevelXpObject[] => [
+//                             account.starting[tracking][key],
+//                             account.ending[tracking][key],
+//                         ]
+//                     );
+//                     const xpDiff = skillsComponents.map(
+//                         (startEnd: hiscores.RankLevelXpObject[]):
+//                         number => startEnd[1].xp - startEnd[0].xp
+//                     );
+//                     const xpGain = xpDiff.reduce(
+//                         (acc, x): number => acc + x
+//                     );
+//                     return xpGain;
+//                 }
+//             );
+//             const xp = xps.reduce(
+//                 (acc: number, x: number): number => acc + x
+//             );
+//             return xp;
+//         }
 
-        case Event.Tracking.BH: {
-            if (Event.getEventTracking(event) !== Event.Tracking.BH) return 0;
-            const gains: number[] = participant.runescapeAccounts.map(
-                (account: Event.CompetitiveAccount): number => {
-                    if (account.starting === undefined
-                            || account.ending === undefined) return NaN;
-                    const rankAndScoreComponents:
-                    hiscores.RankScoreObject[][] = keys.map(
-                        (key: string):
-                        hiscores.RankScoreObject[] => [
-                            account.starting.bh[key],
-                            account.ending.bh[key],
-                        ]
-                    );
-                    const bhDiff = rankAndScoreComponents.map(
-                        (startEnd: hiscores.RankScoreObject[]):
-                        number => startEnd[1].score - startEnd[0].score
-                    );
-                    const bhGain = bhDiff.reduce(
-                        (acc: number, x: number): number => acc + x
-                    );
-                    return bhGain;
-                }
-            );
-            const gain = gains.reduce(
-                (acc: number, x: number): number => acc + x
-            );
-            return gain;
-        }
+//         case Event.Tracking.BH: {
+//             if (Event.getEventTracking(event) !== Event.Tracking.BH) return 0;
+//             const gains: number[] = participant.runescapeAccounts.map(
+//                 (account: Event.CompetitiveAccount): number => {
+//                     if (account.starting === undefined
+//                             || account.ending === undefined) return NaN;
+//                     const rankAndScoreComponents:
+//                     hiscores.RankScoreObject[][] = keys.map(
+//                         (key: string):
+//                         hiscores.RankScoreObject[] => [
+//                             account.starting.bh[key],
+//                             account.ending.bh[key],
+//                         ]
+//                     );
+//                     const bhDiff = rankAndScoreComponents.map(
+//                         (startEnd: hiscores.RankScoreObject[]):
+//                         number => startEnd[1].score - startEnd[0].score
+//                     );
+//                     const bhGain = bhDiff.reduce(
+//                         (acc: number, x: number): number => acc + x
+//                     );
+//                     return bhGain;
+//                 }
+//             );
+//             const gain = gains.reduce(
+//                 (acc: number, x: number): number => acc + x
+//             );
+//             return gain;
+//         }
 
-        case Event.Tracking.CLUES: {
-            if (Event.getEventTracking(event) !== Event.Tracking.CLUES) return 0;
-            const gains: number[] = participant.runescapeAccounts.map(
-                (account: Event.CompetitiveAccount): number => {
-                    if (account.starting === undefined
-                        || account.ending === undefined) return NaN;
-                    const rankAndScoreComponents:
-                    hiscores.RankScoreObject[][] = keys.map(
-                        (key: string):
-                        hiscores.RankScoreObject[] => [
-                            account.starting.clues[key],
-                            account.ending.clues[key],
-                        ]
-                    );
-                    const clueDiff = rankAndScoreComponents.map(
-                        (startEnd: hiscores.RankScoreObject[]):
-                        number => startEnd[1].score - startEnd[0].score
-                    );
-                    const clueGain = clueDiff.reduce(
-                        (acc: number, x: number): number => acc + x
-                    );
-                    return clueGain;
-                }
-            );
-            const gain = gains.reduce(
-                (acc: number, x: number): number => acc + x
-            );
-            return gain;
-        }
+//         case Event.Tracking.CLUES: {
+//             if (Event.getEventTracking(event) !== Event.Tracking.CLUES) return 0;
+//             const gains: number[] = participant.runescapeAccounts.map(
+//                 (account: Event.CompetitiveAccount): number => {
+//                     if (account.starting === undefined
+//                         || account.ending === undefined) return NaN;
+//                     const rankAndScoreComponents:
+//                     hiscores.RankScoreObject[][] = keys.map(
+//                         (key: string):
+//                         hiscores.RankScoreObject[] => [
+//                             account.starting.clues[key],
+//                             account.ending.clues[key],
+//                         ]
+//                     );
+//                     const clueDiff = rankAndScoreComponents.map(
+//                         (startEnd: hiscores.RankScoreObject[]):
+//                         number => startEnd[1].score - startEnd[0].score
+//                     );
+//                     const clueGain = clueDiff.reduce(
+//                         (acc: number, x: number): number => acc + x
+//                     );
+//                     return clueGain;
+//                 }
+//             );
+//             const gain = gains.reduce(
+//                 (acc: number, x: number): number => acc + x
+//             );
+//             return gain;
+//         }
 
-        case Event.Tracking.LMS: {
-            if (Event.getEventTracking(event) !== Event.Tracking.LMS) return 0;
-            const gains: number[] = participant.runescapeAccounts.map(
-                (account: Event.CompetitiveAccount): number => {
-                    if (account.starting === undefined
-                        || account.ending === undefined) return NaN;
-                    return account.ending.lms.score - account.starting.lms.score;
-                }
-            );
-            const gain = gains.reduce(
-                (acc: number, x: number): number => acc + x
-            );
-            return gain;
-        }
+//         case Event.Tracking.LMS: {
+//             if (Event.getEventTracking(event) !== Event.Tracking.LMS) return 0;
+//             const gains: number[] = participant.runescapeAccounts.map(
+//                 (account: Event.CompetitiveAccount): number => {
+//                     if (account.starting === undefined
+//                         || account.ending === undefined) return NaN;
+//                     return account.ending.lms.score - account.starting.lms.score;
+//                 }
+//             );
+//             const gain = gains.reduce(
+//                 (acc: number, x: number): number => acc + x
+//             );
+//             return gain;
+//         }
 
-        default:
-            return participant.customScore;
-    }
-};
+//         default:
+//             return participant.customScore;
+//     }
+// };
 
 /**
  * @param data The Data input to process

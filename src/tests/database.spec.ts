@@ -710,7 +710,8 @@ const insertEventA: Event.Object = {
     name: 'undefined test',
     teams: [],
     tracker: {
-        tracking: Event.Tracking.NONE,
+        tracking: 'casual',
+        what: undefined,
     },
 };
 
@@ -719,33 +720,29 @@ const insertEventB: Event.Object = {
     guilds: {
         creator: {
             discordId: 'testE',
-            guildMessages: {
-                scoreboardMessages: [
-                    {
-                        channelId: 'testB',
-                        messageId: 'testC',
-                    },
-                ],
-                statusMessage: {
+            scoreboardMessages: [
+                {
                     channelId: 'testB',
-                    messageId: 'testD',
+                    messageId: 'testC',
                 },
+            ],
+            statusMessage: {
+                channelId: 'testB',
+                messageId: 'testD',
             },
         },
         others: [
             {
                 discordId: 'testA',
-                guildMessages: {
-                    scoreboardMessages: [
-                        {
-                            channelId: 'testB',
-                            messageId: 'testE',
-                        },
-                    ],
-                    statusMessage: {
+                scoreboardMessages: [
+                    {
                         channelId: 'testB',
-                        messageId: 'testF',
+                        messageId: 'testE',
                     },
+                ],
+                statusMessage: {
+                    channelId: 'testB',
+                    messageId: 'testF',
                 },
             },
         ],
@@ -789,9 +786,9 @@ const insertEventB: Event.Object = {
         },
     ],
     tracker: {
-        tracking: Event.Tracking.SKILLS,
+        tracking: 'skills',
         what: [
-            Event.Skills.AGILITY,
+            'agility',
         ],
     },
 };
@@ -1026,8 +1023,8 @@ describe('Postgres Database', (): void => {
                 Db.testDb,
             );
         });
-        it('should return one event.', (): void => {
-            expect(fetchedEvents.length).to.equal(1);
+        it('should return two events.', (): void => {
+            expect(fetchedEvents.length).to.equal(2);
         });
         it('should return two events.', async (): Promise<void> => {
             // @ts-ignore
