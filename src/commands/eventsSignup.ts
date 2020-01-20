@@ -24,7 +24,7 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to signup for?';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find event id. Hint: find the event id with the list events command. Please try again.';
+                return 'Event not found or no Guild access. Hint: find valid event ids with the list events command. Please try again.';
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q2E:
@@ -48,7 +48,20 @@ class EventsSignupConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
                     const event: Event.Object | null = await Db.fetchEvent(eventId);
-                    if (event === null) {
+                    // do we have access
+                    let access = false;
+                    if (event !== null) {
+                        const standard: boolean = event.guilds.creator.discordId
+                            === this.opMessage.guild.id;
+                        const global: boolean = event.global === true
+                            && event.guilds.others !== undefined
+                            && event.guilds.others.some(
+                                (guild: Event.Guild):
+                                boolean => guild.discordId === this.opMessage.guild.id
+                            );
+                        access = standard || global;
+                    }
+                    if (event === null || access === false) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
                         this.event = event;
@@ -99,6 +112,7 @@ class EventsSignupConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q2E;
                     break;
                 }
+                this.hiscore = hiscore;
 
                 // is the user already on a team?
                 // use that team
@@ -200,8 +214,9 @@ class EventsSignupConversation extends Conversation {
                 }
 
                 // save event
-                willSignUpPlayer$.next(this.event);
                 await Db.upsertEvent(this.event);
+                willSignUpPlayer$.next(this.event);
+
                 this.state = CONVERSATION_STATE.DONE;
                 this.returnMessage = 'Signed up for team';
                 break;

@@ -10,7 +10,7 @@ import { willAddEvent$, } from '../main';
 
 class EventAddConversation extends Conversation {
     event: Event.Object;
-    tracker: Event.Tracker;
+    tracker: Event.Tracking;
     start: Date;
     end: Date;
 
@@ -42,7 +42,7 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q4E:
                 return 'Could not set event type.';
             case CONVERSATION_STATE.Q4C:
-                return `Event will be of type ${this.tracker.tracking} and track ${this.tracker.what === undefined ? 'nothing' : this.tracker.what}. Is this ok?`;
+                return `Event will be of type ${this.tracker.category} and track ${this.tracker.what === undefined ? 'nothing' : this.tracker.what}. Is this ok?`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q5E:
@@ -299,7 +299,7 @@ class EventAddConversation extends Conversation {
                     return;
                 }
                 this.tracker = {
-                    tracking,
+                    category: tracking,
                     what,
                 };
                 this.state = CONVERSATION_STATE.Q5;
@@ -330,7 +330,8 @@ class EventAddConversation extends Conversation {
                         },
                     },
                     teams: [],
-                    tracker: this.tracker as Event.Tracker,
+                    tracking: this.tracker as Event.Tracking,
+                    global: this.params.global,
                 };
                 this.state = CONVERSATION_STATE.CONFIRM;
                 break;

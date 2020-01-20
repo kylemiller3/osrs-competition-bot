@@ -1,6 +1,7 @@
 import {
     hiscores,
 } from 'osrs-json-api';
+import { getTagFromDiscordId, gClient, getDisplayNameFromDiscordId, } from './main';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
@@ -163,8 +164,8 @@ export namespace Event {
      * Contract for what the event tracks
      * @category Event
      */
-    export interface Tracker {
-        tracking: TrackingCategory
+    export interface Tracking {
+        category: TrackingCategory
         what: BountyHunter[] | Clues[] | Skills[] | Bosses[] | undefined
     }
 
@@ -202,7 +203,8 @@ export namespace Event {
         when: When
         guilds: CompetingGuilds
         teams: Team[]
-        tracker: Tracker
+        tracking: Tracking
+        global: boolean
     }
 
     /**
@@ -214,8 +216,8 @@ export namespace Event {
     export const getEventTracking = (
         event: Event.Object
     ): TrackingCategory => {
-        if (event.tracker === undefined) return 'casual';
-        return event.tracker.tracking;
+        if (event.tracking === undefined) return 'casual';
+        return event.tracking.category;
     };
 
     /**
@@ -256,23 +258,221 @@ export namespace Event {
         event: Event.Object
     ): boolean => getEventTracking(event) === 'custom';
 
-    /**
-     * Searches the events array for a specific [[Event]]
-     * @param events The source events to search
-     * @param eventIdToSearch The event id to search for
-     * @returns The found event
-     * @category Event Filter
-     */
-    export const findEventById = (
-        events: Event.Object[],
-        eventIdToSearch: number,
-    ): Event.Object | undefined => {
-        const foundEvent: Event.Object | undefined = events.find(
-            (event: Event.Object):
-            boolean => event.id === eventIdToSearch
+
+    // Process event scoreboards here
+
+    export interface WhatScoreboard {
+        lhs: string
+        whatScore: number
+    }
+
+    export interface AccountScoreboard {
+        lhs: string
+        accountScore: number
+        whatsScores: WhatScoreboard[] | undefined
+    }
+
+    export interface ParticipantScoreboard {
+        lhs: string
+        customScore: number
+        participantScore: number
+        accountsScores: AccountScoreboard[]
+    }
+
+    export interface TeamScoreboard {
+        lhs: string
+        teamScore: number
+        participantsScores: ParticipantScoreboard[]
+    }
+
+
+    export const getEventScoreboardString = async (
+        eventName: string,
+        guildId: string,
+        currentScoreboard: TeamScoreboard[],
+        lastScoreboard: TeamScoreboard[],
+        eventType: TrackingCategory,
+        granularity: 'teams' | 'participants' | 'accounts' | 'what',
+        inversion: boolean = false,
+        mode: 'regular' | 'shortened', // boss mode is likely too long make a special case
+        numEntries: number = 3,
+    ): Promise<string> => {
+        // format the string here
+        const tabLength = 2;
+        const lhsPaddingLength = 6;
+        const diffPadding = 2;
+
+        const lhsPad: string = new Array(lhsPaddingLength + 1).join(' ');
+        const tab: string = new Array(tabLength + 1).join(' ');
+
+        const promises: Promise<string>[] = currentScoreboard.flatMap(
+            (team: TeamScoreboard):
+            Promise<string>[] => team.participantsScores.flatMap(
+                (participant: ParticipantScoreboard):
+                Promise<string> => {
+                    const displayName: string | null = getDisplayNameFromDiscordId(
+                        gClient,
+                        guildId,
+                        participant.lhs,
+                    );
+                    if (displayName === null) {
+                        return getTagFromDiscordId(
+                            gClient,
+                            participant.lhs,
+                        );
+                    }
+                    return Promise.resolve(displayName);
+                }
+            )
         );
-        return foundEvent;
+        const tags: string[] = await Promise.all(promises);
+
+        let idx = 0;
+        const str: string = currentScoreboard.map(
+            (team: TeamScoreboard): string => {
+                const participantsStr = team.participantsScores.map(
+                    (participant: ParticipantScoreboard): string => {
+                        const accountsStr = participant.accountsScores.map(
+                            (account: AccountScoreboard): string => {
+                                if (account.whatsScores !== undefined) {
+                                    const whatStr = account.whatsScores.map(
+                                        (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore}`
+                                    ).join(`\n${tab}${tab}${tab}`);
+                                    return `${account.lhs}${tab}${account.accountScore}\n${tab}${tab}${tab}${whatStr}`;
+                                }
+                                return account.lhs;
+                            }
+                        ).join(`\n${tab}${tab}`);
+                        const ret = `${tags[idx]}${tab}${participant.participantScore}\n${tab}${tab}${accountsStr}`;
+                        idx += 1;
+                        return ret;
+                    }
+                ).join(`\n${tab}`);
+                return `Team ${team.lhs}${tab}${team.teamScore}\n${tab}${participantsStr}`;
+            }
+        ).join('\n');
+
+        return `Event ${eventName} (${eventType})\n`.concat(str);
     };
+
+    export const getEventTeamsScoreboards = (
+        event: Event.Object,
+    ): TeamScoreboard[] => {
+        // get the tracking category
+        const categoryKey: TrackingCategory = event.tracking.category;
+
+        // get the tracking what list
+        const whatKeys: string[] | undefined = event.tracking.what;
+
+        const add = (acc: number, x: number): number => acc + x;
+        const teamsScores: TeamScoreboard[] | undefined = event.teams.map(
+            (team: Team): TeamScoreboard => {
+                const participantsScores: ParticipantScoreboard[] = team.participants.map(
+                    (participant: Participant): ParticipantScoreboard => {
+                        const accountsScores:
+                        AccountScoreboard[] = participant.runescapeAccounts.map(
+                            (account: CompetitiveAccount): AccountScoreboard => {
+                                const whatsScores:
+                                WhatScoreboard[] | undefined = whatKeys === undefined
+                                    ? undefined
+                                    : whatKeys.map(
+                                        (whatKey: string): WhatScoreboard => {
+                                            if (categoryKey === 'skills') {
+                                                const ending = account
+                                                    .ending
+                                                    .skills[whatKey]
+                                                    .xp;
+                                                const starting = account
+                                                    .starting
+                                                    .skills[whatKey]
+                                                    .xp;
+                                                return {
+                                                    lhs: whatKey,
+                                                    whatScore: ending - starting,
+                                                };
+                                            }
+                                            const ending = account
+                                                .ending[categoryKey][whatKey]
+                                                .score;
+                                            const starting = account
+                                                .starting[categoryKey][whatKey]
+                                                .score;
+                                            return {
+                                                lhs: whatKey,
+                                                whatScore: ending - starting,
+                                            };
+                                        }
+                                    ).sort(
+                                        (a: WhatScoreboard, b: WhatScoreboard):
+                                        number => b.whatScore - a.whatScore
+                                    );
+                                const accountScore: number = whatsScores === undefined
+                                    ? 0
+                                    : whatsScores.map(
+                                        (what: WhatScoreboard): number => what.whatScore
+                                    ).reduce(add);
+                                return {
+                                    lhs: account.rsn,
+                                    accountScore,
+                                    whatsScores,
+                                };
+                            }
+                        ).sort(
+                            (a: AccountScoreboard, b: AccountScoreboard):
+                            number => b.accountScore - a.accountScore
+                        );
+                        const customScore: number = participant.customScore;
+                        const participantScore: number = accountsScores.map(
+                            (account: AccountScoreboard): number => account.accountScore,
+                            customScore,
+                        ).reduce(add);
+
+                        return {
+                            lhs: participant.discordId,
+                            customScore,
+                            participantScore,
+                            accountsScores,
+                        };
+                    }
+                ).sort(
+                    (a: ParticipantScoreboard, b: ParticipantScoreboard):
+                    number => b.participantScore - a.participantScore
+                );
+                const teamScore: number = participantsScores.map(
+                    (participant: ParticipantScoreboard):
+                    number => participant.participantScore
+                ).reduce(add);
+
+                return {
+                    lhs: team.name,
+                    teamScore,
+                    participantsScores,
+                };
+            }
+        ).sort(
+            (a: TeamScoreboard, b: TeamScoreboard):
+            number => b.teamScore - a.teamScore
+        );
+        return teamsScores;
+    };
+
+    // /**
+    //  * Searches the events array for a specific [[Event]]
+    //  * @param events The source events to search
+    //  * @param eventIdToSearch The event id to search for
+    //  * @returns The found event
+    //  * @category Event Filter
+    //  */
+    // export const findEventById = (
+    //     events: Event.Object[],
+    //     eventIdToSearch: number,
+    // ): Event.Object | undefined => {
+    //     const foundEvent: Event.Object | undefined = events.find(
+    //         (event: Event.Object):
+    //         boolean => event.id === eventIdToSearch
+    //     );
+    //     return foundEvent;
+    // };
 
     // /**
     //  * Gets all currently scheduled [[Event]]s that have yet to end

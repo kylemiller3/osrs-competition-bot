@@ -219,10 +219,9 @@ export abstract class Conversation {
 export namespace ConversationManager {
     const allConversations: Record<string, Conversation> = {};
 
-    export const startNewConversation = async (
+    export const stopConversation = (
         msg: discord.Message,
-        newConversation: Conversation
-    ): Promise<void> => {
+    ): void => {
         const foundConversation: Conversation | undefined = allConversations[
             msg.author.id
         ];
@@ -230,6 +229,13 @@ export namespace ConversationManager {
         if (foundConversation) {
             foundConversation.stopConversation();
         }
+    };
+
+    export const startNewConversation = async (
+        msg: discord.Message,
+        newConversation: Conversation
+    ): Promise<void> => {
+        stopConversation(msg);
 
         await newConversation.init();
         const question = newConversation.produceQ();

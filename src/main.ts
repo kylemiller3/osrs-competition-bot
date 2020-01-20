@@ -2,12 +2,13 @@ import * as discord from 'discord.js';
 
 import { EventEmitter, } from 'events';
 import {
-    fromEvent, Observable, Subject, merge, Subscription, forkJoin,
+    fromEvent, Observable, Subject, merge, forkJoin, of,
 } from 'rxjs';
 import {
-    filter, tap,
+    filter, tap, mergeMap,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
+import { async, } from 'rxjs/internal/scheduler/async';
 import privateKey from './auth';
 import { Command, } from './command';
 import { Utils, } from './utils';
@@ -32,6 +33,7 @@ import { MessageWrapper, } from './messageWrapper';
 import { Event, } from './event';
 import { Network, } from './network';
 import { Settings, } from './settings';
+import { ConversationManager, } from './conversation';
 
 /**
  * Global discord client
@@ -206,6 +208,27 @@ export const getTextChannelFromId = (
 };
 
 /**
+ * Gets the user's [[discord.Guild]] tag from a Discord id
+ * @param discordId The Discord id to lookup
+ * @returns The user's display name
+ * @category Helper
+ */
+export const getTagFromDiscordId = async (
+    client: discord.Client,
+    discordId: string
+): Promise<string> => {
+    const user: discord.User | null = await client.fetchUser(
+        discordId
+    ).catch(
+        (): null => null
+    );
+    if (user === null) {
+        return discordId;
+    }
+    return user.tag;
+};
+
+/**
  * Gets the user's [[discord.Guild]] display name from a Discord id
  * @param guildId The Guild id to use for display name lookup
  * @param discordId The Discord id to lookup
@@ -220,7 +243,7 @@ export const getDisplayNameFromDiscordId = (
     const guild: discord.Guild = client.guilds.get(
         guildId
     ) as discord.Guild;
-    if (guild === undefined || !guild.available) return '(guild unavailable)';
+    if (guild === undefined || !guild.available) return null;
     const foundMember: discord.GuildMember = guild.members.find(
         (member: discord.GuildMember):
         boolean => member.id === discordId
@@ -237,6 +260,14 @@ const commandReceived$ = (
     command: Command.ALL
 ): Observable<discord.Message> => mergedMessage$
     .pipe(
+        tap(
+            (msg: discord.Message):
+            void => {
+                if (msg.content.toLowerCase().startsWith('.exit')) {
+                    ConversationManager.stopConversation(msg);
+                }
+            }
+        ),
         filter(
             (msg: discord.Message):
             boolean => msg.guild
@@ -367,6 +398,10 @@ const scheduleEventsTimers = async (): Promise<void> => {
     );
 };
 
+/**
+ * Helper function when the bot restarts
+ * @category Helper
+ */
 const resumeRunningEvents = async (): Promise<void> => {
     const events: Event.Object[] | null = await Db.fetchAllCurrentlyRunningEvents();
     if (events === null) {
@@ -379,12 +414,18 @@ const resumeRunningEvents = async (): Promise<void> => {
     );
 };
 
+/**
+ * Helper function that deletes one [[Event.ChannelMessage]]
+ * @param guild the Guild object to delete from
+ * @param eventMessage the [[Event.ChannelMessage]]
+ * @category Helper
+ */
 const deleteMessages = async (
     guild: discord.Guild,
     eventMessage: Event.ChannelMessage,
-): Promise<void> => {
+): Promise<MessageWrapper.Response[]> => {
     if (!guild.available) {
-        return;
+        return [];
     }
 
     const channel: discord.TextChannel | null = getTextChannelFromId(
@@ -392,7 +433,7 @@ const deleteMessages = async (
         eventMessage.channelId,
     );
     if (channel === null) {
-        return;
+        return [];
     }
 
     // get message objects
@@ -416,18 +457,95 @@ const deleteMessages = async (
     const validDiscordMessages: discord.Message[] = discordMessages.filter(
         Utils.isDefinedFilter
     );
-    validDiscordMessages.forEach(
-        (message: discord.Message): void => {
-            MessageWrapper.deleteMessage({
+
+    return Promise.all(
+        validDiscordMessages.map(
+            (message: discord.Message):
+            Promise<MessageWrapper.Response> => MessageWrapper.deleteMessage({
                 message,
-            });
-        }
+            })
+        )
     );
 };
 
+/** Refreshes a [[Event.ChannelMessage]]
+    @param client the Discord Client
+    @param guildId the Guild id
+    @param oldMessage the old message to delete
+    @param content new message string,
+    @category Helper
+    @returns a new [[Event.ChannelMessage]]
+ */
+const refreshMessage = async (
+    client: discord.Client,
+    guild: discord.Guild,
+    oldMessage?: Event.ChannelMessage,
+    content?: string,
+    options?: discord.MessageOptions,
+): Promise<Event.ChannelMessage | null> => {
+    // sanity checks
+    const settings: Settings.Object | null = await Db.fetchSettings(
+        guild.id,
+    );
+    if (settings === null) {
+        Utils.logger.info(`Looks like ${guild.id} has not set their settings.`);
+        return null;
+    }
+
+    // get channel
+    const channelToPostTo: discord.TextChannel | null = getTextChannelFromId(
+        guild,
+        settings.channelId,
+    );
+
+    if (channelToPostTo === null) {
+        return null;
+    }
+
+    // delete old status message
+    if (oldMessage !== undefined) {
+        await deleteMessages(
+            guild,
+            oldMessage
+        );
+    }
+
+    // post new status
+    const dummyMessage: discord.Message = new discord.Message(
+        channelToPostTo,
+        null as unknown as Record<string, unknown>,
+        client,
+    );
+
+    let messagePromise: Promise<MessageWrapper.Response | null> = Promise.resolve(null);
+    if (content !== undefined && content.length > 0) {
+        messagePromise = MessageWrapper.sendMessage({
+            message: dummyMessage,
+            content,
+            options,
+        });
+    }
+    const response: MessageWrapper.Response | null = await messagePromise;
+    if (response === null) {
+        return null;
+    }
+
+    const messagePart = {
+        channelId: settings.channelId,
+        messagesId: response.messages
+            .filter(Utils.isDefinedFilter)
+            .map((msg: discord.Message): string => msg.id),
+    };
+    return messagePart;
+};
+
+/**
+ * Startup and initialization
+ */
 const init = async (): Promise<void> => {
     await gClient.login(privateKey);
 
+    // register command listener
     commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
     commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
     commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
@@ -444,7 +562,9 @@ const init = async (): Promise<void> => {
     commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
     commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
     commandReceived$(Command.ALL.HELP).subscribe(help);
+    Utils.logger.info('Command listeners running');
 
+    // When we receive a message
     MessageWrapper.sentMessages$.subscribe(
         (response: MessageWrapper.Response): void => {
             Utils.logger.trace(`Message with tag ${response.tag} sent.`);
@@ -457,28 +577,45 @@ const init = async (): Promise<void> => {
         }
     );
 
+    // when an event will start
     willStartEvent$.subscribe(
         async (event: Event.Object): Promise<void> => {
             Utils.logger.debug(`Event ${event.id} is starting.`);
             if (event.id === undefined) {
                 throw new Error('event id is undefined');
             }
+
+            // release start timer
+            // should already be expired
             startTimers[event.id] = undefined;
 
+            // if we have a competitive event
+            // track scoreboard automatically
             if (!Event.isEventCasual(event)
                 && !Event.isEventCustom(event)) {
-                // auto score update
                 Utils.logger.trace('Event is auto tracking score');
                 updateTimers[event.id] = setInterval(
-                    (): void => {
-                        willUpdateScores$.next(event);
-                    }, 1000 * 60 * 10
+                    async (): Promise<void> => {
+                        if (event.id === undefined) {
+                            Utils.logger.error('This should never happen.');
+                            return;
+                        }
+                        const updatedEvent: Event.Object | null = await Db.fetchEvent(event.id);
+                        const timeout: NodeJS.Timeout | undefined = updateTimers[event.id];
+                        if (updatedEvent === null && timeout !== undefined) {
+                            clearInterval(timeout);
+                            updateTimers[event.id] = undefined;
+                        }
+
+                        if (updatedEvent !== null) {
+                            willUpdateScores$.next(updatedEvent);
+                        }
+                    }, 1000 * 60 * 1
                 );
+                willUpdateScores$.next(event);
             }
 
-            // main logic
-            // print/update scoreboard
-            Utils.logger.debug(`Event ${event.id} has started.`);
+            // combine all guild objects
             const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
                 ? [
                     event.guilds.creator,
@@ -488,7 +625,7 @@ const init = async (): Promise<void> => {
                     event.guilds.creator,
                 ];
 
-            // update status and scoreboard
+            // update status and scoreboard promises
             const guildMessagesPromises:
             Promise<[
                 Event.ChannelMessage | null,
@@ -499,21 +636,10 @@ const init = async (): Promise<void> => {
                     Event.ChannelMessage | null,
                     Event.ChannelMessage | null,
                 ]> => {
-                    // sanity checks
-                    const settings: Settings.Object | null = await Db.fetchSettings(
-                        eventGuild.discordId,
-                    );
-                    if (settings === null) {
-                        Utils.logger.info(`Looks like ${eventGuild.discordId} has not set their settings.`);
-                        return [
-                            null,
-                            null,
-                        ];
-                    }
-
+                    // get guild
                     const guild: discord.Guild | null = getGuildFromId(
                         gClient,
-                        settings.guildId,
+                        eventGuild.discordId,
                     );
 
                     if (guild === null) {
@@ -524,90 +650,40 @@ const init = async (): Promise<void> => {
                         ];
                     }
 
-                    const channelToPostTo: discord.TextChannel | null = getTextChannelFromId(
-                        guild,
-                        settings.channelId,
+                    const scoreboard:
+                    Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
+                        event,
+                    );
+                    const scoreboardStr: string = await Event.getEventScoreboardString(
+                        event.name,
+                        guild.id,
+                        scoreboard,
+                        scoreboard,
+                        event.tracking.category,
+                        'what',
+                        false,
+                        'regular',
                     );
 
-                    if (channelToPostTo === null) {
-                        return [
-                            null,
-                            null,
-                        ];
-                    }
-
-                    if (eventGuild.statusMessage !== undefined) {
-                        await deleteMessages(
+                    const results = await Promise.all([
+                        refreshMessage(
+                            gClient,
                             guild,
-                            eventGuild.statusMessage
-                        );
-                    }
-
-                    if (eventGuild.scoreboardMessage !== undefined) {
-                        await deleteMessages(
+                            eventGuild.statusMessage,
+                            `${guild.name} is starting`,
+                        ), refreshMessage(
+                            gClient,
                             guild,
-                            eventGuild.scoreboardMessage
-                        );
-                    }
-
-                    const statusMessage: discord.Message = new discord.Message(
-                        channelToPostTo,
-                        null as unknown as Record<string, unknown>,
-                        gClient,
-                    );
-                    const statusPromise: Promise<
-                    MessageWrapper.Response | null
-                    > = MessageWrapper.sendMessage({
-                        message: statusMessage,
-                        content: 'test 123',
-                    });
-
-                    const scoreboardMessage: discord.Message = new discord.Message(
-                        channelToPostTo,
-                        null as unknown as Record<string, unknown>,
-                        gClient,
-                    );
-                    const scoreboardPromise: Promise<
-                    MessageWrapper.Response | null
-                    > = MessageWrapper.sendMessage({
-                        message: scoreboardMessage,
-                        content: 'scoreboard 123',
-                        options: {
-                            code: true,
-                        },
-                    });
-
-                    const responses: [
-                        MessageWrapper.Response | null,
-                        MessageWrapper.Response | null
-                    ] = await Promise.all([
-                        statusPromise,
-                        scoreboardPromise,
+                            eventGuild.scoreboardMessage,
+                            `${scoreboardStr}`,
+                            {
+                                code: true,
+                            }
+                        ),
                     ]);
-
-                    let statusPart: Event.ChannelMessage | null = null;
-                    if (responses[0] !== null) {
-                        statusPart = {
-                            channelId: settings.channelId,
-                            messagesId: responses[0].messages
-                                .filter(Utils.isDefinedFilter)
-                                .map((msg: discord.Message): string => msg.id),
-                        };
-                    }
-
-                    let scoreboardPart: Event.ChannelMessage | null = null;
-                    if (responses[1] !== null) {
-                        scoreboardPart = {
-                            channelId: settings.channelId,
-                            messagesId: responses[1].messages
-                                .filter(Utils.isDefinedFilter)
-                                .map((msg: discord.Message): string => msg.id),
-                        };
-                    }
-
                     return [
-                        statusPart,
-                        scoreboardPart,
+                        results[0],
+                        results[1],
                     ];
                 }
             );
@@ -628,11 +704,13 @@ const init = async (): Promise<void> => {
                 ? guildMessages[0][1]
                 : undefined;
 
-            // create others guild message array
+            // create others message array
             const othersMessages: [
                 Event.ChannelMessage | null,
                 Event.ChannelMessage | null,
             ][] = guildMessages.slice(1);
+
+            // do the same thing for others as the creator guild
             othersMessages.forEach(
                 (otherMessage: [
                     Event.ChannelMessage | null,
@@ -652,7 +730,6 @@ const init = async (): Promise<void> => {
             // save event
             await Db.upsertEvent(newEvent);
             didStartEvent$.next(newEvent);
-            willUpdateScores$.next(event);
         }
     );
 
@@ -668,32 +745,26 @@ const init = async (): Promise<void> => {
             if (event.id === undefined) {
                 throw new Error('event id is undefined');
             }
+
+            // release timers
             endTimers[event.id] = undefined;
 
+            // if this event is competitive
+            // we need to unset these update timers
             const updateTimer:
             NodeJS.Timeout | undefined = updateTimers[event.id];
-
             if (updateTimer !== undefined) {
                 clearInterval(updateTimer);
                 updateTimers[event.id] = undefined;
             }
 
+            // one last update to scoreboard
             if (!Event.isEventCasual(event)
                 && !Event.isEventCustom(event)) {
-                // auto score update
                 Utils.logger.trace('Event is auto tracking score');
-                // end after update
-                const sub: Subscription = didUpdateScores$.subscribe(
-                    (e: Event.Object): void => {
-                        didEndEvent$.next(e);
-                        sub.unsubscribe();
-                    }
-                );
                 willUpdateScores$.next(event);
-            } else {
-                // end immediately
-                didEndEvent$.next(event);
             }
+            didEndEvent$.next(event);
         }
     );
 
@@ -706,25 +777,27 @@ const init = async (): Promise<void> => {
     willUpdateScores$.subscribe(
         async (event: Event.Object): Promise<void> => {
             Utils.logger.debug(`Event ${event.id} scores will update.`);
-            const participants: Event.Participant[] = event.teams.flatMap(
+            const flattenedParticipants: Event.Participant[] = event.teams.flatMap(
                 (team: Event.Team): Event.Participant[] => team.participants
             );
 
-            const accounts: Event.Account[] = participants.flatMap(
+            const flattenedAccounts: Event.Account[] = flattenedParticipants.flatMap(
                 (participant: Event.Participant):
                 Event.Account[] => participant.runescapeAccounts
             );
 
-            const observables: Observable<hiscores.Player | null>[] = accounts.flatMap(
+            let observables: Observable<hiscores.Player | null>[] = flattenedAccounts.flatMap(
                 (account: Event.Account):
                 Observable<hiscores.Player | null> => Network.hiscoresFetch$(
                     account.rsn,
                     false,
                 )
             );
+
             if (observables.length === 0) {
-                didUpdateScores$.next(event);
-                return;
+                observables = [
+                    of(null),
+                ];
             }
 
             // un-flatmap
@@ -732,55 +805,135 @@ const init = async (): Promise<void> => {
             forkJoin(observables).subscribe(
                 async (results: hiscores.Player[]):
                 Promise<void> => {
-                    event.teams.forEach(
-                        (team: Event.Team, idi: number):
-                        void => {
-                            team.participants.forEach(
-                                (participant: Event.Participant, idj: number):
-                                void => participant.runescapeAccounts.forEach(
-                                    (_, idk: number):
-                                    void => {
-                                        const account: Event.CompetitiveAccount = event
-                                            .teams[idi]
-                                            .participants[idj]
-                                            .runescapeAccounts[idk] as Event.CompetitiveAccount;
-                                        if (results[idx] !== null) {
-                                            account.ending = results[idx];
-                                            if (account.starting === undefined) {
-                                                account.starting = account.ending;
+                    // prepare a new event
+                    const newEvent: Event.Object = { ...event, };
+
+                    // cascade remake of teams
+                    const newTeams: Event.Team[] = newEvent.teams.map(
+                        (team: Event.Team): Event.Team => {
+                            const newTeam: Event.Team = { ...team, };
+                            const newParticipants:
+                            Event.Participant[] = newTeam.participants.map(
+                                (participant: Event.Participant):
+                                Event.Participant => {
+                                    const newParticipant: Event.Participant = { ...participant, };
+                                    const newAccounts:
+                                    Event.CompetitiveAccount[] = newParticipant
+                                        .runescapeAccounts.map(
+                                            (account: Event.CompetitiveAccount):
+                                            Event.CompetitiveAccount => {
+                                                const newAccount = { ...account, };
+                                                newAccount.ending = results[idx];
+                                                idx += 1;
+                                                return newAccount;
                                             }
-                                        }
-                                        idx += 1;
-                                    }
-                                )
+                                        );
+                                    newParticipant.runescapeAccounts = newAccounts;
+                                    return newParticipant;
+                                }
+                            );
+                            newTeam.participants = newParticipants;
+                            return newTeam;
+                        }
+                    );
+                    newEvent.teams = newTeams;
+
+                    // combine all guild objects
+                    const eventGuilds: Event.Guild[] = newEvent.guilds.others !== undefined
+                        ? [
+                            newEvent.guilds.creator,
+                            ...newEvent.guilds.others,
+                        ]
+                        : [
+                            newEvent.guilds.creator,
+                        ];
+
+                    // update scoreboard promises
+                    const guildMessagesPromises:
+                    Promise<Event.ChannelMessage | null>[] = eventGuilds.map(
+                        async (eventGuild: Event.Guild):
+                        Promise<Event.ChannelMessage | null> => {
+                            // get guild
+                            const guild: discord.Guild | null = getGuildFromId(
+                                gClient,
+                                eventGuild.discordId,
+                            );
+
+                            if (guild === null) {
+                                Utils.logger.warn('Discord guild not available');
+                                return null;
+                            }
+
+                            const scoreboard:
+                            Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
+                                newEvent,
+                            );
+                            const scoreboardStr: string = await Event.getEventScoreboardString(
+                                newEvent.name,
+                                guild.id,
+                                scoreboard,
+                                scoreboard,
+                                newEvent.tracking.category,
+                                'what',
+                                false,
+                                'regular',
+                            );
+
+                            return refreshMessage(
+                                gClient,
+                                guild,
+                                eventGuild.scoreboardMessage,
+                                `${scoreboardStr}`,
+                                {
+                                    code: true,
+                                }
                             );
                         }
                     );
-                    await Db.upsertEvent(event);
-                    didUpdateScores$.next(event);
+                    const guildMessages:
+                    (Event.ChannelMessage | null)[] = await Promise.all(
+                        guildMessagesPromises
+                    );
+
+                    // first message belongs to the owner
+                    newEvent.guilds.creator.scoreboardMessage = guildMessages[0] !== null
+                        ? guildMessages[0]
+                        : undefined;
+
+                    // create others message array
+                    const othersMessages: (
+                        Event.ChannelMessage | null
+                    )[] = guildMessages.slice(1);
+
+                    // do the same thing for others as the creator guild
+                    othersMessages.forEach(
+                        (otherMessages: Event.ChannelMessage | null, idy: number): void => {
+                            if (newEvent.guilds.others !== undefined) {
+                                newEvent.guilds.others[idy]
+                                    .scoreboardMessage = otherMessages !== null
+                                        ? otherMessages[0]
+                                        : undefined;
+                            }
+                        }
+                    );
+
+                    // save event
+                    await Db.upsertEvent(newEvent);
+                    didUpdateScores$.next(newEvent);
                 }
             );
         }
     );
 
     didUpdateScores$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} did update scores.`);
+        async (event: Event.Object): Promise<void> => {
+            Utils.logger.debug(`Event ${event.id} scores did update.`);
         }
     );
 
     willAddEvent$.subscribe(
         async (event: Event.Object): Promise<void> => {
             Utils.logger.debug(`Event ${event.id} will be added.`);
-            scheduleEventsTimers();
-            didAddEvent$.next(event);
-        }
-    );
-
-    didAddEvent$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} has been added.`);
-
             // fix all the event chains
             if (Utils.isInPast(event.when.start)) {
                 Utils.logger.info('Event started in the past');
@@ -789,7 +942,16 @@ const init = async (): Promise<void> => {
             if (Utils.isInPast(event.when.end)) {
                 Utils.logger.info('Event ended in the past');
                 willEndEvent$.next(event);
+            } else {
+                scheduleEventsTimers();
             }
+            didAddEvent$.next(event);
+        }
+    );
+
+    didAddEvent$.subscribe(
+        (event: Event.Object): void => {
+            Utils.logger.debug(`Event ${event.id} has been added.`);
         }
     );
 
@@ -825,3 +987,11 @@ const init = async (): Promise<void> => {
     );
 };
 init();
+
+
+// TODO: work on bot events
+// work on when event ends
+// when unsigned up
+// you can currently delete events cross guilds - fix this
+// signup edit unsignup delete - any modification of events should not be cross guild
+// contain these functions

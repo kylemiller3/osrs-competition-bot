@@ -709,14 +709,16 @@ const insertEventA: Event.Object = {
     },
     name: 'undefined test',
     teams: [],
-    tracker: {
-        tracking: 'casual',
+    tracking: {
+        category: 'casual',
         what: undefined,
     },
+    global: false,
 };
 
 const insertEventB: Event.Object = {
     id: undefined,
+    global: false,
     guilds: {
         creator: {
             discordId: 'testE',
@@ -789,8 +791,8 @@ const insertEventB: Event.Object = {
             ],
         },
     ],
-    tracker: {
-        tracking: 'skills',
+    tracking: {
+        category: 'skills',
         what: [
             'agility',
         ],
