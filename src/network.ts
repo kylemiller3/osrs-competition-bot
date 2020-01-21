@@ -16,25 +16,51 @@ export namespace Network {
      * @param bound A bound network function to call
      * @returns A promise of the network result
      */
+    // export const genericNetworkFetch$ = <T>(
+    //     bound: () => Promise<T | null>,
+    //     shouldRetry: (error: Error) => boolean = (): boolean => true
+    // ): Observable<T | null> => {
+    //     const ret: Observable<T | null> = from(
+    //         bound()
+    //     ).pipe(
+    //         retryBackoff({
+    //             initialInterval: 50,
+    //             maxInterval: 10000,
+    //             maxRetries: 10,
+    //             shouldRetry,
+    //         }),
+    //         catchError((error: Error): Observable<null> => { // must catch to get values
+    //             Utils.logger.error(error);
+    //             return of(null);
+    //         }),
+    //     );
+    //     return ret;
+    // };
+
     export const genericNetworkFetch$ = <T>(
         bound: () => Promise<T | null>,
         shouldRetry: (error: Error) => boolean = (): boolean => true
     ): Observable<T | null> => {
-        const ret: Observable<T | null> = from(
-            bound()
-        ).pipe(
-            retryBackoff({
-                initialInterval: 50,
-                maxInterval: 10000,
-                maxRetries: 10,
-                shouldRetry,
-            }),
-            catchError((error: Error): Observable<null> => { // must catch to get values
-                Utils.logger.error(error);
-                return of(null);
-            }),
+        const deferred: Observable<T | null> = defer(
+            (): Observable<T | null> => {
+                const ret: Observable<T | null> = from(
+                    bound()
+                ).pipe(
+                    retryBackoff({
+                        initialInterval: 50,
+                        maxInterval: 10000,
+                        maxRetries: 10,
+                        shouldRetry,
+                    }),
+                    catchError((error: Error): Observable<null> => { // must catch to get values
+                        Utils.logger.error(error);
+                        return of(null);
+                    }),
+                );
+                return ret;
+            }
         );
-        return ret;
+        return deferred;
     };
 
     const CACHE_SIZE = 1000;

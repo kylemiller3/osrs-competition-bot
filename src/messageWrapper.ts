@@ -1,9 +1,9 @@
 import * as discord from 'discord.js';
 import {
-    Observable, of, Subject, forkJoin, from,
+    Observable, of, Subject, forkJoin, from, concat,
 } from 'rxjs';
 import {
-    mergeMap, map, share, filter,
+    mergeMap, map, share, filter, combineAll, flatMap, concatMap,
 } from 'rxjs/operators';
 import { rejects, } from 'assert';
 import { Network, } from './network';
@@ -50,6 +50,10 @@ export namespace MessageWrapper {
     }
 
     const regex = /[\s\S]{1,1980}(?:\n|$)/g;
+    export const getMessageChunks = (
+        content: string
+    ): string[] => content.match(regex) || [];
+
     export const sentMessages$ = sendMessages$.pipe(
         mergeMap(
             (sendInfo: SendInfo):
@@ -58,7 +62,7 @@ export namespace MessageWrapper {
                 input.tag = input.tag
                     ? input.tag
                     : `${Math.random()}`;
-                const chunks: string[] = input.content.match(regex) || [];
+                const chunks: string[] = getMessageChunks(input.content);
                 const requests: Observable<(discord.Message | null)[]>[] = chunks.map(
                     (chunk: string, idx: number):
                     Observable<(discord.Message | null)[]> => {
@@ -71,46 +75,61 @@ export namespace MessageWrapper {
                             chunk,
                             clonedOptions,
                         );
-                        // eslint-disable-next-line max-len
                         return Network.genericNetworkFetch$<discord.Message | discord.Message[]>(
                             bound,
                         ).pipe(
-                            map((x: discord.Message | discord.Message[] | null):
-                            (discord.Message | null)[] => [
-                                x,
-                            ].flatMap(
+                            map(
+                                (x: discord.Message | discord.Message[] | null):
+                                (discord.Message | null)[] => [
+                                    x,
+                                ].flatMap(
                                 // @ts-ignore
-                                (t: discord.Message | discord.Message[] | null):
-                                (discord.Message | discord.Message[] | null) => t
-                            ))
+                                    (t: discord.Message | discord.Message[] | null):
+                                    (discord.Message | discord.Message[] | null) => t
+                                )
+                            )
                         );
                     }
                 );
 
-                // this possibly works
-                // return concat(observables).pipe(
-                //     combineAll(),
-                //     map(x => x.flatMap(t=>t))
-                // );
-
-                const requestPromise = requests
-                    .map(
-                        (obs: Observable<(discord.Message | null)[]>):
-                        Promise<(discord.Message | null)[]> => obs.toPromise()
+                const ret = concat(
+                    requests
+                ).pipe(
+                    combineAll(),
+                    map(
+                        (results: (discord.Message | null)[][]):
+                        (discord.Message | null)[] => {
+                            const flattened = results.flatMap(
+                                (x: (discord.Message | null)[]):
+                                (discord.Message | null)[] => x
+                            );
+                            return flattened;
+                        }
                     )
-                    .reduce(async (promiseChain, currentTask):
-                    Promise<(discord.Message | null)[]> => {
-                        const arr = [
-                            ...await promiseChain,
-                            ...await currentTask,
-                        ].flatMap((x): (discord.Message | null) => x);
-                        return arr;
-                    });
-
+                );
                 return forkJoin(
                     of(input.tag),
-                    from(requestPromise)
+                    ret,
                 );
+
+                // const requestPromise = requests
+                //     .map(
+                //         (obs: Observable<(discord.Message | null)[]>):
+                //         Promise<(discord.Message | null)[]> => obs.toPromise()
+                //     )
+                //     .reduce(async (promiseChain, currentTask):
+                //     Promise<(discord.Message | null)[]> => {
+                //         const arr = [
+                //             ...await promiseChain,
+                //             ...await currentTask,
+                //         ].flatMap((x): (discord.Message | null) => x);
+                //         return arr;
+                //     });
+
+                // return forkJoin(
+                //     of(input.tag),
+                //     from(requestPromise)
+                // );
             }
         ),
         map((x: [string, (discord.Message | null)[]]): Response => ({
@@ -160,12 +179,26 @@ export namespace MessageWrapper {
                     ? input.tag
                     : `${Math.random()}`;
 
+                // editInfo.messages.map(
+                //     (message: discord.Message):
+                //     Observable<discord.Message | null> => {
+                //         const bound = input.message.edit.bind(
+                //             input.message,
+                //             input.newContent,
+                //             input.options,
+                //         );
+                //         const request: Observable<discord.Message | null> = Network.genericNetworkFetch$<discord.Message>(
+                //             bound,
+                //         );
+                //     }
+                // );
+
                 const bound = input.message.edit.bind(
                     input.message,
                     input.newContent,
                     input.options,
                 );
-                const request = Network.genericNetworkFetch$<discord.Message>(
+                const request: Observable<discord.Message | null> = Network.genericNetworkFetch$<discord.Message>(
                     bound,
                 );
                 return forkJoin(

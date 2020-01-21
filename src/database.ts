@@ -53,7 +53,7 @@ export namespace Db {
             Utils.logger.debug(event.query);
         },
         receive(data: unknown): void {
-            Utils.logger.debug(JSON.stringify(data));
+            Utils.logger.trace(JSON.stringify(data));
         },
         task(event: pgp.IEventContext): void {
             if (event.ctx.finish) {
@@ -274,7 +274,7 @@ export namespace Db {
         event: Event.Object,
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Object> => {
-        if (event.id === undefined) {
+        if (event.id === -1) {
             const ret: {id: number; event: Event.Object} = await db.one(
                 insertNewEventStmt,
                 JSON.stringify(event),

@@ -697,7 +697,7 @@ const accountA: Event.CompetitiveAccount = {
 };
 
 const insertEventA: Event.Object = {
-    id: undefined,
+    id: -1,
     guilds: {
         creator: {
             discordId: 'testA',
@@ -717,7 +717,7 @@ const insertEventA: Event.Object = {
 };
 
 const insertEventB: Event.Object = {
-    id: undefined,
+    id: -1,
     global: false,
     guilds: {
         creator: {
@@ -728,12 +728,12 @@ const insertEventB: Event.Object = {
                     'testC',
                 ],
             },
-            statusMessage: {
-                channelId: 'testB',
-                messagesId: [
-                    'testD',
-                ],
-            },
+            // statusMessage: {
+            //     channelId: 'testB',
+            //     messagesId: [
+            //         'testD',
+            //     ],
+            // },
         },
         others: [
             {
@@ -744,12 +744,12 @@ const insertEventB: Event.Object = {
                         'testE',
                     ],
                 },
-                statusMessage: {
-                    channelId: 'testB',
-                    messagesId: [
-                        'testF',
-                    ],
-                },
+                // statusMessage: {
+                //     channelId: 'testB',
+                //     messagesId: [
+                //         'testF',
+                //     ],
+                // },
             },
         ],
     },

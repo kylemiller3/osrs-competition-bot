@@ -184,7 +184,6 @@ export namespace Event {
      */
     export interface Guild {
         discordId: string
-        statusMessage?: ChannelMessage
         scoreboardMessage?: ChannelMessage
     }
 
@@ -198,7 +197,7 @@ export namespace Event {
      * @category Event
      */
     export interface Object {
-        id?: number
+        id: number
         name: string
         when: When
         guilds: CompetingGuilds
@@ -287,7 +286,7 @@ export namespace Event {
 
 
     export const getEventScoreboardString = async (
-        eventName: string,
+        event: Event.Object,
         guildId: string,
         currentScoreboard: TeamScoreboard[],
         lastScoreboard: TeamScoreboard[],
@@ -352,7 +351,16 @@ export namespace Event {
             }
         ).join('\n');
 
-        return `Event ${eventName} (${eventType})\n`.concat(str);
+        const now: Date = new Date();
+        let status: string;
+        if (event.when.end >= new Date('9999-12-31')) {
+            status = '';
+        } else if (event.when.end <= now) {
+            status = '(ended)';
+        } else {
+            status = `(${Number(((event.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
+        }
+        return `Event ${event.name} (${event.tracking.category})\n${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}`;
     };
 
     export const getEventTeamsScoreboards = (

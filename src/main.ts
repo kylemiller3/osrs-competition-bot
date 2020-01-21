@@ -2,10 +2,10 @@ import * as discord from 'discord.js';
 
 import { EventEmitter, } from 'events';
 import {
-    fromEvent, Observable, Subject, merge, forkJoin, of,
+    fromEvent, Observable, Subject, merge, forkJoin, of, from, concat,
 } from 'rxjs';
 import {
-    filter, tap, mergeMap,
+    filter, tap, mergeMap, flatMap, concatMap,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { async, } from 'rxjs/internal/scheduler/async';
@@ -371,8 +371,9 @@ const scheduleEventsTimers = async (): Promise<void> => {
     // schedule timers if not exists
     events.forEach(
         (event: Event.Object): void => {
-            if (event.id === undefined) {
-                throw new Error('event id is undefined');
+            if (event.id === -1) {
+                Utils.logger.error('event id is undefined');
+                return;
             }
 
             if (startTimers[event.id] === undefined
@@ -539,6 +540,127 @@ const refreshMessage = async (
     return messagePart;
 };
 
+// when an event will start
+willStartEvent$.pipe(
+    flatMap(
+        (event: Event.Object): Observable<void[]> => {
+            Utils.logger.debug(`Event ${event.id} is starting.`);
+
+            // release start timer
+            // should already be expired
+            startTimers[event.id] = undefined;
+
+            // if we have a competitive event
+            // track scoreboard automatically
+            if (!Event.isEventCasual(event)
+                && !Event.isEventCustom(event)) {
+                Utils.logger.trace('Event is auto tracking score');
+                updateTimers[event.id] = setInterval(
+                    async (): Promise<void> => {
+                        const updatedEvent: Event.Object | null = await Db.fetchEvent(event.id);
+                        const timeout: NodeJS.Timeout | undefined = updateTimers[event.id];
+                        if (updatedEvent === null && timeout !== undefined) {
+                            clearInterval(timeout);
+                            updateTimers[event.id] = undefined;
+                        }
+
+                        if (updatedEvent !== null) {
+                            willUpdateScores$.next(updatedEvent);
+                        }
+                    }, 1000 * 60 * 1
+                );
+            }
+
+            // combine all guild objects
+            const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
+                ? [
+                    event.guilds.creator,
+                    ...event.guilds.others,
+                ]
+                : [
+                    event.guilds.creator,
+                ];
+
+            const promises: Promise<void>[] = eventGuilds.map(
+                (eventGuild: Event.Guild, idx: number):
+                Promise<void> => {
+                    const guild: discord.Guild | null = getGuildFromId(
+                        gClient,
+                        eventGuild.discordId,
+                    );
+
+                    if (guild === null) {
+                        Utils.logger.warn('Discord guild not available');
+                        return Promise.resolve();
+                    }
+
+                    const scoreboard:
+                    Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
+                        event,
+                    );
+
+                    const refreshMessagesPromise = async ():
+                    Promise<void> => {
+                        const scoreboardStr = await Event.getEventScoreboardString(
+                            event,
+                            guild.id,
+                            scoreboard,
+                            scoreboard,
+                            event.tracking.category,
+                            'what',
+                            false,
+                            'regular',
+                        );
+                        // const msg1 = await refreshMessage(
+                        //     gClient,
+                        //     guild,
+                        //     eventGuild.statusMessage,
+                        //     `${guild.name} is starting`,
+                        // );
+                        const msg1 = null;
+                        const msg2 = await refreshMessage(
+                            gClient,
+                            guild,
+                            eventGuild.scoreboardMessage,
+                            `${scoreboardStr}`,
+                            {
+                                code: true,
+                            }
+                        );
+                        // map these messages back to the original guild objects
+                        const newEvent: Event.Object = { ...event, };
+
+                        // first message belongs to the owner
+                        if (idx === 0) {
+                            // newEvent.guilds.creator.statusMessage = msg1 !== null
+                            //     ? msg1
+                            //     : undefined;
+                            newEvent.guilds.creator.scoreboardMessage = msg2 !== null
+                                ? msg2
+                                : undefined;
+                        } else if (newEvent.guilds.others !== undefined) {
+                            // newEvent.guilds.others[idx - 1].statusMessage = msg1 !== null
+                            //     ? msg1
+                            //     : undefined;
+                            newEvent.guilds.others[idx - 1].scoreboardMessage = msg2 !== null
+                                ? msg2
+                                : undefined;
+                        }
+
+                        // save event
+                        const savedEvent: Event.Object = await Db.upsertEvent(
+                            newEvent
+                        );
+                        didStartEvent$.next(savedEvent);
+                    };
+                    return refreshMessagesPromise();
+                }
+            );
+            return forkJoin(promises);
+        }
+    ),
+).subscribe();
+
 /**
  * Startup and initialization
  */
@@ -577,162 +699,6 @@ const init = async (): Promise<void> => {
         }
     );
 
-    // when an event will start
-    willStartEvent$.subscribe(
-        async (event: Event.Object): Promise<void> => {
-            Utils.logger.debug(`Event ${event.id} is starting.`);
-            if (event.id === undefined) {
-                throw new Error('event id is undefined');
-            }
-
-            // release start timer
-            // should already be expired
-            startTimers[event.id] = undefined;
-
-            // if we have a competitive event
-            // track scoreboard automatically
-            if (!Event.isEventCasual(event)
-                && !Event.isEventCustom(event)) {
-                Utils.logger.trace('Event is auto tracking score');
-                updateTimers[event.id] = setInterval(
-                    async (): Promise<void> => {
-                        if (event.id === undefined) {
-                            Utils.logger.error('This should never happen.');
-                            return;
-                        }
-                        const updatedEvent: Event.Object | null = await Db.fetchEvent(event.id);
-                        const timeout: NodeJS.Timeout | undefined = updateTimers[event.id];
-                        if (updatedEvent === null && timeout !== undefined) {
-                            clearInterval(timeout);
-                            updateTimers[event.id] = undefined;
-                        }
-
-                        if (updatedEvent !== null) {
-                            willUpdateScores$.next(updatedEvent);
-                        }
-                    }, 1000 * 60 * 1
-                );
-                willUpdateScores$.next(event);
-            }
-
-            // combine all guild objects
-            const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
-                ? [
-                    event.guilds.creator,
-                    ...event.guilds.others,
-                ]
-                : [
-                    event.guilds.creator,
-                ];
-
-            // update status and scoreboard promises
-            const guildMessagesPromises:
-            Promise<[
-                Event.ChannelMessage | null,
-                Event.ChannelMessage | null,
-            ]>[] = eventGuilds.map(
-                async (eventGuild: Event.Guild):
-                Promise<[
-                    Event.ChannelMessage | null,
-                    Event.ChannelMessage | null,
-                ]> => {
-                    // get guild
-                    const guild: discord.Guild | null = getGuildFromId(
-                        gClient,
-                        eventGuild.discordId,
-                    );
-
-                    if (guild === null) {
-                        Utils.logger.warn('Discord guild not available');
-                        return [
-                            null,
-                            null,
-                        ];
-                    }
-
-                    const scoreboard:
-                    Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
-                        event,
-                    );
-                    const scoreboardStr: string = await Event.getEventScoreboardString(
-                        event.name,
-                        guild.id,
-                        scoreboard,
-                        scoreboard,
-                        event.tracking.category,
-                        'what',
-                        false,
-                        'regular',
-                    );
-
-                    const results = await Promise.all([
-                        refreshMessage(
-                            gClient,
-                            guild,
-                            eventGuild.statusMessage,
-                            `${guild.name} is starting`,
-                        ), refreshMessage(
-                            gClient,
-                            guild,
-                            eventGuild.scoreboardMessage,
-                            `${scoreboardStr}`,
-                            {
-                                code: true,
-                            }
-                        ),
-                    ]);
-                    return [
-                        results[0],
-                        results[1],
-                    ];
-                }
-            );
-
-            const guildMessages: [
-                Event.ChannelMessage | null,
-                Event.ChannelMessage | null,
-            ][] = await Promise.all(guildMessagesPromises);
-
-            // map these messages back to the original guild objects
-            const newEvent: Event.Object = { ...event, };
-
-            // first message belongs to the owner
-            newEvent.guilds.creator.statusMessage = guildMessages[0][0] !== null
-                ? guildMessages[0][0]
-                : undefined;
-            newEvent.guilds.creator.scoreboardMessage = guildMessages[0][1] !== null
-                ? guildMessages[0][1]
-                : undefined;
-
-            // create others message array
-            const othersMessages: [
-                Event.ChannelMessage | null,
-                Event.ChannelMessage | null,
-            ][] = guildMessages.slice(1);
-
-            // do the same thing for others as the creator guild
-            othersMessages.forEach(
-                (otherMessage: [
-                    Event.ChannelMessage | null,
-                    Event.ChannelMessage | null,
-                ], idx: number): void => {
-                    if (newEvent.guilds.others !== undefined) {
-                        newEvent.guilds.others[idx].statusMessage = otherMessage[0] !== null
-                            ? otherMessage[0]
-                            : undefined;
-                        newEvent.guilds.others[idx].scoreboardMessage = otherMessage[1] !== null
-                            ? otherMessage[1]
-                            : undefined;
-                    }
-                }
-            );
-
-            // save event
-            await Db.upsertEvent(newEvent);
-            didStartEvent$.next(newEvent);
-        }
-    );
-
     didStartEvent$.subscribe(
         (event: Event.Object): void => {
             Utils.logger.debug(`Event ${event.id} did start.`);
@@ -742,8 +708,9 @@ const init = async (): Promise<void> => {
     willEndEvent$.subscribe(
         (event: Event.Object): void => {
             Utils.logger.debug(`Event ${event.id} will end.`);
-            if (event.id === undefined) {
-                throw new Error('event id is undefined');
+            if (event.id === -1) {
+                Utils.logger.error('event id is undefined');
+                return;
             }
 
             // release timers
@@ -868,8 +835,11 @@ const init = async (): Promise<void> => {
                             Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
                                 newEvent,
                             );
+                            const state: 'ended' | 'running' = Utils.isInPast(
+                                newEvent.when.end
+                            ) ? 'ended' : 'running';
                             const scoreboardStr: string = await Event.getEventScoreboardString(
-                                newEvent.name,
+                                newEvent,
                                 guild.id,
                                 scoreboard,
                                 scoreboard,
