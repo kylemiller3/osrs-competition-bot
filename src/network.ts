@@ -49,7 +49,7 @@ export namespace Network {
                     retryBackoff({
                         initialInterval: 50,
                         maxInterval: 10000,
-                        maxRetries: 10,
+                        maxRetries: 7,
                         shouldRetry,
                     }),
                     catchError((error: Error): Observable<null> => { // must catch to get values
@@ -114,7 +114,7 @@ export namespace Network {
                 undefined,
                 asciiRsn,
             );
-            const obs: Observable<hiscores.Player | null> = genericNetworkFetch$(
+            const obs = genericNetworkFetch$<hiscores.Player | null>(
                 bound,
                 (error: Error): boolean => {
                     if (
@@ -129,15 +129,13 @@ export namespace Network {
             ).pipe(
                 publishReplay(1),
                 refCount(),
-                tap(
-                    (response: hiscores.Player):
-                    void => {
-                        if (response === null) {
-                            Utils.logger.error(`Could not find rsn '${asciiRsn}'`);
-                            hiscoreCache[asciiRsn] = undefined;
-                        }
+                catchError(
+                    (error: Error): Observable<null> => {
+                        Utils.logger.error(`Networking error: ${error}`);
+                        hiscoreCache[asciiRsn] = undefined;
+                        return of(null);
                     }
-                )
+                ),
             );
 
             hiscoreCache[asciiRsn] = {
