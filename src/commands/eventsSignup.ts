@@ -18,7 +18,7 @@ class EventsSignupConversation extends Conversation {
     private async signupToEventWithRsnAndTeam(
         id: number,
         rsn: string,
-        teamName: string,
+        teamName?: string,
     ): Promise<CONVERSATION_STATE> {
         // p1
         if (Number.isNaN(id)) {
@@ -80,15 +80,51 @@ class EventsSignupConversation extends Conversation {
             return CONVERSATION_STATE.Q2E;
         }
 
+        // is the participant already on a team?
+        const participantIdx: number = event.teams.findIndex(
+            (team: Event.Team):
+            boolean => team.participants.some(
+                (participant: Event.Participant):
+                boolean => participant.discordId === this.opMessage.author.id
+            )
+        );
+
+        const participantJdx: number = participantIdx !== -1
+            ? event.teams[participantIdx].participants.findIndex(
+                (participant: Event.Participant):
+                boolean => participant.discordId === this.opMessage.author.id
+            ) : -1;
+
+        const newEvent: Event.Object = { ...event, };
+        if (participantIdx !== -1 && participantJdx !== -1) {
+            // we know the team to signup for
+            const participant: Event.Participant = newEvent
+                .teams[participantIdx]
+                .participants[participantJdx];
+            newEvent
+                .teams[participantIdx]
+                .participants[participantJdx]
+                .runescapeAccounts = participant
+                    .runescapeAccounts.concat({
+                        rsn,
+                    });
+            // save event
+            const savedEvent: Event.Object = await Db.upsertEvent(newEvent);
+            willSignUpPlayer$.next(savedEvent);
+
+            this.returnMessage = 'Signed up for team';
+            return CONVERSATION_STATE.DONE;
+        } if (teamName === undefined) {
+            // we should ask the user what team they are going to signup for
+            return CONVERSATION_STATE.Q3;
+        }
+
         // p3
         const teamIdx: number = event.teams.findIndex(
             (team: Event.Team):
             boolean => team.name.toLowerCase() === teamName.toLowerCase()
         );
-        const foundTeam: Event.Team | undefined = teamIdx !== -1
-            ? event.teams[teamIdx]
-            : undefined;
-        if (foundTeam === undefined) {
+        if (teamIdx === -1) {
             // if we didn't find the team
             // create a new team
             const team: Event.Team = {
@@ -105,7 +141,7 @@ class EventsSignupConversation extends Conversation {
                     },
                 ],
             };
-            event.teams = event.teams.concat(team);
+            newEvent.teams = event.teams.concat(team);
         } else {
             // we found the team
             // so add the participant to the new team
@@ -118,7 +154,7 @@ class EventsSignupConversation extends Conversation {
                     },
                 ],
             };
-            event
+            newEvent
                 .teams[teamIdx]
                 .participants = event
                     .teams[teamIdx]
@@ -128,7 +164,7 @@ class EventsSignupConversation extends Conversation {
         }
 
         // save event
-        const savedEvent: Event.Object = await Db.upsertEvent(event);
+        const savedEvent: Event.Object = await Db.upsertEvent(newEvent);
         willSignUpPlayer$.next(savedEvent);
 
         this.returnMessage = 'Signed up for team';
@@ -141,16 +177,21 @@ class EventsSignupConversation extends Conversation {
         const rsn = this.params.rsn as string | undefined;
         const team = this.params.team as string | undefined;
 
-        if (id === undefined || rsn === undefined || team === undefined) {
+        if (id === undefined || rsn === undefined) {
             return Promise.resolve(false);
         }
 
         this.state = CONVERSATION_STATE.DONE;
-        await this.signupToEventWithRsnAndTeam(
+        const stateCheck: CONVERSATION_STATE = await this.signupToEventWithRsnAndTeam(
             id,
             rsn,
             team,
         );
+
+        if (stateCheck !== CONVERSATION_STATE.DONE) {
+            this.returnMessage = 'No team specified';
+        }
+
         return Promise.resolve(true);
     }
 
@@ -182,7 +223,11 @@ class EventsSignupConversation extends Conversation {
             }
             case CONVERSATION_STATE.Q2: {
                 this.rsn = qa.answer.content;
-                this.state = CONVERSATION_STATE.Q3;
+                this.state = await this.signupToEventWithRsnAndTeam(
+                    this.id,
+                    this.rsn,
+                    this.teamName,
+                );
                 break;
             }
             case CONVERSATION_STATE.Q3: {

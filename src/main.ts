@@ -866,7 +866,9 @@ willAddEvent$.subscribe(
         if (Utils.isInPast(event.when.end)) {
             Utils.logger.info('Event ended in the past');
             willEndEvent$.next(event);
-        } else {
+        }
+        if (!Utils.isInPast(event.when.start)
+            && !Utils.isInPast(event.when.end)) {
             scheduleEvents();
             // print the board
             willUpdateScores$.next([
