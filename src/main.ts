@@ -33,6 +33,7 @@ import { Event, } from './event';
 import { Network, } from './network';
 import { Settings, } from './settings';
 import { ConversationManager, } from './conversation';
+import { async } from 'rxjs/internal/scheduler/async';
 
 /**
  * Global discord client
@@ -643,10 +644,15 @@ const scheduleEvents = async (): Promise<void> => {
 
             if (startTimers[event.id] === undefined
                 && event.when.start >= now
-                && event.when.end < twentyFiveHours) {
+                && event.when.start < twentyFiveHours) {
                 startTimers[event.id] = setTimeout(
-                    (): void => {
-                        willStartEvent$.next(event);
+                    async (): Promise<void> => {
+                        if (event.id !== undefined) {
+                            const updatedEvent: Event.Object | null = await Db.fetchEvent(event.id);
+                            if (updatedEvent !== null) {
+                                willStartEvent$.next(updatedEvent);
+                            }
+                        }
                     }, event.when.start.getTime() - now.getTime(),
                 );
             }
@@ -655,8 +661,13 @@ const scheduleEvents = async (): Promise<void> => {
                 && event.when.end >= now
                 && event.when.end < twentyFiveHours) {
                 endTimers[event.id] = setTimeout(
-                    (): void => {
-                        willEndEvent$.next(event);
+                    async (): Promise<void> => {
+                        if (event.id !== undefined) {
+                            const updatedEvent: Event.Object | null = await Db.fetchEvent(event.id);
+                            if (updatedEvent !== null) {
+                                willEndEvent$.next(updatedEvent);
+                            }
+                        }
                     }, event.when.end.getTime() - now.getTime()
                 );
             }
