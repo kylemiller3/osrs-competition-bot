@@ -328,26 +328,26 @@ export namespace Event {
 
         let idx = 0;
         const str: string = currentScoreboard.map(
-            (team: TeamScoreboard): string => {
+            (team: TeamScoreboard, idi: number): string => {
                 const participantsStr = team.participantsScores.map(
                     (participant: ParticipantScoreboard): string => {
                         const accountsStr = participant.accountsScores.map(
                             (account: AccountScoreboard): string => {
                                 if (account.whatsScores !== undefined) {
                                     const whatStr = account.whatsScores.map(
-                                        (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore}`
+                                        (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore.toLocaleString('en-us')}`
                                     ).join(`\n${tab}${tab}${tab}`);
-                                    return `${account.lhs}${tab}${account.accountScore}\n${tab}${tab}${tab}${whatStr}`;
+                                    return `${account.lhs}${tab}${account.accountScore.toLocaleString('en-us')}\n${tab}${tab}${tab}${whatStr}`;
                                 }
                                 return account.lhs;
                             }
                         ).join(`\n${tab}${tab}`);
-                        const ret = `${tags[idx]}${tab}${participant.participantScore}\n${tab}${tab}${accountsStr}`;
+                        const ret = `${tags[idx]}${tab}${participant.participantScore.toLocaleString('en-us')}\n${tab}${tab}${accountsStr}`;
                         idx += 1;
                         return ret;
                     }
                 ).join(`\n${tab}`);
-                return `Team ${team.lhs}${tab}${team.teamScore}\n${tab}${participantsStr}`;
+                return `${idi + 1}. Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
             }
         ).join('\n');
 
@@ -360,7 +360,7 @@ export namespace Event {
         } else {
             status = `(${Number(((event.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
         }
-        return `Event ${event.name} (${event.tracking.category})\n${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}`;
+        return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}`;
     };
 
     export const getEventTeamsScoreboards = (

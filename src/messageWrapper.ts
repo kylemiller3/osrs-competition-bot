@@ -66,14 +66,13 @@ export namespace MessageWrapper {
                 const requests: Observable<(discord.Message | null)[]>[] = chunks.map(
                     (chunk: string, idx: number):
                     Observable<(discord.Message | null)[]> => {
-                        const clonedOptions: discord.MessageOptions = { ...input.options, };
-                        if (idx !== 0) {
-                            clonedOptions.reply = undefined;
+                        if (idx !== 0 && input.options !== undefined) {
+                            input.options.reply = undefined;
                         }
                         const bound = input.message.channel.send.bind(
                             input.message.channel,
                             chunk,
-                            clonedOptions,
+                            input.options,
                         );
                         return Network.genericNetworkFetch$<discord.Message | discord.Message[]>(
                             bound,
@@ -92,7 +91,7 @@ export namespace MessageWrapper {
                     }
                 );
 
-                const ret = concat(
+                const ret: Observable<(discord.Message | null)[]> = concat(
                     requests
                 ).pipe(
                     combineAll(),

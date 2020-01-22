@@ -12,8 +12,8 @@ class EventEditConversation extends Conversation {
     event: Event.Object;
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<void> {
-        return Promise.resolve();
+    async init(): Promise<boolean> {
+        return Promise.resolve(false);
     }
 
     produceQ(): string | null {

@@ -2,13 +2,12 @@ import * as discord from 'discord.js';
 
 import { EventEmitter, } from 'events';
 import {
-    fromEvent, Observable, Subject, merge, forkJoin, of, from, concat,
+    fromEvent, Observable, Subject, merge, forkJoin, of, from, concat, defer,
 } from 'rxjs';
 import {
-    filter, tap, mergeMap, flatMap, concatMap,
+    filter, tap, mergeMap, concatMap, map, combineAll,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
-import { async, } from 'rxjs/internal/scheduler/async';
 import privateKey from './auth';
 import { Command, } from './command';
 import { Utils, } from './utils';
@@ -76,7 +75,7 @@ export const didEndEvent$: Subject<Event.Object> = new Subject();
  * Observable of updating scores
  * @category Observable
  */
-export const willUpdateScores$: Subject<Event.Object> = new Subject();
+export const willUpdateScores$: Subject<[Event.Object, boolean]> = new Subject();
 /**
  * Observable of updated scores
  * @category Observable
@@ -93,6 +92,18 @@ export const willSignUpPlayer$: Subject<Event.Object> = new Subject();
  * @category Observable
  */
 export const didSignupPlayer$: Subject<Event.Object> = new Subject();
+
+/**
+ * Observable of unsigning up player
+ * @category Observable
+ */
+export const willUnsignupPlayer$: Subject<Event.Object> = new Subject();
+
+/**
+ * Observable of unsigned up player
+ * @category Observable
+ */
+export const didUnsignupPlayer$: Subject<Event.Object> = new Subject();
 
 /**
  * Observable of adding events
@@ -353,51 +364,6 @@ export const spoofMessage = (
 
 const startTimers: Record<number, NodeJS.Timeout | undefined> = {};
 const endTimers: Record<number, NodeJS.Timeout | undefined> = {};
-const updateTimers: Record<number, NodeJS.Timeout | undefined> = {};
-
-const scheduleEventsTimers = async (): Promise<void> => {
-    const now: Date = new Date();
-    const twentyFiveHours: Date = new Date();
-    twentyFiveHours.setHours(twentyFiveHours.getHours() + 25);
-
-    let events: Event.Object[] | null = await Db.fetchAllEventsBetweenDates(
-        now, twentyFiveHours,
-    );
-
-    if (events === null) {
-        events = [];
-    }
-
-    // schedule timers if not exists
-    events.forEach(
-        (event: Event.Object): void => {
-            if (event.id === -1) {
-                Utils.logger.error('event id is undefined');
-                return;
-            }
-
-            if (startTimers[event.id] === undefined
-                && event.when.start >= now
-                && event.when.end < twentyFiveHours) {
-                startTimers[event.id] = setTimeout(
-                    (): void => {
-                        willStartEvent$.next(event);
-                    }, event.when.start.getTime() - now.getTime(),
-                );
-            }
-
-            if (endTimers[event.id] === undefined
-                && event.when.end >= now
-                && event.when.end < twentyFiveHours) {
-                endTimers[event.id] = setTimeout(
-                    (): void => {
-                        willEndEvent$.next(event);
-                    }, event.when.end.getTime() - now.getTime()
-                );
-            }
-        }
-    );
-};
 
 /**
  * Helper function when the bot restarts
@@ -503,20 +469,22 @@ const refreshMessage = async (
         return null;
     }
 
-    // delete old status message
-    if (oldMessage !== undefined) {
-        await deleteMessages(
-            guild,
-            oldMessage
-        );
-    }
-
     // post new status
     const dummyMessage: discord.Message = new discord.Message(
         channelToPostTo,
         null as unknown as Record<string, unknown>,
         client,
     );
+
+
+    // delete old status message
+    let deleteMessagePromise: Promise<MessageWrapper.Response[] | null> = Promise.resolve(null);
+    if (oldMessage !== undefined) {
+        deleteMessagePromise = deleteMessages(
+            guild,
+            oldMessage
+        );
+    }
 
     let messagePromise: Promise<MessageWrapper.Response | null> = Promise.resolve(null);
     if (content !== undefined && content.length > 0) {
@@ -526,7 +494,15 @@ const refreshMessage = async (
             options,
         });
     }
-    const response: MessageWrapper.Response | null = await messagePromise;
+
+    const responses: [
+        (MessageWrapper.Response[] | null),
+        (MessageWrapper.Response | null)
+    ] = await Promise.all([
+        deleteMessagePromise,
+        messagePromise,
+    ]);
+    const response: MessageWrapper.Response | null = responses[1];
     if (response === null) {
         return null;
     }
@@ -540,10 +516,171 @@ const refreshMessage = async (
     return messagePart;
 };
 
+const saveAndNotifyUpdatedEventScoreboard = (
+    event: Event.Object,
+): Observable<Event.Object> => {
+    const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
+        ? [
+            event.guilds.creator,
+            ...event.guilds.others,
+        ]
+        : [
+            event.guilds.creator,
+        ];
+    const observables: Observable<Event.ChannelMessage | null>[] = eventGuilds.map(
+        (eventGuild: Event.Guild):
+        Observable<Event.ChannelMessage | null> => {
+            const guild: discord.Guild | null = getGuildFromId(
+                gClient,
+                eventGuild.discordId
+            );
+            if (guild === null) {
+                Utils.logger.warn('Discord guild not available');
+                return of(null);
+            }
+            const scoreboard: Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(event);
+            const deferredRefreshObservable: Observable<Event.ChannelMessage | null> = defer(
+                (): Observable<Event.ChannelMessage | null> => from(
+                    Event.getEventScoreboardString(
+                        event,
+                        guild.id,
+                        scoreboard,
+                        scoreboard,
+                        event.tracking.category,
+                        'what',
+                        false,
+                        'regular'
+                    )
+                ).pipe(
+                    mergeMap(
+                        (scoreboardStr: string):
+                        Observable<Event.ChannelMessage | null> => {
+                            const msg2 = refreshMessage(
+                                gClient,
+                                guild,
+                                eventGuild.scoreboardMessage,
+                                `${scoreboardStr}`,
+                                {
+                                    code: true,
+                                }
+                            );
+                            return from(msg2);
+                        }
+                    )
+                )
+            );
+            return deferredRefreshObservable;
+        }
+    );
+    const newEvent: Event.Object = { ...event, };
+    const ret: Observable<Event.Object> = concat(
+        observables
+    ).pipe(
+        combineAll(),
+        map(
+            (channelMessages: (Event.ChannelMessage | null)[]):
+            Event.Object => {
+                channelMessages.forEach(
+                    (channelMessage: Event.ChannelMessage, idx: number):
+                    void => {
+                        if (idx === 0) {
+                        // newEvent.guilds.creator.statusMessage = msg1 !== null
+                        //     ? msg1
+                        //     : undefined;
+                            newEvent.guilds
+                                .creator
+                                .scoreboardMessage = channelMessage !== null
+                                    ? channelMessage
+                                    : undefined;
+                        } else if (newEvent.guilds.others !== undefined) {
+                        // newEvent.guilds.others[idx - 1].statusMessage = msg1 !== null
+                        //     ? msg1
+                        //     : undefined;
+                            newEvent.guilds.others[idx - 1]
+                                .scoreboardMessage = channelMessage !== null
+                                    ? channelMessage
+                                    : undefined;
+                        }
+                    }
+                );
+                return newEvent;
+            }
+        ),
+        mergeMap(
+            (eventToSave: Event.Object): Observable<Event.Object> => from(
+                Db.upsertEvent(eventToSave)
+            )
+        ),
+        tap(
+            (savedEvent: Event.Object): void => {
+                didUpdateScores$.next(savedEvent);
+            }
+        ),
+    );
+    return ret;
+};
+
+const scheduleEvents = async (): Promise<void> => {
+    const now: Date = new Date();
+    const twentyFiveHours: Date = new Date();
+    twentyFiveHours.setHours(twentyFiveHours.getHours() + 25);
+
+    let events: Event.Object[] | null = await Db.fetchAllEventsBetweenDates(
+        now, twentyFiveHours,
+    );
+
+    if (events === null) {
+        events = [];
+    }
+
+    // schedule timers if not exists
+    events.forEach(
+        (event: Event.Object): void => {
+            if (event.id === -1) {
+                Utils.logger.error('event id is undefined');
+                return;
+            }
+
+            if (startTimers[event.id] === undefined
+                && event.when.start >= now
+                && event.when.end < twentyFiveHours) {
+                startTimers[event.id] = setTimeout(
+                    (): void => {
+                        willStartEvent$.next(event);
+                    }, event.when.start.getTime() - now.getTime(),
+                );
+            }
+
+            if (endTimers[event.id] === undefined
+                && event.when.end >= now
+                && event.when.end < twentyFiveHours) {
+                endTimers[event.id] = setTimeout(
+                    (): void => {
+                        willEndEvent$.next(event);
+                    }, event.when.end.getTime() - now.getTime()
+                );
+            }
+        }
+    );
+};
+
+// When we receive a message
+MessageWrapper.sentMessages$.subscribe(
+    (response: MessageWrapper.Response): void => {
+        Utils.logger.trace(`Message with tag ${response.tag} sent.`);
+    },
+    (err: Error): void => {
+        Utils.logger.error(`Message sending error: ${err.message}`);
+    },
+    (): void => {
+        Utils.logger.trace('Finished sending messages.');
+    }
+);
+
 // when an event will start
 willStartEvent$.pipe(
-    flatMap(
-        (event: Event.Object): Observable<void[]> => {
+    map(
+        (event: Event.Object): void => {
             Utils.logger.debug(`Event ${event.id} is starting.`);
 
             // release start timer
@@ -555,195 +692,50 @@ willStartEvent$.pipe(
             if (!Event.isEventCasual(event)
                 && !Event.isEventCustom(event)) {
                 Utils.logger.trace('Event is auto tracking score');
-                updateTimers[event.id] = setInterval(
-                    async (): Promise<void> => {
-                        const updatedEvent: Event.Object | null = await Db.fetchEvent(event.id);
-                        const timeout: NodeJS.Timeout | undefined = updateTimers[event.id];
-                        if (updatedEvent === null && timeout !== undefined) {
-                            clearInterval(timeout);
-                            updateTimers[event.id] = undefined;
-                        }
+                willUpdateScores$.next([
+                    event,
+                    true,
+                ]);
+            }
 
-                        if (updatedEvent !== null) {
-                            willUpdateScores$.next(updatedEvent);
-                        }
-                    }, 1000 * 60 * 1
+            // // combine all guild objects
+            // const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
+            //     ? [
+            //         event.guilds.creator,
+            //         ...event.guilds.others,
+            //     ]
+            //     : [
+            //         event.guilds.creator,
+            //     ];
+
+
+            // updateEventScoreboard(
+            //     eventGuilds,
+            //     event,
+            // ).subscribe(
+            //     async (updatedEvent: Event.Object): Promise<void> => {
+            //         // save event
+            //         await Db.upsertEvent(updatedEvent);
+            //         didUpdateScores$.next(updatedEvent);
+            //     }
+            // );
+        }
+    )
+).subscribe();
+
+willUpdateScores$.pipe(
+    concatMap(
+        (obj: [Event.Object, boolean]): Observable<Event.Object> => {
+            const event: Event.Object = obj[0];
+            const forced: boolean = obj[1];
+            Utils.logger.debug(`Event ${event.id} scores will update.`);
+
+            if (Utils.isInFuture(event.when.start)) {
+                return saveAndNotifyUpdatedEventScoreboard(
+                    event,
                 );
             }
 
-            // combine all guild objects
-            const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
-                ? [
-                    event.guilds.creator,
-                    ...event.guilds.others,
-                ]
-                : [
-                    event.guilds.creator,
-                ];
-
-            const promises: Promise<void>[] = eventGuilds.map(
-                (eventGuild: Event.Guild, idx: number):
-                Promise<void> => {
-                    const guild: discord.Guild | null = getGuildFromId(
-                        gClient,
-                        eventGuild.discordId,
-                    );
-
-                    if (guild === null) {
-                        Utils.logger.warn('Discord guild not available');
-                        return Promise.resolve();
-                    }
-
-                    const scoreboard:
-                    Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
-                        event,
-                    );
-
-                    const refreshMessagesPromise = async ():
-                    Promise<void> => {
-                        const scoreboardStr = await Event.getEventScoreboardString(
-                            event,
-                            guild.id,
-                            scoreboard,
-                            scoreboard,
-                            event.tracking.category,
-                            'what',
-                            false,
-                            'regular',
-                        );
-                        // const msg1 = await refreshMessage(
-                        //     gClient,
-                        //     guild,
-                        //     eventGuild.statusMessage,
-                        //     `${guild.name} is starting`,
-                        // );
-                        const msg1 = null;
-                        const msg2 = await refreshMessage(
-                            gClient,
-                            guild,
-                            eventGuild.scoreboardMessage,
-                            `${scoreboardStr}`,
-                            {
-                                code: true,
-                            }
-                        );
-                        // map these messages back to the original guild objects
-                        const newEvent: Event.Object = { ...event, };
-
-                        // first message belongs to the owner
-                        if (idx === 0) {
-                            // newEvent.guilds.creator.statusMessage = msg1 !== null
-                            //     ? msg1
-                            //     : undefined;
-                            newEvent.guilds.creator.scoreboardMessage = msg2 !== null
-                                ? msg2
-                                : undefined;
-                        } else if (newEvent.guilds.others !== undefined) {
-                            // newEvent.guilds.others[idx - 1].statusMessage = msg1 !== null
-                            //     ? msg1
-                            //     : undefined;
-                            newEvent.guilds.others[idx - 1].scoreboardMessage = msg2 !== null
-                                ? msg2
-                                : undefined;
-                        }
-
-                        // save event
-                        const savedEvent: Event.Object = await Db.upsertEvent(
-                            newEvent
-                        );
-                        didStartEvent$.next(savedEvent);
-                    };
-                    return refreshMessagesPromise();
-                }
-            );
-            return forkJoin(promises);
-        }
-    ),
-).subscribe();
-
-/**
- * Startup and initialization
- */
-const init = async (): Promise<void> => {
-    await gClient.login(privateKey);
-
-    // register command listener
-    commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
-    commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
-    commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
-    commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
-    commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
-    commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
-    commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);
-    commandReceived$(Command.ALL.EVENTS_ADD_SCORE).subscribe(eventsAddScore);
-    commandReceived$(Command.ALL.EVENTS_LIST_ACTIVE).subscribe(eventsListActive);
-    commandReceived$(Command.ALL.EVENTS_LIST_ALL).subscribe(eventsListAll);
-    commandReceived$(Command.ALL.EVENTS_LIST_PARTICIPANTS).subscribe(eventsListParticipants);
-    commandReceived$(Command.ALL.EVENTS_AMISIGNEDUP).subscribe(eventsAmISignedUp);
-    commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
-    commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
-    commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
-    commandReceived$(Command.ALL.HELP).subscribe(help);
-    Utils.logger.info('Command listeners running');
-
-    // When we receive a message
-    MessageWrapper.sentMessages$.subscribe(
-        (response: MessageWrapper.Response): void => {
-            Utils.logger.trace(`Message with tag ${response.tag} sent.`);
-        },
-        (err: Error): void => {
-            Utils.logger.error(`Message sending error: ${err.message}`);
-        },
-        (): void => {
-            Utils.logger.trace('Finished sending messages.');
-        }
-    );
-
-    didStartEvent$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} did start.`);
-        }
-    );
-
-    willEndEvent$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} will end.`);
-            if (event.id === -1) {
-                Utils.logger.error('event id is undefined');
-                return;
-            }
-
-            // release timers
-            endTimers[event.id] = undefined;
-
-            // if this event is competitive
-            // we need to unset these update timers
-            const updateTimer:
-            NodeJS.Timeout | undefined = updateTimers[event.id];
-            if (updateTimer !== undefined) {
-                clearInterval(updateTimer);
-                updateTimers[event.id] = undefined;
-            }
-
-            // one last update to scoreboard
-            if (!Event.isEventCasual(event)
-                && !Event.isEventCustom(event)) {
-                Utils.logger.trace('Event is auto tracking score');
-                willUpdateScores$.next(event);
-            }
-            didEndEvent$.next(event);
-        }
-    );
-
-    didEndEvent$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} did end.`);
-        }
-    );
-
-    willUpdateScores$.subscribe(
-        async (event: Event.Object): Promise<void> => {
-            Utils.logger.debug(`Event ${event.id} scores will update.`);
             const flattenedParticipants: Event.Participant[] = event.teams.flatMap(
                 (team: Event.Team): Event.Participant[] => team.participants
             );
@@ -757,7 +749,7 @@ const init = async (): Promise<void> => {
                 (account: Event.Account):
                 Observable<hiscores.Player | null> => Network.hiscoresFetch$(
                     account.rsn,
-                    false,
+                    forced,
                 )
             );
 
@@ -769,195 +761,218 @@ const init = async (): Promise<void> => {
 
             // un-flatmap
             let idx = 0;
-            forkJoin(observables).subscribe(
-                async (results: hiscores.Player[]):
-                Promise<void> => {
-                    // prepare a new event
-                    const newEvent: Event.Object = { ...event, };
+            const inner: Observable<Event.Object> = forkJoin(observables).pipe(
+                concatMap(
+                    (results: hiscores.Player[]):
+                    Observable<Event.Object> => {
+                        // prepare a new event
+                        const newEvent: Event.Object = { ...event, };
 
-                    // cascade remake of teams
-                    const newTeams: Event.Team[] = newEvent.teams.map(
-                        (team: Event.Team): Event.Team => {
-                            const newTeam: Event.Team = { ...team, };
-                            const newParticipants:
-                            Event.Participant[] = newTeam.participants.map(
-                                (participant: Event.Participant):
-                                Event.Participant => {
-                                    const newParticipant: Event.Participant = { ...participant, };
-                                    const newAccounts:
-                                    Event.CompetitiveAccount[] = newParticipant
-                                        .runescapeAccounts.map(
-                                            (account: Event.CompetitiveAccount):
-                                            Event.CompetitiveAccount => {
-                                                const newAccount = { ...account, };
-                                                newAccount.ending = results[idx];
-                                                idx += 1;
-                                                return newAccount;
-                                            }
-                                        );
-                                    newParticipant.runescapeAccounts = newAccounts;
-                                    return newParticipant;
-                                }
-                            );
-                            newTeam.participants = newParticipants;
-                            return newTeam;
-                        }
-                    );
-                    newEvent.teams = newTeams;
-
-                    // combine all guild objects
-                    const eventGuilds: Event.Guild[] = newEvent.guilds.others !== undefined
-                        ? [
-                            newEvent.guilds.creator,
-                            ...newEvent.guilds.others,
-                        ]
-                        : [
-                            newEvent.guilds.creator,
-                        ];
-
-                    // update scoreboard promises
-                    const guildMessagesPromises:
-                    Promise<Event.ChannelMessage | null>[] = eventGuilds.map(
-                        async (eventGuild: Event.Guild):
-                        Promise<Event.ChannelMessage | null> => {
-                            // get guild
-                            const guild: discord.Guild | null = getGuildFromId(
-                                gClient,
-                                eventGuild.discordId,
-                            );
-
-                            if (guild === null) {
-                                Utils.logger.warn('Discord guild not available');
-                                return null;
+                        // cascade remake of teams
+                        const newTeams: Event.Team[] = newEvent.teams.map(
+                            (team: Event.Team): Event.Team => {
+                                const newTeam: Event.Team = { ...team, };
+                                const newParticipants:
+                                Event.Participant[] = newTeam.participants.map(
+                                    (participant: Event.Participant):
+                                    Event.Participant => {
+                                        const newParticipant:
+                                        Event.Participant = { ...participant, };
+                                        const newAccounts:
+                                        Event.CompetitiveAccount[] = newParticipant
+                                            .runescapeAccounts.map(
+                                                (account: Event.CompetitiveAccount):
+                                                Event.CompetitiveAccount => {
+                                                    const newAccount = { ...account, };
+                                                    newAccount.ending = results[idx];
+                                                    idx += 1;
+                                                    return newAccount;
+                                                }
+                                            );
+                                        newParticipant.runescapeAccounts = newAccounts;
+                                        return newParticipant;
+                                    }
+                                );
+                                newTeam.participants = newParticipants;
+                                return newTeam;
                             }
-
-                            const scoreboard:
-                            Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
-                                newEvent,
-                            );
-                            const state: 'ended' | 'running' = Utils.isInPast(
-                                newEvent.when.end
-                            ) ? 'ended' : 'running';
-                            const scoreboardStr: string = await Event.getEventScoreboardString(
-                                newEvent,
-                                guild.id,
-                                scoreboard,
-                                scoreboard,
-                                newEvent.tracking.category,
-                                'what',
-                                false,
-                                'regular',
-                            );
-
-                            return refreshMessage(
-                                gClient,
-                                guild,
-                                eventGuild.scoreboardMessage,
-                                `${scoreboardStr}`,
-                                {
-                                    code: true,
-                                }
-                            );
-                        }
-                    );
-                    const guildMessages:
-                    (Event.ChannelMessage | null)[] = await Promise.all(
-                        guildMessagesPromises
-                    );
-
-                    // first message belongs to the owner
-                    newEvent.guilds.creator.scoreboardMessage = guildMessages[0] !== null
-                        ? guildMessages[0]
-                        : undefined;
-
-                    // create others message array
-                    const othersMessages: (
-                        Event.ChannelMessage | null
-                    )[] = guildMessages.slice(1);
-
-                    // do the same thing for others as the creator guild
-                    othersMessages.forEach(
-                        (otherMessages: Event.ChannelMessage | null, idy: number): void => {
-                            if (newEvent.guilds.others !== undefined) {
-                                newEvent.guilds.others[idy]
-                                    .scoreboardMessage = otherMessages !== null
-                                        ? otherMessages[0]
-                                        : undefined;
-                            }
-                        }
-                    );
-
-                    // save event
-                    await Db.upsertEvent(newEvent);
-                    didUpdateScores$.next(newEvent);
-                }
+                        );
+                        newEvent.teams = newTeams;
+                        return saveAndNotifyUpdatedEventScoreboard(
+                            newEvent
+                        );
+                    }
+                ),
             );
+            return inner;
         }
-    );
+    ),
+).subscribe();
 
-    didUpdateScores$.subscribe(
-        async (event: Event.Object): Promise<void> => {
-            Utils.logger.debug(`Event ${event.id} scores did update.`);
+didStartEvent$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} did start.`);
+    }
+);
+
+willEndEvent$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} will end.`);
+        if (event.id === -1) {
+            Utils.logger.error('event id is undefined');
+            return;
         }
-    );
 
-    willAddEvent$.subscribe(
-        async (event: Event.Object): Promise<void> => {
-            Utils.logger.debug(`Event ${event.id} will be added.`);
-            // fix all the event chains
-            if (Utils.isInPast(event.when.start)) {
-                Utils.logger.info('Event started in the past');
-                willStartEvent$.next(event);
-            }
-            if (Utils.isInPast(event.when.end)) {
-                Utils.logger.info('Event ended in the past');
-                willEndEvent$.next(event);
-            } else {
-                scheduleEventsTimers();
-            }
-            didAddEvent$.next(event);
+        // release timer
+        endTimers[event.id] = undefined;
+
+        // one last update to scoreboard
+        if (!Event.isEventCasual(event)
+            && !Event.isEventCustom(event)) {
+            Utils.logger.trace('Event is auto tracking score');
+            willUpdateScores$.next([
+                event,
+                true,
+            ]);
         }
-    );
+        didEndEvent$.next(event);
+    }
+);
 
-    didAddEvent$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} has been added.`);
+didEndEvent$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} did end.`);
+    }
+);
+
+didUpdateScores$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} scores did update.`);
+    }
+);
+
+willAddEvent$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} will be added.`);
+        // fix all the event chains
+        if (Utils.isInPast(event.when.start)) {
+            Utils.logger.info('Event started in the past');
+            willStartEvent$.next(event);
         }
-    );
-
-    willSignUpPlayer$.subscribe(
-        async (event: Event.Object): Promise<void> => {
-            Utils.logger.debug(`Event ${event.id} will signup player.`);
-            const now: Date = new Date();
-            if (event.when.start <= now
-                && !Event.isEventCasual(event)
-                && !Event.isEventCustom(event)) {
-                // already started - update the scores
-                willUpdateScores$.next(event);
-            }
-
-            didSignupPlayer$.next(event);
+        if (Utils.isInPast(event.when.end)) {
+            Utils.logger.info('Event ended in the past');
+            willEndEvent$.next(event);
+        } else {
+            scheduleEvents();
         }
-    );
+        didAddEvent$.next(event);
+    }
+);
 
-    didSignupPlayer$.subscribe(
-        (event: Event.Object): void => {
-            Utils.logger.debug(`Event ${event.id} did signup player.`);
-        }
-    );
+didAddEvent$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} has been added.`);
+    }
+);
+
+willSignUpPlayer$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} will signup player.`);
+        // update the board
+        willUpdateScores$.next([
+            event,
+            false,
+        ]);
+        didSignupPlayer$.next(event);
+    }
+);
+
+didSignupPlayer$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} did signup player.`);
+    }
+);
+
+willUnsignupPlayer$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} will unsignup player.`);
+        // update the board
+        willUpdateScores$.next([
+            event,
+            false,
+        ]);
+        didUnsignupPlayer$.next(event);
+    }
+);
+
+didUnsignupPlayer$.subscribe(
+    (event: Event.Object): void => {
+        Utils.logger.debug(`Event ${event.id} did unsignup player`);
+    }
+);
+
+/**
+ * Startup and initialization
+ */
+const init = async (): Promise<void> => {
+    await gClient.login(privateKey);
+
+    // register command listener
+    commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
+    commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
+    commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
+    // commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
+    commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
+    commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
+    commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);
+    // commandReceived$(Command.ALL.EVENTS_ADD_SCORE).subscribe(eventsAddScore);
+    // commandReceived$(Command.ALL.EVENTS_LIST_ACTIVE).subscribe(eventsListActive);
+    commandReceived$(Command.ALL.EVENTS_LIST_ALL).subscribe(eventsListAll);
+    // commandReceived$(Command.ALL.EVENTS_LIST_PARTICIPANTS).subscribe(eventsListParticipants);
+    // commandReceived$(Command.ALL.EVENTS_AMISIGNEDUP).subscribe(eventsAmISignedUp);
+    commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
+    commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
+    // commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
+    // commandReceived$(Command.ALL.HELP).subscribe(help);
+    Utils.logger.info('Command listeners running');
 
     await Db.createTables();
     await resumeRunningEvents();
-    await scheduleEventsTimers();
+    await scheduleEvents();
 
-    // tick
+    // tick tock
     setInterval(
-        scheduleEventsTimers,
+        scheduleEvents,
         1000 * 60 * 60 * 24,
+    );
+
+    // updates
+    setInterval(
+        async (): Promise<void> => {
+            const runningEvents:
+            (Event.Object[] | null) = await Db.fetchAllCurrentlyRunningEvents();
+            if (runningEvents === null) {
+                return;
+            }
+            const filteredEvents: Event.Object[] = runningEvents.filter(
+                Utils.isDefinedFilter
+            );
+            const autoUpdateEvents: Event.Object[] = filteredEvents.filter(
+                (eventToFilter: Event.Object): boolean => !Event.isEventCasual(eventToFilter)
+                    && !Event.isEventCustom(eventToFilter)
+            );
+            autoUpdateEvents.forEach(
+                (autoEvent: Event.Object): void => {
+                    willUpdateScores$.next([
+                        autoEvent,
+                        false,
+                    ]);
+                }
+            );
+        }, 1000 * 60 * 6
     );
 };
 init();
-
 
 // TODO: work on bot events
 // work on when event ends

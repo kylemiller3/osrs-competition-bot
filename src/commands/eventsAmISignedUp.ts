@@ -44,8 +44,8 @@ class AmISignedUpConversation extends Conversation {
     //     this.state = CONVERSATION_STATE.Q1;
     // }
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<void> {
-        return Promise.resolve();
+    async init(): Promise<boolean> {
+        return Promise.resolve(false);
     }
 
     produceQ(): string | null {

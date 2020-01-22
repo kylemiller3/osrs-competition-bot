@@ -43,14 +43,14 @@ export namespace Db {
         capSQL: true,
         connect(client: pg.IClient): void {
             const cp = client.connectionParameters;
-            Utils.logger.debug('Connected to database:', cp.database);
+            Utils.logger.trace('Connected to database:', cp.database);
         },
         disconnect(client: pg.IClient): void {
             const cp = client.connectionParameters;
-            Utils.logger.debug('Disconnecting from database:', cp.database);
+            Utils.logger.trace('Disconnecting from database:', cp.database);
         },
         query(event: pgp.IEventContext): void {
-            Utils.logger.debug(event.query);
+            Utils.logger.trace(`${event.query.name}\n${event.query.text}`);
         },
         receive(data: unknown): void {
             Utils.logger.trace(JSON.stringify(data));
@@ -503,7 +503,9 @@ export namespace Db {
                 + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= current_timestamp `
                 + 'AND '
                 + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz > current_timestamp`
-            + ')',
+            + ')'
+            + 'ORDER BY '
+            + `${EVENTS_COL.ID} ASC`,
     });
     export const fetchAllCurrentlyRunningEvents = async (
         db: pgp.IDatabase<unknown> = Db.mainDb,

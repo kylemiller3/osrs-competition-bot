@@ -54,7 +54,7 @@ export abstract class Conversation {
     state: CONVERSATION_STATE;
     returnMessage: string;
     returnOptions: discord.MessageOptions | undefined;
-    params: Record<string, string | number | boolean>;
+    params: Record<string, string | number | boolean | undefined>;
 
     static parser = <U>(command: Command.ALL, paramName: string, answer: string):
     Record<string, U> => Command.parseParameters<Record<string, U>>(
@@ -64,9 +64,9 @@ export abstract class Conversation {
 
     constructor(
         opMessage: discord.Message,
-        params: Record<string, string | number | boolean> = Object(),
+        params: Record<string, string | number | boolean | undefined> = Object(),
     ) {
-        this.params = params as unknown as Record<string, string | number | boolean>;
+        this.params = params;
         this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
@@ -187,7 +187,7 @@ export abstract class Conversation {
         this.state = CONVERSATION_STATE.Q1;
     }
 
-    abstract async init(): Promise<void>;
+    abstract async init(): Promise<boolean>;
     abstract async consumeQa(qa: Qa): Promise<void>;
     abstract produceQ(): string | null;
 
@@ -237,24 +237,28 @@ export namespace ConversationManager {
     ): Promise<void> => {
         stopConversation(msg);
 
-        await newConversation.init();
-        const question = newConversation.produceQ();
-        if (question === null) {
-            return;
-        }
+        const shorthand: boolean = await newConversation.init();
+        if (!shorthand) {
+            const question = newConversation.produceQ();
+            if (question === null) {
+                return;
+            }
 
-        allConversations[msg.author.id] = newConversation;
-        const sendInfo: MessageWrapper.SendInfo = {
-            message: msg,
-            content: question,
-            options: {
-                reply: msg.author,
-            },
-            tag: newConversation.uuid,
-        };
-        MessageWrapper.sendMessages$.next(
-            sendInfo
-        );
+            allConversations[msg.author.id] = newConversation;
+            const sendInfo: MessageWrapper.SendInfo = {
+                message: msg,
+                content: question,
+                options: {
+                    reply: msg.author,
+                },
+                tag: newConversation.uuid,
+            };
+            MessageWrapper.sendMessages$.next(
+                sendInfo
+            );
+        } else {
+            newConversation.conversationDidEndSuccessfully();
+        }
     };
 }
 

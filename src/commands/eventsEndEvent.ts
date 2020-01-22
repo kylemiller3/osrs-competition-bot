@@ -6,12 +6,13 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
+import { willEndEvent$ } from '../main';
 
 class EventEndConversation extends Conversation {
     event: Event.Object;
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<void> {
-        return Promise.resolve();
+    async init(): Promise<boolean> {
+        return Promise.resolve(false);
     }
 
     produceQ(): string | null {
@@ -51,7 +52,9 @@ class EventEndConversation extends Conversation {
                     this.returnMessage = 'Did not end event.';
                 } else {
                     // end here
-                    // const obj = await Db.upsertEvent(this.params.event);
+                    this.event.when.end = new Date();
+                    const savedEvent: Event.Object = await Db.upsertEvent(this.event);
+                    willEndEvent$.next(savedEvent);
                     // Utils.logger.trace(`Ended event id ${obj.id}.`);
                     this.returnMessage = 'Event successfully ended.';
                 }
