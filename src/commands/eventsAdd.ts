@@ -319,7 +319,6 @@ class EventAddConversation extends Conversation {
                 const global: string = qa.answer.content;
                 this.params.global = Utils.isYes(global);
                 this.event = {
-                    id: -1,
                     name: this.params.name as string,
                     when: {
                         start: this.start as Date,

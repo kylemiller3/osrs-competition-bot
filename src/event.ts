@@ -2,6 +2,7 @@ import {
     hiscores,
 } from 'osrs-json-api';
 import { getTagFromDiscordId, gClient, getDisplayNameFromDiscordId, } from './main';
+import { Utils } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
@@ -197,7 +198,7 @@ export namespace Event {
      * @category Event
      */
     export interface Object {
-        id: number
+        id?: number
         name: string
         when: When
         guilds: CompetingGuilds
@@ -355,10 +356,12 @@ export namespace Event {
         let status: string;
         if (event.when.end >= new Date('9999-12-31')) {
             status = '';
-        } else if (event.when.end <= now) {
+        } else if (Utils.isInPast(event.when.end)) {
             status = '(ended)';
-        } else {
+        } else if (Utils.isInPast(event.when.start)) {
             status = `(${Number(((event.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
+        } else {
+            status = '(sign-ups)';
         }
         return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}`;
     };

@@ -48,10 +48,12 @@ class EventDeleteConversation extends Conversation {
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
-                if (!Utils.isYes(answer) || this.event.id === -1) {
+                if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Cancelled.';
                 } else {
-                    Db.deleteEvent(this.event.id);
+                    if (this.event.id !== undefined) {
+                        Db.deleteEvent(this.event.id);
+                    }
                     this.returnMessage = 'Event deleted.';
                 }
                 this.state = CONVERSATION_STATE.DONE;

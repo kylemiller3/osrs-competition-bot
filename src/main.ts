@@ -350,8 +350,8 @@ export const spoofMessage = (
         gClient
     );
 
-    Utils.logger.info('Injecting new spoofed message.');
-    Utils.logger.debug(newMessage);
+    Utils.logger.debug('Injecting new spoofed message.');
+    Utils.logger.trace(newMessage);
     messageInjector$.next(
         newMessage,
     );
@@ -636,7 +636,7 @@ const scheduleEvents = async (): Promise<void> => {
     // schedule timers if not exists
     events.forEach(
         (event: Event.Object): void => {
-            if (event.id === -1) {
+            if (event.id === undefined) {
                 Utils.logger.error('event id is undefined');
                 return;
             }
@@ -685,7 +685,9 @@ willStartEvent$.pipe(
 
             // release start timer
             // should already be expired
-            startTimers[event.id] = undefined;
+            if (event.id !== undefined) {
+                startTimers[event.id] = undefined;
+            }
 
             // if we have a competitive event
             // track scoreboard automatically
@@ -818,12 +820,11 @@ didStartEvent$.subscribe(
 willEndEvent$.subscribe(
     (event: Event.Object): void => {
         Utils.logger.debug(`Event ${event.id} will end.`);
-        if (event.id === -1) {
+        if (event.id === undefined) {
             Utils.logger.error('event id is undefined');
             return;
         }
 
-        // release timer
         endTimers[event.id] = undefined;
 
         // one last update to scoreboard
@@ -864,6 +865,11 @@ willAddEvent$.subscribe(
             willEndEvent$.next(event);
         } else {
             scheduleEvents();
+            // print the board
+            willUpdateScores$.next([
+                event,
+                false,
+            ]);
         }
         didAddEvent$.next(event);
     }

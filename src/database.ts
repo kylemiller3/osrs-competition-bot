@@ -274,7 +274,7 @@ export namespace Db {
         event: Event.Object,
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Object> => {
-        if (event.id === -1) {
+        if (event.id === undefined) {
             const ret: {id: number; event: Event.Object} = await db.one(
                 insertNewEventStmt,
                 JSON.stringify(event),

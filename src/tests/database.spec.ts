@@ -697,7 +697,6 @@ const accountA: Event.CompetitiveAccount = {
 };
 
 const insertEventA: Event.Object = {
-    id: -1,
     guilds: {
         creator: {
             discordId: 'testA',
@@ -717,7 +716,6 @@ const insertEventA: Event.Object = {
 };
 
 const insertEventB: Event.Object = {
-    id: -1,
     global: false,
     guilds: {
         creator: {
