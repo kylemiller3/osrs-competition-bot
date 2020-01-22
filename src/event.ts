@@ -2,7 +2,7 @@ import {
     hiscores,
 } from 'osrs-json-api';
 import { getTagFromDiscordId, gClient, getDisplayNameFromDiscordId, } from './main';
-import { Utils } from './utils';
+import { Utils, } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
@@ -113,21 +113,14 @@ export namespace Event {
     }
 
     /**
-     * Contract for a [[Participant]]'s RuneScape account
-     * @category Event
-     */
-    export interface Account {
-        rsn: string
-    }
-
-    /**
      * Extended contract of a [[Participant]]'s [[Account]]
      * for a competitive [[Event]]
      * @category Event
      */
-    export interface CompetitiveAccount extends Account {
-        starting: hiscores.Player
-        ending: hiscores.Player
+    export interface Account {
+        rsn: string
+        starting?: hiscores.Player
+        ending?: hiscores.Player
     }
 
     /**
@@ -338,17 +331,28 @@ export namespace Event {
                                     const whatStr = account.whatsScores.map(
                                         (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore.toLocaleString('en-us')}`
                                     ).join(`\n${tab}${tab}${tab}`);
-                                    return `${account.lhs}${tab}${account.accountScore.toLocaleString('en-us')}\n${tab}${tab}${tab}${whatStr}`;
+                                    if (account.accountScore !== 0) {
+                                        return `${account.lhs}${tab}${account.accountScore.toLocaleString('en-us')}\n${tab}${tab}${tab}${whatStr}`;
+                                    }
+                                    return `${account.lhs}\n${tab}${tab}${tab}${whatStr}`;
                                 }
                                 return account.lhs;
                             }
                         ).join(`\n${tab}${tab}`);
-                        const ret = `${tags[idx]}${tab}${participant.participantScore.toLocaleString('en-us')}\n${tab}${tab}${accountsStr}`;
+                        let ret: string;
+                        if (participant.participantScore !== 0) {
+                            ret = `${tags[idx]}${tab}${participant.participantScore.toLocaleString('en-us')}\n${tab}${tab}${accountsStr}`;
+                        } else {
+                            ret = `${tags[idx]}\n${tab}${tab}${accountsStr}`;
+                        }
                         idx += 1;
                         return ret;
                     }
                 ).join(`\n${tab}`);
-                return `${idi + 1}. Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
+                if (team.teamScore !== 0) {
+                    return `${idi + 1}. Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
+                }
+                return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}`;
             }
         ).join('\n');
 
@@ -382,35 +386,42 @@ export namespace Event {
                     (participant: Participant): ParticipantScoreboard => {
                         const accountsScores:
                         AccountScoreboard[] = participant.runescapeAccounts.map(
-                            (account: CompetitiveAccount): AccountScoreboard => {
+                            (account: Account): AccountScoreboard => {
                                 const whatsScores:
                                 WhatScoreboard[] | undefined = whatKeys === undefined
                                     ? undefined
                                     : whatKeys.map(
                                         (whatKey: string): WhatScoreboard => {
-                                            if (categoryKey === 'skills') {
+                                            if (account.ending !== undefined
+                                                && account.starting !== undefined) {
+                                                if (categoryKey === 'skills') {
+                                                    const ending = account
+                                                        .ending
+                                                        .skills[whatKey]
+                                                        .xp;
+                                                    const starting = account
+                                                        .starting
+                                                        .skills[whatKey]
+                                                        .xp;
+                                                    return {
+                                                        lhs: whatKey,
+                                                        whatScore: ending - starting,
+                                                    };
+                                                }
                                                 const ending = account
-                                                    .ending
-                                                    .skills[whatKey]
-                                                    .xp;
+                                                    .ending[categoryKey][whatKey]
+                                                    .score;
                                                 const starting = account
-                                                    .starting
-                                                    .skills[whatKey]
-                                                    .xp;
+                                                    .starting[categoryKey][whatKey]
+                                                    .score;
                                                 return {
                                                     lhs: whatKey,
                                                     whatScore: ending - starting,
                                                 };
                                             }
-                                            const ending = account
-                                                .ending[categoryKey][whatKey]
-                                                .score;
-                                            const starting = account
-                                                .starting[categoryKey][whatKey]
-                                                .score;
                                             return {
                                                 lhs: whatKey,
-                                                whatScore: ending - starting,
+                                                whatScore: 0,
                                             };
                                         }
                                     ).sort(

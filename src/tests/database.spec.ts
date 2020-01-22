@@ -8,7 +8,7 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 import { Settings, } from '../settings';
 
-const accountA: Event.CompetitiveAccount = {
+const accountA: Event.Account = {
     rsn: 'rsn1',
     starting: {
         bosses: {

@@ -781,10 +781,10 @@ willUpdateScores$.pipe(
                                         const newParticipant:
                                         Event.Participant = { ...participant, };
                                         const newAccounts:
-                                        Event.CompetitiveAccount[] = newParticipant
+                                        Event.Account[] = newParticipant
                                             .runescapeAccounts.map(
-                                                (account: Event.CompetitiveAccount):
-                                                Event.CompetitiveAccount => {
+                                                (account: Event.Account):
+                                                Event.Account => {
                                                     const newAccount = { ...account, };
                                                     newAccount.ending = results[idx];
                                                     if (newAccount.starting === undefined) {
