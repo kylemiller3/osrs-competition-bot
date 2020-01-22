@@ -100,9 +100,7 @@ class EventsSignupConversation extends Conversation {
                         runescapeAccounts: [
                             {
                                 rsn,
-                                starting: hiscore,
-                                ending: hiscore,
-                            } as Event.CompetitiveAccount,
+                            },
                         ],
                     },
                 ],
@@ -117,9 +115,7 @@ class EventsSignupConversation extends Conversation {
                 runescapeAccounts: [
                     {
                         rsn,
-                        starting: hiscore,
-                        ending: hiscore,
-                    } as Event.CompetitiveAccount,
+                    },
                 ],
             };
             event

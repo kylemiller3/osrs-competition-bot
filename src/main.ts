@@ -787,6 +787,9 @@ willUpdateScores$.pipe(
                                                 Event.CompetitiveAccount => {
                                                     const newAccount = { ...account, };
                                                     newAccount.ending = results[idx];
+                                                    if (newAccount.starting === undefined) {
+                                                        newAccount.starting = newAccount.ending;
+                                                    }
                                                     idx += 1;
                                                     return newAccount;
                                                 }
