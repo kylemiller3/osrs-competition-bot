@@ -3,7 +3,7 @@ import {
     Observable, of, Subject, forkJoin, from, concat,
 } from 'rxjs';
 import {
-    mergeMap, map, share, filter, combineAll, flatMap, concatMap,
+    mergeMap, map, share, filter, combineAll, flatMap, concatMap, catchError,
 } from 'rxjs/operators';
 import { rejects, } from 'assert';
 import { Network, } from './network';
@@ -45,7 +45,7 @@ export namespace MessageWrapper {
      * Contract of the messages that were received
      */
     export interface Response {
-        messages: (discord.Message | null)[]
+        messages: discord.Message[]
         tag: string
     }
 
@@ -57,15 +57,15 @@ export namespace MessageWrapper {
     export const sentMessages$ = sendMessages$.pipe(
         mergeMap(
             (sendInfo: SendInfo):
-            Observable<[string, (discord.Message | null)[]]> => {
+            Observable<[string, discord.Message[]]> => {
                 const input: SendInfo = { ...sendInfo, };
                 input.tag = input.tag
                     ? input.tag
                     : `${Math.random()}`;
                 const chunks: string[] = getMessageChunks(input.content);
-                const requests: Observable<(discord.Message | null)[]>[] = chunks.map(
+                const requests: Observable<discord.Message[]>[] = chunks.map(
                     (chunk: string, idx: number):
-                    Observable<(discord.Message | null)[]> => {
+                    Observable<discord.Message[]> => {
                         if (idx !== 0 && input.options !== undefined) {
                             input.options.reply = undefined;
                         }
@@ -74,33 +74,36 @@ export namespace MessageWrapper {
                             chunk,
                             input.options,
                         );
-                        return Network.genericNetworkFetch$<discord.Message | discord.Message[]>(
+                        const ret: Observable<(discord.Message)[]> = Network.genericNetworkFetch$<discord.Message | discord.Message[]>(
                             bound,
                         ).pipe(
                             map(
-                                (x: discord.Message | discord.Message[] | null):
-                                (discord.Message | null)[] => [
+                                (x: discord.Message | discord.Message[]):
+                                discord.Message[] => [
                                     x,
                                 ].flatMap(
-                                // @ts-ignore
-                                    (t: discord.Message | discord.Message[] | null):
-                                    (discord.Message | discord.Message[] | null) => t
+                                    (t: discord.Message | discord.Message[]):
+                                    (discord.Message | discord.Message[]) => t
                                 )
-                            )
+                            ),
+                            catchError(
+                                (): [] => []
+                            ),
                         );
+                        return ret;
                     }
                 );
 
-                const ret: Observable<(discord.Message | null)[]> = concat(
+                const ret: Observable<discord.Message[]> = concat(
                     requests
                 ).pipe(
                     combineAll(),
                     map(
-                        (results: (discord.Message | null)[][]):
-                        (discord.Message | null)[] => {
+                        (results: (discord.Message)[][]):
+                        (discord.Message)[] => {
                             const flattened = results.flatMap(
-                                (x: (discord.Message | null)[]):
-                                (discord.Message | null)[] => x
+                                (x: (discord.Message)[]):
+                                (discord.Message)[] => x
                             );
                             return flattened;
                         }
@@ -110,28 +113,9 @@ export namespace MessageWrapper {
                     of(input.tag),
                     ret,
                 );
-
-                // const requestPromise = requests
-                //     .map(
-                //         (obs: Observable<(discord.Message | null)[]>):
-                //         Promise<(discord.Message | null)[]> => obs.toPromise()
-                //     )
-                //     .reduce(async (promiseChain, currentTask):
-                //     Promise<(discord.Message | null)[]> => {
-                //         const arr = [
-                //             ...await promiseChain,
-                //             ...await currentTask,
-                //         ].flatMap((x): (discord.Message | null) => x);
-                //         return arr;
-                //     });
-
-                // return forkJoin(
-                //     of(input.tag),
-                //     from(requestPromise)
-                // );
             }
         ),
-        map((x: [string, (discord.Message | null)[]]): Response => ({
+        map((x: [string, discord.Message[]]): Response => ({
             tag: x[0],
             messages: x[1],
         })),
@@ -149,8 +133,12 @@ export namespace MessageWrapper {
                 const bound = input.message.delete.bind(
                     input.message,
                 );
-                const request = Network.genericNetworkFetch$<discord.Message>(
+                const request: Observable<discord.Message | null> = Network.genericNetworkFetch$<discord.Message>(
                     bound,
+                ).pipe(
+                    catchError(
+                        (): Observable<null> => of(null)
+                    ),
                 );
                 return forkJoin(
                     of(input.tag),
@@ -159,12 +147,21 @@ export namespace MessageWrapper {
             }
         ),
         map(
-            (response: [string, discord.Message | null]): Response => ({
-                messages: [
-                    response[1],
-                ].flatMap((x): (discord.Message | null) => x),
-                tag: response[0],
-            })
+            (response: [string, discord.Message | null]): Response => {
+                const msg: discord.Message | null = response[1];
+                if (msg === null) {
+                    return {
+                        messages: [],
+                        tag: response[0],
+                    };
+                }
+                return {
+                    messages: [
+                        msg,
+                    ],
+                    tag: response[0],
+                };
+            }
         ),
         share(),
     );
@@ -178,20 +175,6 @@ export namespace MessageWrapper {
                     ? input.tag
                     : `${Math.random()}`;
 
-                // editInfo.messages.map(
-                //     (message: discord.Message):
-                //     Observable<discord.Message | null> => {
-                //         const bound = input.message.edit.bind(
-                //             input.message,
-                //             input.newContent,
-                //             input.options,
-                //         );
-                //         const request: Observable<discord.Message | null> = Network.genericNetworkFetch$<discord.Message>(
-                //             bound,
-                //         );
-                //     }
-                // );
-
                 const bound = input.message.edit.bind(
                     input.message,
                     input.newContent,
@@ -199,6 +182,10 @@ export namespace MessageWrapper {
                 );
                 const request: Observable<discord.Message | null> = Network.genericNetworkFetch$<discord.Message>(
                     bound,
+                ).pipe(
+                    catchError(
+                        (): Observable<null> => of(null)
+                    ),
                 );
                 return forkJoin(
                     of(input.tag),
@@ -207,12 +194,21 @@ export namespace MessageWrapper {
             }
         ),
         map(
-            (response: [string, discord.Message | null]): Response => ({
-                messages: [
-                    response[1],
-                ].flatMap((x): (discord.Message | null) => x),
-                tag: response[0],
-            })
+            (response: [string, discord.Message | null]): Response => {
+                const msg: discord.Message | null = response[1];
+                if (msg === null) {
+                    return {
+                        messages: [],
+                        tag: response[0],
+                    };
+                }
+                return {
+                    messages: [
+                        msg,
+                    ],
+                    tag: response[0],
+                };
+            }
         ),
         share(),
     );

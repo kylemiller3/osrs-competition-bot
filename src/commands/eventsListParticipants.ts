@@ -48,8 +48,7 @@ class ListParticipantsConversation extends Conversation {
                                             participant.discordId
                                         ).catch(
                                             (error: Error): string => {
-                                                Utils.logger.error('Error fetching player');
-                                                Utils.logger.error(error.message);
+                                                Utils.logger.error(`${error} when fetching player`);
                                                 return participant.discordId;
                                             }
                                         )

@@ -278,9 +278,9 @@ export namespace Event {
         participantsScores: ParticipantScoreboard[]
     }
 
-
     export const getEventScoreboardString = async (
         event: Event.Object,
+        error: Error | undefined = undefined,
         guildId: string,
         currentScoreboard: TeamScoreboard[],
         lastScoreboard: TeamScoreboard[],
@@ -367,7 +367,19 @@ export namespace Event {
         } else {
             status = '(sign-ups)';
         }
-        return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}`;
+
+        // if (error !== undefined) {
+        //     const lastUpdatedStr: string = lastUpdateSuccess === null
+        //         ? 'Updated: never'
+        //         : `Updated: ${lastUpdateSuccess.toLocaleString('en-us')}`;
+        //     return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}\nError: ${error.message}\n${lastUpdatedStr}`;
+        // }
+        // lastUpdateSuccess = new Date();
+        // return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}\nUpdated: ${lastUpdateSuccess.toLocaleString('en-us')}`;
+        if (error !== undefined) {
+            return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}\n\n${error}`;
+        }
+        return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}\n\nUpdated: ${new Date().toLocaleString('en-us')}`;
     };
 
     export const getEventTeamsScoreboards = (

@@ -5,9 +5,10 @@ import {
     fromEvent, Observable, Subject, merge, forkJoin, of, from, concat, defer,
 } from 'rxjs';
 import {
-    filter, tap, mergeMap, concatMap, map, combineAll,
+    filter, tap, mergeMap, concatMap, map, combineAll, catchError,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
+import { async, } from 'rxjs/internal/scheduler/async';
 import privateKey from './auth';
 import { Command, } from './command';
 import { Utils, } from './utils';
@@ -33,7 +34,6 @@ import { Event, } from './event';
 import { Network, } from './network';
 import { Settings, } from './settings';
 import { ConversationManager, } from './conversation';
-import { async } from 'rxjs/internal/scheduler/async';
 
 /**
  * Global discord client
@@ -412,7 +412,7 @@ const deleteMessages = async (
             messageId,
         ).catch(
             (error: Error): null => {
-                Utils.logger.warn(`Error fetching messages: ${error.message}`);
+                Utils.logger.warn(`${error} during discord message fetch`);
                 return null;
             }
         )
@@ -519,6 +519,7 @@ const refreshMessage = async (
 
 const saveAndNotifyUpdatedEventScoreboard = (
     event: Event.Object,
+    lastError: Error | undefined,
 ): Observable<Event.Object> => {
     const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
         ? [
@@ -539,18 +540,21 @@ const saveAndNotifyUpdatedEventScoreboard = (
                 Utils.logger.warn('Discord guild not available');
                 return of(null);
             }
-            const scoreboard: Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(event);
+            const scoreboard: Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
+                event
+            );
             const deferredRefreshObservable: Observable<Event.ChannelMessage | null> = defer(
                 (): Observable<Event.ChannelMessage | null> => from(
                     Event.getEventScoreboardString(
                         event,
+                        lastError,
                         guild.id,
                         scoreboard,
                         scoreboard,
                         event.tracking.category,
                         'what',
                         false,
-                        'regular'
+                        'regular',
                     )
                 ).pipe(
                     mergeMap(
@@ -748,6 +752,7 @@ willUpdateScores$.pipe(
             if (Utils.isInFuture(event.when.start)) {
                 return saveAndNotifyUpdatedEventScoreboard(
                     event,
+                    undefined,
                 );
             }
 
@@ -814,10 +819,18 @@ willUpdateScores$.pipe(
                         );
                         newEvent.teams = newTeams;
                         return saveAndNotifyUpdatedEventScoreboard(
-                            newEvent
+                            newEvent,
+                            undefined,
                         );
                     }
                 ),
+            ).pipe(
+                catchError(
+                    (error: Error): Observable<Event.Object> => saveAndNotifyUpdatedEventScoreboard(
+                        event,
+                        error,
+                    )
+                )
             );
             return inner;
         }

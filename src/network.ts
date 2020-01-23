@@ -4,7 +4,7 @@ import {
 
 import { retryBackoff, } from 'backoff-rxjs';
 import {
-    timeout, catchError, publishReplay, refCount, tap,
+    timeout, catchError, publishReplay, refCount, tap, map,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { Utils, } from './utils';
@@ -38,23 +38,23 @@ export namespace Network {
     // };
 
     export const genericNetworkFetch$ = <T>(
-        bound: () => Promise<T | null>,
+        bound: () => Promise<T>,
         shouldRetry: (error: Error) => boolean = (): boolean => true
-    ): Observable<T | null> => {
-        const deferred: Observable<T | null> = defer(
-            (): Observable<T | null> => {
-                const ret: Observable<T | null> = from(
+    ): Observable<T> => {
+        const deferred: Observable<T> = defer(
+            (): Observable<T> => {
+                const ret: Observable<T> = from(
                     bound()
                 ).pipe(
                     retryBackoff({
                         initialInterval: 50,
                         maxInterval: 10000,
-                        maxRetries: 7,
+                        maxRetries: 5,
                         shouldRetry,
                     }),
-                    catchError((error: Error): Observable<null> => { // must catch to get values
+                    catchError((error: Error): Observable<T> => {
                         Utils.logger.error(error);
-                        return of(null);
+                        throw error;
                     }),
                 );
                 return ret;
@@ -114,28 +114,34 @@ export namespace Network {
                 undefined,
                 asciiRsn,
             );
+
+            const isInputError: (error: Error) => boolean = (
+                error: Error
+            ): boolean => error.message === 'Player not found! Check RSN or game mode.'
+                || error.message === 'RSN must be less or equal to 12 characters'
+                || error.message === 'RSN must be of type string';
             const obs = genericNetworkFetch$<hiscores.Player | null>(
                 bound,
                 (error: Error): boolean => {
-                    if (
-                        error.message.toLowerCase() === 'Player not found! Check RSN or game mode.'.toLowerCase()
-                        || error.message.toLowerCase() === 'RSN must be less or equal to 12 characters'.toLowerCase()
-                        || error.message.toLowerCase() === 'RSN must be of type string'.toLowerCase()
-                    ) {
+                    if (isInputError(error)) {
                         return false;
                     }
                     return true;
                 },
             ).pipe(
-                publishReplay(1),
-                refCount(),
                 catchError(
                     (error: Error): Observable<null> => {
-                        Utils.logger.error(`Networking error: ${error}`);
+                        if (isInputError(error)) {
+                            // consume this error
+                            // not a real networking error
+                            return of(null);
+                        }
                         hiscoreCache[asciiRsn] = undefined;
-                        return of(null);
+                        throw error;
                     }
                 ),
+                publishReplay(1),
+                refCount(),
             );
 
             hiscoreCache[asciiRsn] = {
@@ -154,5 +160,24 @@ export namespace Network {
             return obs;
         }
         return cachedRsn.observable;
+
+        // const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
+        // const bound = hiscores.getPlayer.bind(
+        //     undefined,
+        //     asciiRsn,
+        // );
+        // return genericNetworkFetch$<hiscores.Player>(
+        //     bound,
+        //     (error: Error): boolean => {
+        //         if (
+        //             error.message.toLowerCase() === 'Player not found! Check RSN or game mode.'.toLowerCase()
+        //             || error.message.toLowerCase() === 'RSN must be less or equal to 12 characters'.toLowerCase()
+        //             || error.message.toLowerCase() === 'RSN must be of type string'.toLowerCase()
+        //         ) {
+        //             return false;
+        //         }
+        //         return true;
+        //     },
+        // );
     };
 }

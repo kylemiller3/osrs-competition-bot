@@ -71,10 +71,16 @@ class EventsSignupConversation extends Conversation {
             return CONVERSATION_STATE.DONE;
         }
 
-        const hiscore: hiscores.Player | null = await Network.hiscoresFetch$(
-            rsn,
-            false
-        ).toPromise();
+        let hiscore: hiscores.Player | null = null;
+        try {
+            hiscore = await Network.hiscoresFetch$(
+                rsn,
+                false
+            ).toPromise();
+        } catch (_) {
+            this.returnMessage = 'Can\'t reach OSRS hiscores. Try again later.';
+            return CONVERSATION_STATE.DONE;
+        }
 
         if (hiscore === null) {
             return CONVERSATION_STATE.Q2E;
@@ -204,7 +210,7 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q2E:
-                return 'Cannot find Runescape name on hiscores.';
+                return 'Cannot find Runescape name on hiscores. Maybe the Runescape hiscores are down?';
             case CONVERSATION_STATE.Q3:
                 return 'Which team would you like to join?';
             case CONVERSATION_STATE.Q3E:
