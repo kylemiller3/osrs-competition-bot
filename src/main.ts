@@ -736,6 +736,8 @@ willStartEvent$.pipe(
     )
 ).subscribe();
 
+// will update scoreboard
+// and save updated event to db
 willUpdateScores$.pipe(
     concatMap(
         (obj: [Event.Object, boolean]): Observable<Event.Object> => {
@@ -758,7 +760,7 @@ willUpdateScores$.pipe(
                 Event.Account[] => participant.runescapeAccounts
             );
 
-            let observables: Observable<hiscores.Player | null>[] = flattenedAccounts.flatMap(
+            const observables: Observable<hiscores.Player | null>[] = flattenedAccounts.flatMap(
                 (account: Event.Account):
                 Observable<hiscores.Player | null> => Network.hiscoresFetch$(
                     account.rsn,
@@ -766,17 +768,11 @@ willUpdateScores$.pipe(
                 )
             );
 
-            if (observables.length === 0) {
-                observables = [
-                    of(null),
-                ];
-            }
-
             // un-flatmap
             let idx = 0;
             const inner: Observable<Event.Object> = forkJoin(observables).pipe(
                 concatMap(
-                    (results: hiscores.Player[]):
+                    (results: (hiscores.Player | null)[]):
                     Observable<Event.Object> => {
                         // prepare a new event
                         const newEvent: Event.Object = { ...event, };
@@ -797,9 +793,12 @@ willUpdateScores$.pipe(
                                                 (account: Event.Account):
                                                 Event.Account => {
                                                     const newAccount = { ...account, };
-                                                    newAccount.ending = results[idx];
-                                                    if (newAccount.starting === undefined) {
-                                                        newAccount.starting = newAccount.ending;
+                                                    const result: hiscores.Player | null = results[idx];
+                                                    if (result !== null) {
+                                                        newAccount.ending = result;
+                                                        if (newAccount.starting === undefined) {
+                                                            newAccount.starting = newAccount.ending;
+                                                        }
                                                     }
                                                     idx += 1;
                                                     return newAccount;
