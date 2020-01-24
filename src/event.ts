@@ -406,6 +406,31 @@ export namespace Event {
                                         (whatKey: string): WhatScoreboard => {
                                             if (account.ending !== undefined
                                                 && account.starting !== undefined) {
+                                                // case of a new boss or skill or something
+                                                // we may not have the starting defined
+                                                if (account.ending[categoryKey] !== undefined
+                                                    && account.ending[categoryKey][whatKey] !== undefined
+                                                    && (account.starting[categoryKey] === undefined
+                                                    || account.starting[categoryKey][whatKey] === undefined)
+                                                ) {
+                                                    if (categoryKey === 'skills') {
+                                                        const ending = account
+                                                            .ending
+                                                            .skills[whatKey]
+                                                            .xp;
+                                                        return {
+                                                            lhs: whatKey,
+                                                            whatScore: ending,
+                                                        };
+                                                    }
+                                                    const ending = account
+                                                        .ending[categoryKey][whatKey]
+                                                        .score;
+                                                    return {
+                                                        lhs: whatKey,
+                                                        whatScore: ending,
+                                                    };
+                                                }
                                                 if (categoryKey === 'skills') {
                                                     const ending = account
                                                         .ending
