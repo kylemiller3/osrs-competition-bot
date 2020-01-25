@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/out/main.js",
             "preLaunchTask": "npm: build",
             "runtimeExecutable": "~/.nvm/versions/node/v12.13.0/bin/node",
-            "runtimeArgs": ["-r", "esm"],
+            "runtimeArgs": ["-r", "esm", "-r", "ts-node/register"],
             "stopOnEntry": true,
             "console": "integratedTerminal",
         },
