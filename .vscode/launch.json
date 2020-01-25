@@ -10,7 +10,7 @@
             "request": "launch",
             "name": "Launch Program",
             "program": "${workspaceFolder}/out/main.js",
-            "preLaunchTask": "npm: build",
+            // "preLaunchTask": "npm: build",
             "runtimeExecutable": "~/.nvm/versions/node/v12.13.0/bin/node",
             "runtimeArgs": ["-r", "esm", "-r", "ts-node/register"],
             "stopOnEntry": true,
