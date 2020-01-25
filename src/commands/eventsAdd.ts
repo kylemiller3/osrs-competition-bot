@@ -26,21 +26,22 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q1E:
                 return 'Failed to name the event.\nExample: Runecrafting Event #1. Please try again.';
             case CONVERSATION_STATE.Q2: {
-                const thirtyMinsFromNow: Date = new Date();
-                thirtyMinsFromNow.setSeconds(0);
-                thirtyMinsFromNow.setMinutes(thirtyMinsFromNow.getMinutes() + 30);
-                return `Start it when?\nExample: ${thirtyMinsFromNow.toISOString()} (~30 minutes from now) OR 'now' for right now.`;
+                const twoDaysFromNow: Date = new Date();
+                twoDaysFromNow.setMilliseconds(0);
+                twoDaysFromNow.setSeconds(0);
+                twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
+                return `Start it when?\nExample: ${twoDaysFromNow.toISOString()} (2 days from now) OR 'now' for right now.`;
             }
             case CONVERSATION_STATE.Q2E:
                 return 'Failed to set date. Please try again.';
             case CONVERSATION_STATE.Q2C:
                 return `Starting date is set for ${this.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3: {
-                const twoDaysFromNow: Date = new Date();
-                twoDaysFromNow.setSeconds(0);
-                twoDaysFromNow.setMinutes(0);
-                twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
-                return `End it when?\nExample: ${twoDaysFromNow.toISOString} (~2 days from now) OR 'tbd' for long running event.`;
+                const oneWeekFromNow: Date = new Date();
+                oneWeekFromNow.setMilliseconds(0);
+                oneWeekFromNow.setSeconds(0);
+                oneWeekFromNow.setHours(oneWeekFromNow.getHours() + 24 * 7);
+                return `End it when?\nExample: ${oneWeekFromNow.toISOString()} (a week from now) OR 'tbd' for long running event.`;
             }
             case CONVERSATION_STATE.Q3E:
                 return 'Failed to set date. Maybe your event ends before it starts? Please try again.';
