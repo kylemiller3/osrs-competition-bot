@@ -61,13 +61,17 @@ class EventsSignupConversation extends Conversation {
             return CONVERSATION_STATE.DONE;
         }
 
-        let hiscore: hiscores.Player | null = null;
-        try {
-            hiscore = await Network.hiscoresFetch$(
-                rsn,
-                false
-            ).toPromise();
-        } catch (_) {
+        let success = true;
+        const hiscore: hiscores.Player | null = await Network.hiscoresFetch$(
+            rsn,
+            false
+        ).toPromise().catch(
+            (): null => {
+                success = false;
+                return null;
+            }
+        );
+        if (!success) {
             this.returnMessage = 'Can\'t reach OSRS hiscores. Try again later.';
             return CONVERSATION_STATE.DONE;
         }
@@ -286,53 +290,6 @@ const eventsSignup = (
         msg,
         eventsSignupConversation
     );
-
-    /*
-    let errors: string[] = [];
-    if (params.id === undefined) {
-        errors = [
-            ...errors,
-            Error.NO_EVENT_SPECIFIED,
-        ];
-    }
-
-    const event: Event.Event = {} as Event.Event;
-    // grab stats?
-    if (event === undefined) {
-        msg.reply(Error.EVENT_NOT_FOUND);
-        return;
-    }
-
-    if (params.rsn === undefined
-        && (!Event.isEventCasual(event) && !Event.isEventCustom(event))) {
-        errors = [
-            ...errors,
-            Error.NO_RSN_SPECIFIED,
-        ];
-    }
-
-    if (params.team === undefined && Event.isTeamEvent(event)) {
-        errors = [
-            ...errors,
-            Error.NO_TEAM_SPECIFIED,
-        ];
-    }
-
-    if (errors.length > 0) {
-        Utils.logger.info(
-            errors.join(' ')
-        );
-        return;
-    }
-
-    if (!event.state.hasEnded) {
-        if (Event.isEventCasual(event) || Event.isEventCustom(event)) {
-            // mutate participants
-        } else {
-            // grab stats
-        }
-    }
-    */
 };
 
 export default eventsSignup;

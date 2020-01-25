@@ -662,15 +662,13 @@ export namespace Command {
             const commandParamStr: string = commandStr.concat(
                 Object.keys(cDescription.params).map(
                     (paramName: string):
-                    string => {
-                        // if (cDescription.params) {
-                        //     // if (cDescription.params[paramName].required) {
-                        //         return `${paramName}=(${cDescription.params[paramName].usage})`;
-                        //     // }
-                        //     // return `${paramName}?=(${cDescription.params[paramName].usage})`;
-                        // }
-                        return '';
-                    }
+                    string => ''
+                    // if (cDescription.params) {
+                    //     // if (cDescription.params[paramName].required) {
+                    //         return `${paramName}=(${cDescription.params[paramName].usage})`;
+                    //     // }
+                    //     // return `${paramName}?=(${cDescription.params[paramName].usage})`;
+                    // }
                 ).join(' ')
             );
             return commandParamStr;

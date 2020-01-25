@@ -128,47 +128,46 @@ export namespace Db {
     ): Promise<unknown> => db.tx(
         async (task: pgp.ITask<unknown>):
         Promise<void> => {
-            try {
-                //---------------
-                // Settings table
-                //---------------
-                task.none({
-                    text: 'CREATE TABLE IF NOT EXISTS '
+            //---------------
+            // Settings table
+            //---------------
+            task.none({
+                text: 'CREATE TABLE IF NOT EXISTS '
                 + `${TABLES.SETTINGS}`
                 + '('
                     + `${SETTINGS_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
                     + `${SETTINGS_COL.CHANNEL_ID} TEXT NOT NULL`
                 + ')',
-                });
+            });
 
-                //------------
-                // Event table
-                //------------
-                task.none({
-                    text: 'CREATE OR REPLACE FUNCTION '
+            //------------
+            // Event table
+            //------------
+            task.none({
+                text: 'CREATE OR REPLACE FUNCTION '
                 + 'f_cast_isots(text) '
                 + 'RETURNS timestamptz AS '
                 + '$$SELECT to_timestamp($1, \'YYYY-MM-DDTHH24:MI\')$$ '
                 + 'LANGUAGE sql IMMUTABLE',
-                });
-                task.none({
-                    text: 'CREATE TABLE IF NOT EXISTS '
+            });
+            task.none({
+                text: 'CREATE TABLE IF NOT EXISTS '
                         + `${TABLES.EVENTS}`
                         + '('
                             + `${EVENTS_COL.ID} SERIAL PRIMARY KEY, `
                             + `${EVENTS_COL.EVENT} JSONB NOT NULL `
                         + ')',
-                });
-                task.none({
-                    text: 'CREATE INDEX idx_name ON '
+            });
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_name ON '
                         + `${TABLES.EVENTS}`
                         + '('
                             + `(${EVENTS_COL.EVENT}->>'name')`
                         + ')',
 
-                });
-                task.none({
-                    text: 'CREATE INDEX idx_start ON '
+            });
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_start ON '
                         + `${TABLES.EVENTS}`
                         + '('
                             + 'f_cast_isots'
@@ -176,9 +175,9 @@ export namespace Db {
                                 + `(${EVENTS_COL.EVENT}->'when'->>'start')`
                             + ')'
                         + ')',
-                });
-                task.none({
-                    text: 'CREATE INDEX idx_end ON '
+            });
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_end ON '
                         + `${TABLES.EVENTS}`
                         + '('
                             + 'f_cast_isots'
@@ -186,42 +185,48 @@ export namespace Db {
                                 + `(${EVENTS_COL.EVENT}->'when'->>'end')`
                             + ')'
                         + ')',
-                });
-                task.none({
-                    text: 'CREATE INDEX idx_creator_guild_id ON '
+            });
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_creator_guild_id ON '
                         + `${TABLES.EVENTS}`
                         + '('
                             + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId')`
                         + ')',
-                });
-                task.none({
-                    text: 'CREATE INDEX idx_other_guilds ON '
+            });
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_other_guilds ON '
                         + `${TABLES.EVENTS} `
                         + 'USING gin '
                         + '('
                             + `(${EVENTS_COL.EVENT}->'guilds'->'others')`
                             + ' jsonb_path_ops'
                         + ')',
-                });
-                task.none({
-                    text: 'CREATE INDEX idx_participants ON '
+            });
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_participants ON '
                         + `${TABLES.EVENTS} `
                         + 'USING gin '
                         + '('
                             + `(${EVENTS_COL.EVENT}->'teams'->'participants')`
                             + ' jsonb_path_ops'
                         + ')',
-                });
-                task.none({
-                    text: 'ALTER TABLE '
+            });
+            task.none({
+                text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS name_is_defined`,
+            });
+            task.none({
+                text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT name_is_defined CHECK '
                     + '('
                         + `(${EVENTS_COL.EVENT} ? 'name' AND NOT ${EVENTS_COL.EVENT}->>'name' IS NULL)`
                     + ')',
-                });
-                task.none({
-                    text: 'ALTER TABLE '
+            });
+            task.none({
+                text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS valid_dates`,
+            });
+            task.none({
+                text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT valid_dates CHECK '
                     + '('
@@ -235,27 +240,30 @@ export namespace Db {
                             + `${EVENTS_COL.EVENT}->'when' ? 'end' AND NOT ${EVENTS_COL.EVENT}->'when'->>'end' IS NULL`
                         + ')'
                     + ')',
-                });
-                task.none({
-                    text: 'ALTER TABLE '
+            });
+            task.none({
+                text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS creator_guild_id_is_defined`,
+            });
+            task.none({
+                text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
                     + '('
                         + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'discordId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' IS NULL`
                     + ')',
-                });
-                task.none({
-                    text: 'ALTER TABLE '
+            });
+            task.none({
+                text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS teams_have_participant`,
+            });
+            task.none({
+                text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT teams_have_participant CHECK '
                     + '('
                         + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? ((@.teams.type() == "array" && @.teams.size() == 0) || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
                     + ')',
-                });
+            });
             // TODO: add constraint that checks for unique rsn?
-            } catch (error) {
-                Utils.logger.error(`${error} while creating database tables.`);
-            }
         }
     );
 
@@ -459,48 +467,6 @@ export namespace Db {
         if (ret === null) return null;
         return eventRowToEvent(ret);
     };
-
-    // const fetchGuildIdAdjustedEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
-    //     name: 'fetch owned event id adjusted',
-    //     text: 'SELECT '
-    //         + `${EVENTS_COL.ID}, `
-    //         + `${EVENTS_COL.EVENT}, `
-    //         + 'row_number() '
-    //         + 'OVER '
-    //         + '('
-    //             + 'ORDER BY '
-    //             + `${EVENTS_COL.ID} `
-    //             + 'DESC'
-    //         + ') '
-    //         + 'AS relativeRowNumber '
-    //         + 'FROM '
-    //         + '('
-    //             + 'SELECT '
-    //             + `${EVENTS_COL.ID}, `
-    //             + `${EVENTS_COL.EVENT} `
-    //             + 'FROM '
-    //             + `${TABLES.EVENTS} `
-    //             + 'WHERE '
-    //             + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
-    //             + 'OR '
-    //             + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`
-    //             + 'ORDER BY '
-    //             + `${EVENTS_COL.ID} DESC`
-    //         + ') '
-    //         + 'WHERE '
-    //         + 'relativeRowNumber = $2::bigint',
-    // });
-    // export const fetchGuildIdAdjustedEvent = (
-    //     db: pgp.IDatabase<unknown>,
-    //     guildId: string,
-    //     relativeRowNumber: number,
-    // ): Promise<Event.Event | null> => db.oneOrNone(
-    //     fetchGuildIdAdjustedEventStmt,
-    //     [
-    //         guildId,
-    //         relativeRowNumber,
-    //     ],
-    // );
 
     const fetchAllOfAParticipantsEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch a participant\'s events',

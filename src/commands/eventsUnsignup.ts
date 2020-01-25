@@ -145,11 +145,6 @@ void => {
         msg,
         eventDeleteConversation
     );
-
-    // if (params.id === undefined) {
-    //     msg.reply(ERROR.NO_EVENT_SPECIFIED);
-    //     return;
-    // }
 };
 
 export default eventsUnsignup;

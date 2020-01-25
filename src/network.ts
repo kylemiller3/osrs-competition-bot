@@ -160,24 +160,5 @@ export namespace Network {
             return obs;
         }
         return cachedRsn.observable;
-
-        // const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
-        // const bound = hiscores.getPlayer.bind(
-        //     undefined,
-        //     asciiRsn,
-        // );
-        // return genericNetworkFetch$<hiscores.Player>(
-        //     bound,
-        //     (error: Error): boolean => {
-        //         if (
-        //             error.message.toLowerCase() === 'Player not found! Check RSN or game mode.'.toLowerCase()
-        //             || error.message.toLowerCase() === 'RSN must be less or equal to 12 characters'.toLowerCase()
-        //             || error.message.toLowerCase() === 'RSN must be of type string'.toLowerCase()
-        //         ) {
-        //             return false;
-        //         }
-        //         return true;
-        //     },
-        // );
     };
 }

@@ -1021,9 +1021,4 @@ const init = async (): Promise<void> => {
 };
 init();
 
-// TODO: work on bot events
-// work on when event ends
-// when unsigned up
-// you can currently delete events cross guilds - fix this
-// signup edit unsignup delete - any modification of events should not be cross guild
-// contain these functions
+// TODO:

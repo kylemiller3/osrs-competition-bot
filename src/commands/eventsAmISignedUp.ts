@@ -22,27 +22,6 @@ class AmISignedUpConversation extends Conversation {
         return signedUp;
     }
 
-    // async initAndParseParams(): Promise<void> {
-    //     // parsed parameters
-
-    //     // is this code valid anymore?
-    //     // if (this.params.id !== undefined && this.params.id !== null) {
-    //     //     this.state = CONVERSATION_STATE.DONE;
-    //     //     const foundEvent: Event.Object | undefined = this.events.find(
-    //     //         (event: Event.Object):
-    //     //         boolean => event.id === this.params.id
-    //     //     );
-    //     //     if (foundEvent === undefined) {
-    //     //         this.returnMessage = 'Could not find event. Hint: find the event id with the list events command.';
-    //     //     } else {
-    //     //         this.returnMessage = `You are ${AmISignedUpConversation.isSignedUp(foundEvent, this.opMessage.author.id) ? '' : 'not '}signed up.`;
-    //     //     }
-    //     //     this.conversationDidEnd();
-    //     // } else {
-    //     //     this.state = CONVERSATION_STATE.Q1;
-    //     // }
-    //     this.state = CONVERSATION_STATE.Q1;
-    // }
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
         return Promise.resolve(false);

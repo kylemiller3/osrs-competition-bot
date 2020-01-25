@@ -84,18 +84,6 @@ const eventsDelete = (
         msg,
         eventDeleteConversation
     );
-
-    // const params: Command.EventsDelete = Command.parseParameters(
-    //     Command.ALL.EVENTS_DELETE,
-    //     msg.content,
-    // );
-
-    // if (params.id === undefined) {
-    //     msg.reply(ERROR.NO_EVENT_SPECIFIED);
-    //     return;
-    // }
-
-    // msg.reply(`event ${params.id} deleted.`);
 };
 
 export default eventsDelete;
