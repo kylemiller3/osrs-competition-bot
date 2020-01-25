@@ -21,7 +21,7 @@ class EventEditConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Edit which event id?';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
+                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.Q2:
                 return 'Would you like to edit the name?';
             case CONVERSATION_STATE.Q2O:
