@@ -9,7 +9,7 @@ import {
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { async, } from 'rxjs/internal/scheduler/async';
-import privateKey from './auth';
+import { privateKey, } from './auth';
 import { Command, } from './command';
 import { Utils, } from './utils';
 import adminSetChannel from './commands/adminSetChannel';
