@@ -92,7 +92,7 @@ export namespace Command {
     const eventsAdd: Description = {
         description: 'Schedules a new event.',
         accessControl: onlyAdmin,
-        command: '.events add',
+        command: '.add',
         params: {
             name: {
                 description: 'The event\'s name.',
@@ -116,7 +116,7 @@ export namespace Command {
             },
             type: {
                 description: 'The type of event to schedule.',
-                usage: '(comma seperated lists) skills AND skill1 skill2... OR bh OR lms OR clues AND difficulty1 difficulty2... OR custom OR bosses AND boss list...',
+                usage: '(comma separated lists) skills AND skill1 skill2... OR bh OR lms OR clues AND difficulty1 difficulty2... OR custom OR bosses AND boss list...',
                 expectedType: ParamType.STRING,
                 required: false,
                 default: 'casual',
@@ -138,7 +138,7 @@ export namespace Command {
     const eventsListAll: Description = {
         description: 'Lists all events.',
         accessControl: anyUser,
-        command: '.events listall',
+        command: '.listall',
     };
 
     /**
@@ -148,7 +148,7 @@ export namespace Command {
     const eventsListActive: Description = {
         description: 'Lists active events.',
         accessControl: anyUser,
-        command: '.events listactive',
+        command: '.listactive',
     };
 
     /**
@@ -166,7 +166,7 @@ export namespace Command {
     const eventsDelete: Description = {
         description: 'Deletes an event with id.',
         accessControl: onlyAdmin,
-        command: '.events delete',
+        command: '.delete',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -195,7 +195,7 @@ export namespace Command {
     const eventsEdit: Description = {
         description: 'Edits an event with name.',
         accessControl: onlyAdmin,
-        command: '.events edit',
+        command: '.edit',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -242,7 +242,7 @@ export namespace Command {
     const eventsEndEvent: Description = {
         description: 'Ends an event immediately.',
         accessControl: onlyAdmin,
-        command: '.events end',
+        command: '.end',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -260,7 +260,7 @@ export namespace Command {
     const eventsForceSignup: Description = {
         description: 'Forces a user to sign up for an event.',
         accessControl: onlyAdmin,
-        command: '.events forcesignup',
+        command: '.forcesignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -298,7 +298,7 @@ export namespace Command {
     const eventsForceUnsignup: Description = {
         description: 'Forces a user to un-sign up for an event.',
         accessControl: onlyAdmin,
-        command: '.events forceunsignup',
+        command: '.forceunsignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -333,7 +333,7 @@ export namespace Command {
     const eventsAddScore: Description = {
         description: 'Adds to a user\'s score.',
         accessControl: onlyAdmin,
-        command: '.events updatescore',
+        command: '.updatescore',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -373,7 +373,7 @@ export namespace Command {
     const eventsSignup: Description = {
         description: 'Signs up a user for an event.',
         accessControl: anyUser,
-        command: '.events signup',
+        command: '.signup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -412,7 +412,7 @@ export namespace Command {
     const eventsUnsignup: Description = {
         description: 'Un-signs up a user for an event.',
         accessControl: anyUser,
-        command: '.events unsignup',
+        command: '.unsignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -438,7 +438,7 @@ export namespace Command {
     const eventsListParticipants: Description = {
         description: 'Lists all users signed up for an event.',
         accessControl: anyUser,
-        command: '.events listparticipants',
+        command: '.listparticipants',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -464,7 +464,7 @@ export namespace Command {
     const eventsAmISignedUp: Description = {
         description: 'Tells you if you are signed up for an event.',
         accessControl: anyUser,
-        command: '.events amisignedup',
+        command: '.amisignedup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -482,7 +482,7 @@ export namespace Command {
     const usersStats: Description = {
         description: 'Prints stats for a user or self if no mention.',
         accessControl: anyUser,
-        command: '.users stats',
+        command: '.stats',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -508,7 +508,7 @@ export namespace Command {
     const forceUpdate: Description = {
         description: 'Forces an update for an event.',
         accessControl: onlyAdmin,
-        command: '.events forceupdate',
+        command: '.forceupdate',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -534,7 +534,7 @@ export namespace Command {
     const adminSetChannel: Description = {
         description: 'Sets the announcements channel to the first channel mentioned.',
         accessControl: onlyAdmin,
-        command: '.admin setchannel',
+        command: '.setchannel',
         params: {
             channel: {
                 description: 'Mention of the channel to use.',
@@ -663,12 +663,12 @@ export namespace Command {
                 Object.keys(cDescription.params).map(
                     (paramName: string):
                     string => {
-                        if (cDescription.params) {
-                            if (cDescription.params[paramName].required) {
-                                return `${paramName}=(${cDescription.params[paramName].usage})`;
-                            }
-                            return `${paramName}?=(${cDescription.params[paramName].usage})`;
-                        }
+                        // if (cDescription.params) {
+                        //     // if (cDescription.params[paramName].required) {
+                        //         return `${paramName}=(${cDescription.params[paramName].usage})`;
+                        //     // }
+                        //     // return `${paramName}?=(${cDescription.params[paramName].usage})`;
+                        // }
                         return '';
                     }
                 ).join(' ')
@@ -704,18 +704,20 @@ export namespace Command {
                 ? Object.keys(cDescription.params)
                 : undefined;
             if (paramNames === undefined) {
-                return `${cDescription.command}\n\tDescription: ${cDescription.description}\n\tParams: No parameters\n\t${cDescription.accessControl.description}\n`;
+                // return `${cDescription.command}\n\tDescription: ${cDescription.description}\n\tParams: None\n\t${cDescription.accessControl.description}\n`;
+                return `${cDescription.command}\n\t${cDescription.description}\n\tNo Parameters\n`;
             }
             const paramStr: string = paramNames.map(
                 (name: string):
                 string => {
                     if (cDescription.params) {
-                        return `\t\t${name}: ${cDescription.params[name].description} Expects: ${cDescription.params[name].expectedType}. Required: ${cDescription.params[name].required}. Default: ${cDescription.params[name].default}.`;
+                        // return `\t\t${name}: ${cDescription.params[name].description} Expects: ${cDescription.params[name].expectedType}. Required: ${cDescription.params[name].required}. Default: ${cDescription.params[name].default}.`;
+                        return `\t\t${name}: ${cDescription.params[name].description}`;
                     }
                     return '';
                 }
             ).join('\n');
-            return `${cDescription.command}\n\tDescription: ${cDescription.description}\n\tParams:\n${paramStr}\n\t${generateCommandUsageString(key as unknown as ALL)}`;
+            return `${cDescription.command}\n\t${cDescription.description}\n${paramStr}\n\t${generateCommandUsageString(key as unknown as ALL)}\n`;
         };
 
         const helpStr: string = filteredKeys.map(
