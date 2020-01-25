@@ -5,6 +5,7 @@ import { async, } from 'rxjs/internal/scheduler/async';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
+import { dbPassword } from './auth';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -111,7 +112,7 @@ export namespace Db {
         port: 5432,
         database: 'osrs-competition-bot',
         user: 'postgres',
-        password: '123',
+        password: dbPassword,
     });
 
     export const testDb = pgp(initOptions)({
@@ -119,7 +120,7 @@ export namespace Db {
         port: 5432,
         database: 'osrs-competition-bot-test',
         user: 'postgres',
-        password: '123',
+        password: dbPassword,
     });
 
     export const createTables = (
