@@ -19,7 +19,10 @@ class EventDeleteConversation extends Conversation {
         if (Number.isNaN(id)) {
             return CONVERSATION_STATE.Q1E;
         }
-        const event: Event.Object | null = await Db.fetchEvent(id);
+        const event: Event.Object | null = await Db.fetchGuildEvent(
+            id,
+            this.opMessage.guild.id,
+        );
         let access = false;
         if (event !== null) {
             const standard: boolean = event.guilds.creator.discordId
@@ -93,7 +96,7 @@ class EventDeleteConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Remove yourself from which event id?';
+                return 'Remove yourself from which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
                 return 'Not found. Hint: try the \'!f events listall\' command. Please try again.';
             case CONVERSATION_STATE.CONFIRM:

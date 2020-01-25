@@ -1,6 +1,7 @@
 import pgp, { PreparedStatement, } from 'pg-promise';
 // eslint-disable-next-line import/no-unresolved
 import pg from 'pg-promise/typescript/pg-subset';
+import { async, } from 'rxjs/internal/scheduler/async';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
@@ -368,6 +369,34 @@ export namespace Db {
         return ret.map(eventRowToEvent);
     };
 
+    const fetchCreatorEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch event',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + `${EVENTS_COL.ID} = $1::bigint `
+            + 'AND '
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $2::text`,
+    });
+    export const fetchCreatorEvent = async (
+        id: number,
+        guildId: string,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object | null> => {
+        const ret: EventRow | null = await db.oneOrNone(
+            fetchCreatorEventStmt,
+            [
+                id,
+                guildId,
+            ]
+        );
+        if (ret === null) return null;
+        return eventRowToEvent(ret);
+    };
+
     const fetchAllGuildEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch all guild events',
         text: 'SELECT '
@@ -392,6 +421,38 @@ export namespace Db {
         );
         if (ret === null) return null;
         return ret.map(eventRowToEvent);
+    };
+
+    const fetchGuildEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+        name: 'fetch event',
+        text: 'SELECT '
+            + `${EVENTS_COL.ID}, `
+            + `${EVENTS_COL.EVENT} `
+            + 'FROM '
+            + `${TABLES.EVENTS} `
+            + 'WHERE '
+            + `${EVENTS_COL.ID} = $1::bigint `
+            + 'AND'
+            + '('
+                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $2::text)) `
+                + 'OR '
+                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $2::text`
+            + ')',
+    });
+    export const fetchGuildEvent = async (
+        id: number,
+        guildId: string,
+        db: pgp.IDatabase<unknown> = Db.mainDb,
+    ): Promise<Event.Object | null> => {
+        const ret: EventRow | null = await db.oneOrNone(
+            fetchGuildEventStmt,
+            [
+                id,
+                guildId,
+            ]
+        );
+        if (ret === null) return null;
+        return eventRowToEvent(ret);
     };
 
     // const fetchGuildIdAdjustedEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({

@@ -22,31 +22,40 @@ class EventAddConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'What would you like to name the event?';
+                return 'Event name? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Failed to name the event.\nExample: Runecrafting Event #1.';
-            case CONVERSATION_STATE.Q2:
-                return 'When would you like to start the event?\nExample: 2019-12-20T14:00-05:00 - (which is December 20th, 2019 at 2:00pm ET) OR \'now\' for right now.';
+                return 'Failed to name the event.\nExample: Runecrafting Event #1. Please try again.';
+            case CONVERSATION_STATE.Q2: {
+                const thirtyMinsFromNow: Date = new Date();
+                thirtyMinsFromNow.setSeconds(0);
+                thirtyMinsFromNow.setMinutes(thirtyMinsFromNow.getMinutes() + 30);
+                return `Start it when?\nExample: ${thirtyMinsFromNow.toISOString()} (~30 minutes from now) OR 'now' for right now.`;
+            }
             case CONVERSATION_STATE.Q2E:
-                return 'Failed to set date.';
+                return 'Failed to set date. Please try again.';
             case CONVERSATION_STATE.Q2C:
                 return `Starting date is set for ${this.start.toString()}. Is this ok?`;
-            case CONVERSATION_STATE.Q3:
-                return 'When would you like to end the event?\nExample: 2019-12-21T14:00-05:00 - (which is December 21st, 2019 at 2:00pm ET) OR \'tbd\' for long running event.';
+            case CONVERSATION_STATE.Q3: {
+                const twoDaysFromNow: Date = new Date();
+                twoDaysFromNow.setSeconds(0);
+                twoDaysFromNow.setMinutes(0);
+                twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
+                return `End it when?\nExample: ${twoDaysFromNow.toISOString} (~2 days from now) OR 'tbd' for long running event.`;
+            }
             case CONVERSATION_STATE.Q3E:
-                return 'Failed to set date. Maybe your event ends before it starts?';
+                return 'Failed to set date. Maybe your event ends before it starts? Please try again.';
             case CONVERSATION_STATE.Q3C:
                 return `Ending date is set for ${this.end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
-                return 'Which type of event would you like?\nChoices are casual, \'skills\' with skill name list, \'bh\' with bh mode (\'rogue\' and/or \'hunter\'), \'lms\', \'clues\' with clue difficulty list, or \'custom\'.';
+                return 'Which category of event?\nChoices are \'skills\' with skill name list, \'bh\' with bh mode (\'rogue\' and/or \'hunter\'), \'lms\', \'clues\' with clue difficulty list, \'custom\', or \'bosses\' with bosses list. NOTE: lists must be comma separated and are case sensitive';
             case CONVERSATION_STATE.Q4E:
-                return 'Could not set event type.';
+                return 'Could not set event type. Please try again.';
             case CONVERSATION_STATE.Q4C:
                 return `Event will be of type ${this.tracker.category} and track ${this.tracker.what === undefined ? 'nothing' : this.tracker.what}. Is this ok?`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q5E:
-                return 'Could not set global flag. Try yes or no.';
+                return 'Could not set global flag. Try yes or no. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
                 return `The event looks like this:\n\`\`\`json\n${JSON.stringify(this.event, null, 2)}\n\`\`\`\nIs this ok?`;
             default:

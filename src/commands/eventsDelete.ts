@@ -18,9 +18,9 @@ class EventDeleteConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Delete which event id?';
+                return 'Delete which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
+                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
                 return `Are you sure you want to delete event ${this.event.name}? This cannot be undone.`;
             default:
@@ -36,7 +36,10 @@ class EventDeleteConversation extends Conversation {
                 if (Number.isNaN(idToDelete)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchEvent(idToDelete);
+                    const event: Event.Object | null = await Db.fetchCreatorEvent(
+                        idToDelete,
+                        this.opMessage.guild.id,
+                    );
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {

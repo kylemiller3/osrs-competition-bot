@@ -36,23 +36,23 @@ class AddScoreConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Add score to which event?';
+                return 'Add score to which event? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
+                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.Q2:
                 return 'Add score to which discord user?';
             case CONVERSATION_STATE.Q2E:
-                return 'Could not find discord user mention.';
+                return 'Could not find discord user mention. Please try again.';
             case CONVERSATION_STATE.Q3:
                 return 'How many points to add?';
             case CONVERSATION_STATE.Q3E:
-                return 'Could not parse number.';
+                return 'Could not parse number. Please try again.';
             case CONVERSATION_STATE.Q4:
                 return 'Add a note to this score for record keeping?';
             case CONVERSATION_STATE.Q4O:
                 return 'Enter your note.';
             case CONVERSATION_STATE.Q4E:
-                return 'Could not add a note.';
+                return 'Could not add a note. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
                 return `Add ${this.params.score} to user ${this.user.tag} for event ${this.event.name}?`;
             default:
@@ -68,7 +68,10 @@ class AddScoreConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchEvent(eventId);
+                    const event: Event.Object | null = await Db.fetchCreatorEvent(
+                        eventId,
+                        this.opMessage.guild.id
+                    );
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
@@ -135,19 +138,19 @@ class AddScoreConversation extends Conversation {
 const eventsAddScore = (
     msg: discord.Message
 ): void => {
-    const params: Command.EventsAddScore = Command.parseParameters(
-        Command.ALL.EVENTS_ADD_SCORE,
-        msg.content,
-    );
+    // const params: Command.EventsAddScore = Command.parseParameters(
+    //     Command.ALL.EVENTS_ADD_SCORE,
+    //     msg.content,
+    // );
 
-    const eventAddScoreConversation = new AddScoreConversation(
-        msg,
-        params
-    );
-    ConversationManager.startNewConversation(
-        msg,
-        eventAddScoreConversation
-    );
+    // const eventAddScoreConversation = new AddScoreConversation(
+    //     msg,
+    //     params
+    // );
+    // ConversationManager.startNewConversation(
+    //     msg,
+    //     eventAddScoreConversation
+    // );
 
     /*
 

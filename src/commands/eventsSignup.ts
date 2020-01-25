@@ -24,21 +24,11 @@ class EventsSignupConversation extends Conversation {
         if (Number.isNaN(id)) {
             return CONVERSATION_STATE.Q1E;
         }
-        const event: Event.Object | null = await Db.fetchEvent(id);
-        let access = false;
-        if (event !== null) {
-            const standard: boolean = event.guilds.creator.discordId
-                === this.opMessage.guild.id;
-            const global: boolean = event.global === true
-                && event.guilds.others !== undefined
-                && event.guilds.others.some(
-                    (guild: Event.Guild):
-                    boolean => guild.discordId === this.opMessage.guild.id
-                );
-            access = standard || global;
-        }
-        if (event === null || access === false
-            || Utils.isInPast(event.when.end)) {
+        const event: Event.Object | null = await Db.fetchGuildEvent(
+            id,
+            this.opMessage.guild.id,
+        );
+        if (event === null || Utils.isInPast(event.when.end)) {
             return CONVERSATION_STATE.Q1E;
         }
 
@@ -204,17 +194,17 @@ class EventsSignupConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Which event id would you like to signup for?';
+                return 'Which event id would you like to signup for? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
                 return 'Not found. Hint: try the \'!f events listall\' command. Please try again.';
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q2E:
-                return 'Cannot find Runescape name on hiscores. Maybe the Runescape hiscores are down?';
+                return 'Cannot find Runescape name on hiscores. Maybe the Runescape hiscores are down? Please try again.';
             case CONVERSATION_STATE.Q3:
                 return 'Which team would you like to join?';
             case CONVERSATION_STATE.Q3E:
-                return 'Could not parse team name.';
+                return 'Could not parse team name. Please try again.';
             default:
                 return null;
         }

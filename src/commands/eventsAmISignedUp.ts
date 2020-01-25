@@ -51,9 +51,9 @@ class AmISignedUpConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Which event id would you like to check?';
+                return 'Which event id would you like to check? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
+                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             default:
                 return null;
         }
@@ -67,7 +67,10 @@ class AmISignedUpConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchEvent(eventId);
+                    const event: Event.Object | null = await Db.fetchGuildEvent(
+                        eventId,
+                        this.opMessage.guild.id,
+                    );
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
@@ -86,19 +89,19 @@ class AmISignedUpConversation extends Conversation {
 const eventsAmISignedUp = (
     msg: discord.Message
 ): void => {
-    const params: Command.EventsAmISignedUp = Command.parseParameters(
-        Command.ALL.EVENTS_AMISIGNEDUP,
-        msg.content,
-    );
+    // const params: Command.EventsAmISignedUp = Command.parseParameters(
+    //     Command.ALL.EVENTS_AMISIGNEDUP,
+    //     msg.content,
+    // );
 
-    const amISignedUpConversation = new AmISignedUpConversation(
-        msg,
-        params,
-    );
-    ConversationManager.startNewConversation(
-        msg,
-        amISignedUpConversation
-    );
+    // const amISignedUpConversation = new AmISignedUpConversation(
+    //     msg,
+    //     params,
+    // );
+    // ConversationManager.startNewConversation(
+    //     msg,
+    //     amISignedUpConversation
+    // );
 
     /*
     const event: Event.Event = undefined; // get event here (params.id)

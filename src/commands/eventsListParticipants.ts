@@ -17,9 +17,9 @@ class ListParticipantsConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'List which event id?';
+                return 'List which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id with the list events command. Please try again.';
+                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             default:
                 return null;
         }
@@ -33,7 +33,10 @@ class ListParticipantsConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchEvent(idToEdit);
+                    const event: Event.Object | null = await Db.fetchGuildEvent(
+                        idToEdit,
+                        this.opMessage.guild.id,
+                    );
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
@@ -95,19 +98,19 @@ class ListParticipantsConversation extends Conversation {
 const eventsListParticipants = (
     msg: discord.Message
 ): void => {
-    const params: Command.EventsListParticipants = Command.parseParameters(
-        Command.ALL.EVENTS_LIST_PARTICIPANTS,
-        msg.content,
-    );
+    // const params: Command.EventsListParticipants = Command.parseParameters(
+    //     Command.ALL.EVENTS_LIST_PARTICIPANTS,
+    //     msg.content,
+    // );
 
-    const eventListParticipantsConversation = new ListParticipantsConversation(
-        msg,
-        params,
-    );
-    ConversationManager.startNewConversation(
-        msg,
-        eventListParticipantsConversation
-    );
+    // const eventListParticipantsConversation = new ListParticipantsConversation(
+    //     msg,
+    //     params,
+    // );
+    // ConversationManager.startNewConversation(
+    //     msg,
+    //     eventListParticipantsConversation
+    // );
 
     /*
     if (params.id === undefined) {

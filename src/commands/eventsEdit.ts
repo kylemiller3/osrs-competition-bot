@@ -59,7 +59,10 @@ class EventEditConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchEvent(idToEdit);
+                    const event: Event.Object | null = await Db.fetchCreatorEvent(
+                        idToEdit,
+                        this.opMessage.guild.id,
+                    );
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                     } else {
@@ -186,19 +189,19 @@ class EventEditConversation extends Conversation {
 const eventsEdit = (
     msg: discord.Message
 ): void => {
-    const params: Command.EventsEdit = Command.parseParameters(
-        Command.ALL.EVENTS_EDIT,
-        msg.content,
-    );
+    // const params: Command.EventsEdit = Command.parseParameters(
+    //     Command.ALL.EVENTS_EDIT,
+    //     msg.content,
+    // );
 
-    const eventEditConversation = new EventEditConversation(
-        msg,
-        params,
-    );
-    ConversationManager.startNewConversation(
-        msg,
-        eventEditConversation
-    );
+    // const eventEditConversation = new EventEditConversation(
+    //     msg,
+    //     params,
+    // );
+    // ConversationManager.startNewConversation(
+    //     msg,
+    //     eventEditConversation
+    // );
 };
 
 export default eventsEdit;

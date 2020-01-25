@@ -299,13 +299,13 @@ const getStatsStr = (
 const usersStats = (
     msg: discord.Message
 ): void => {
-    if (msg.mentions.members.array().length > 0) {
-        spoofMessage(
-            Command.ALL.USERS_STATS,
-            msg,
-            msg.mentions.users.array()[0],
-        );
-    }
+    // if (msg.mentions.members.array().length > 0) {
+    //     spoofMessage(
+    //         Command.ALL.USERS_STATS,
+    //         msg,
+    //         msg.mentions.users.array()[0],
+    //     );
+    // }
 };
 
 export default usersStats;

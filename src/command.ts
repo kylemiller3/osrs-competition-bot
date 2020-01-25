@@ -90,9 +90,9 @@ export namespace Command {
      * @category Event Implementations
      */
     const eventsAdd: Description = {
-        description: 'Schedules a new uniquely named event.',
+        description: 'Schedules a new event.',
         accessControl: onlyAdmin,
-        command: '!f events add',
+        command: '.events add',
         params: {
             name: {
                 description: 'The event\'s name.',
@@ -116,7 +116,7 @@ export namespace Command {
             },
             type: {
                 description: 'The type of event to schedule.',
-                usage: 'skills AND skill1 skill2... OR bh OR lms OR clues AND difficulty1 difficulty2... OR custom',
+                usage: '(comma seperated lists) skills AND skill1 skill2... OR bh OR lms OR clues AND difficulty1 difficulty2... OR custom OR bosses AND boss list...',
                 expectedType: ParamType.STRING,
                 required: false,
                 default: 'casual',
@@ -138,7 +138,7 @@ export namespace Command {
     const eventsListAll: Description = {
         description: 'Lists all events.',
         accessControl: anyUser,
-        command: '!f events listall',
+        command: '.events listall',
     };
 
     /**
@@ -148,7 +148,7 @@ export namespace Command {
     const eventsListActive: Description = {
         description: 'Lists active events.',
         accessControl: anyUser,
-        command: '!f events listactive',
+        command: '.events listactive',
     };
 
     /**
@@ -166,7 +166,7 @@ export namespace Command {
     const eventsDelete: Description = {
         description: 'Deletes an event with id.',
         accessControl: onlyAdmin,
-        command: '!f events delete',
+        command: '.events delete',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -195,7 +195,7 @@ export namespace Command {
     const eventsEdit: Description = {
         description: 'Edits an event with name.',
         accessControl: onlyAdmin,
-        command: '!f events edit',
+        command: '.events edit',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -242,7 +242,7 @@ export namespace Command {
     const eventsEndEvent: Description = {
         description: 'Ends an event immediately.',
         accessControl: onlyAdmin,
-        command: '!f events end',
+        command: '.events end',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -260,7 +260,7 @@ export namespace Command {
     const eventsForceSignup: Description = {
         description: 'Forces a user to sign up for an event.',
         accessControl: onlyAdmin,
-        command: '!f events forcesignup',
+        command: '.events forcesignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -298,7 +298,7 @@ export namespace Command {
     const eventsForceUnsignup: Description = {
         description: 'Forces a user to un-sign up for an event.',
         accessControl: onlyAdmin,
-        command: '!f events forceunsignup',
+        command: '.events forceunsignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -333,7 +333,7 @@ export namespace Command {
     const eventsAddScore: Description = {
         description: 'Adds to a user\'s score.',
         accessControl: onlyAdmin,
-        command: '!f events updatescore',
+        command: '.events updatescore',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -373,7 +373,7 @@ export namespace Command {
     const eventsSignup: Description = {
         description: 'Signs up a user for an event.',
         accessControl: anyUser,
-        command: '!f events signup',
+        command: '.events signup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -412,7 +412,7 @@ export namespace Command {
     const eventsUnsignup: Description = {
         description: 'Un-signs up a user for an event.',
         accessControl: anyUser,
-        command: '!f events unsignup',
+        command: '.events unsignup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -438,7 +438,7 @@ export namespace Command {
     const eventsListParticipants: Description = {
         description: 'Lists all users signed up for an event.',
         accessControl: anyUser,
-        command: '!f events listparticipants',
+        command: '.events listparticipants',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -464,7 +464,7 @@ export namespace Command {
     const eventsAmISignedUp: Description = {
         description: 'Tells you if you are signed up for an event.',
         accessControl: anyUser,
-        command: '!f events amisignedup',
+        command: '.events amisignedup',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -482,14 +482,39 @@ export namespace Command {
     const usersStats: Description = {
         description: 'Prints stats for a user or self if no mention.',
         accessControl: anyUser,
-        command: '!f users stats',
+        command: '.users stats',
         params: {
-            user: {
-                description: 'Mention of the user to print stats.',
-                usage: '@mention',
-                expectedType: ParamType.STRING,
-                required: false,
-                default: undefined,
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
+                expectedType: ParamType.NUMBER,
+                required: true,
+            },
+        },
+    };
+
+
+    /**
+     * The resulting dictionary after parsing [[ALL.FORCE_UPDATE]]
+     * @category Parsing Interfaces
+     */
+    export interface ForceUpdate extends Record<string, string | number | boolean> {
+        id: number
+    }
+    /**
+     * Implementation of the force update command description
+     * @category User Implementations
+     */
+    const forceUpdate: Description = {
+        description: 'Forces an update for an event.',
+        accessControl: onlyAdmin,
+        command: '.events forceupdate',
+        params: {
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
+                expectedType: ParamType.NUMBER,
+                required: true,
             },
         },
     };
@@ -509,7 +534,7 @@ export namespace Command {
     const adminSetChannel: Description = {
         description: 'Sets the announcements channel to the first channel mentioned.',
         accessControl: onlyAdmin,
-        command: '!f admin setchannel',
+        command: '.admin setchannel',
         params: {
             channel: {
                 description: 'Mention of the channel to use.',
@@ -526,7 +551,7 @@ export namespace Command {
      * @category Implementations
      */
     const help: Description = {
-        command: '!f help',
+        command: '.help',
         description: 'Prints this help.',
         accessControl: anyUser,
     };
@@ -534,39 +559,41 @@ export namespace Command {
     export enum ALL {
         ADMIN_SET_CHANNEL,
         EVENTS_ADD,
-        EVENTS_AMISIGNEDUP,
+        // EVENTS_AMISIGNEDUP,
         EVENTS_DELETE,
-        EVENTS_EDIT,
+        // EVENTS_EDIT,
         EVENTS_END_EVENT,
         EVENTS_FORCE_SIGNUP,
         EVENTS_FORCE_UNSIGNUP,
-        EVENTS_LIST_ACTIVE,
+        // EVENTS_LIST_ACTIVE,
         EVENTS_LIST_ALL,
-        EVENTS_LIST_PARTICIPANTS,
+        // EVENTS_LIST_PARTICIPANTS,
         EVENTS_SIGNUP,
         EVENTS_UNSIGNUP,
-        EVENTS_ADD_SCORE,
+        // EVENTS_ADD_SCORE,
         HELP,
-        USERS_STATS,
+        // USERS_STATS,
+        FORCE_UPDATE,
     }
 
     const lookup: Record<Command.ALL, Description> = {
         [Command.ALL.ADMIN_SET_CHANNEL]: adminSetChannel,
         [Command.ALL.EVENTS_ADD]: eventsAdd,
-        [Command.ALL.EVENTS_AMISIGNEDUP]: eventsAmISignedUp,
+        // [Command.ALL.EVENTS_AMISIGNEDUP]: eventsAmISignedUp,
         [Command.ALL.EVENTS_DELETE]: eventsDelete,
-        [Command.ALL.EVENTS_EDIT]: eventsEdit,
+        // [Command.ALL.EVENTS_EDIT]: eventsEdit,
         [Command.ALL.EVENTS_END_EVENT]: eventsEndEvent,
         [Command.ALL.EVENTS_FORCE_SIGNUP]: eventsForceSignup,
         [Command.ALL.EVENTS_FORCE_UNSIGNUP]: eventsForceUnsignup,
-        [Command.ALL.EVENTS_LIST_ACTIVE]: eventsListActive,
+        // [Command.ALL.EVENTS_LIST_ACTIVE]: eventsListActive,
         [Command.ALL.EVENTS_LIST_ALL]: eventsListAll,
-        [Command.ALL.EVENTS_LIST_PARTICIPANTS]: eventsListParticipants,
+        // [Command.ALL.EVENTS_LIST_PARTICIPANTS]: eventsListParticipants,
         [Command.ALL.EVENTS_SIGNUP]: eventsSignup,
         [Command.ALL.EVENTS_UNSIGNUP]: eventsUnsignup,
-        [Command.ALL.EVENTS_ADD_SCORE]: eventsAddScore,
+        // [Command.ALL.EVENTS_ADD_SCORE]: eventsAddScore,
         [Command.ALL.HELP]: help,
-        [Command.ALL.USERS_STATS]: usersStats,
+        // [Command.ALL.USERS_STATS]: usersStats,
+        [Command.ALL.FORCE_UPDATE]: forceUpdate,
     };
 
     /**
@@ -718,7 +745,7 @@ export namespace Command {
             acc: Record<string, any>,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             x: Record<string, any>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ): Record<string, any> => {
             acc[Object.keys(x)[0]] = Object.values(x)[0];
             return acc;
@@ -769,7 +796,7 @@ export namespace Command {
                         case ParamType.BOOLEAN:
                             return {
                                 [key]: value.toLowerCase() !== 'false'
-                                        && value.toLowerCase() !== 'no',
+                                    && value.toLowerCase() !== 'no',
                             };
                         case ParamType.NUMBER: {
                             const num: number = parseInt(

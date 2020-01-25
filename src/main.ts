@@ -27,6 +27,7 @@ import eventsSignup from './commands/eventsSignup';
 import eventsUnsignup from './commands/eventsUnsignup';
 import usersStats from './commands/usersStats';
 import help from './commands/help';
+import forceUpdate from './commands/eventsForceUpdate';
 import { Db, } from './database';
 import eventsEdit from './commands/eventsEdit';
 import { MessageWrapper, } from './messageWrapper';
@@ -175,7 +176,7 @@ export const isAdmin = (
             discord.Permissions.FLAGS.ADMINISTRATOR
         ) || guildMember.roles.some(
             (role: discord.Role):
-            boolean => role.name.toLowerCase() === 'osrs event manager'
+                boolean => role.name.toLowerCase() === 'osrs event manager'
         );
     }
     return false;
@@ -258,7 +259,7 @@ export const getDisplayNameFromDiscordId = (
     if (guild === undefined || !guild.available) return null;
     const foundMember: discord.GuildMember = guild.members.find(
         (member: discord.GuildMember):
-        boolean => member.id === discordId
+            boolean => member.id === discordId
     );
     if (foundMember === null) return null;
     return foundMember.displayName;
@@ -274,7 +275,7 @@ const commandReceived$ = (
     .pipe(
         tap(
             (msg: discord.Message):
-            void => {
+                void => {
                 if (msg.content.toLowerCase().startsWith('.exit')) {
                     ConversationManager.stopConversation(msg);
                 }
@@ -282,7 +283,7 @@ const commandReceived$ = (
         ),
         filter(
             (msg: discord.Message):
-            boolean => msg.guild
+                boolean => msg.guild
                 && msg.guild.available
                 && Command.isValid(
                     command,
@@ -291,7 +292,7 @@ const commandReceived$ = (
         ),
         tap(
             (msg: discord.Message):
-            void => {
+                void => {
                 Utils.logger.debug(`message: ${msg.content}`);
                 Utils.logger.debug(`author: ${msg.author.tag}`);
                 Utils.logger.debug(`guild: ${msg.guild.name}`);
@@ -299,17 +300,17 @@ const commandReceived$ = (
         ),
         filter(
             (msg: discord.Message):
-            boolean => Command.hasAccess(
-                command,
-                isAdmin(
-                    msg.guild,
-                    msg.author,
+                boolean => Command.hasAccess(
+                    command,
+                    isAdmin(
+                        msg.guild,
+                        msg.author,
+                    )
                 )
-            )
         ),
         tap(
             ():
-            void => Utils.logger.debug('access: true')
+                void => Utils.logger.debug('access: true')
         ),
     );
 
@@ -406,17 +407,17 @@ const deleteMessages = async (
 
     // get message objects
     const discordMessagesPromises:
-    Promise<discord.Message | null>[] = eventMessage.messagesId.map(
-        (messageId: string):
-        Promise<discord.Message | null> => channel.fetchMessage(
-            messageId,
-        ).catch(
-            (error: Error): null => {
-                Utils.logger.warn(`${error} during discord message fetch`);
-                return null;
-            }
-        )
-    );
+        Promise<discord.Message | null>[] = eventMessage.messagesId.map(
+            (messageId: string):
+                Promise<discord.Message | null> => channel.fetchMessage(
+                    messageId,
+                ).catch(
+                    (error: Error): null => {
+                        Utils.logger.warn(`${error} during discord message fetch`);
+                        return null;
+                    }
+                )
+        );
     const discordMessages: (discord.Message | null)[] = await Promise.all(
         discordMessagesPromises
     );
@@ -429,9 +430,9 @@ const deleteMessages = async (
     return Promise.all(
         validDiscordMessages.map(
             (message: discord.Message):
-            Promise<MessageWrapper.Response> => MessageWrapper.deleteMessage({
-                message,
-            })
+                Promise<MessageWrapper.Response> => MessageWrapper.deleteMessage({
+                    message,
+                })
         )
     );
 };
@@ -531,7 +532,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
         ];
     const observables: Observable<Event.ChannelMessage | null>[] = eventGuilds.map(
         (eventGuild: Event.Guild):
-        Observable<Event.ChannelMessage | null> => {
+            Observable<Event.ChannelMessage | null> => {
             const guild: discord.Guild | null = getGuildFromId(
                 gClient,
                 eventGuild.discordId
@@ -559,7 +560,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
                 ).pipe(
                     mergeMap(
                         (scoreboardStr: string):
-                        Observable<Event.ChannelMessage | null> => {
+                            Observable<Event.ChannelMessage | null> => {
                             const msg2 = refreshMessage(
                                 gClient,
                                 guild,
@@ -584,23 +585,23 @@ const saveAndNotifyUpdatedEventScoreboard = (
         combineAll(),
         map(
             (channelMessages: (Event.ChannelMessage | null)[]):
-            Event.Object => {
+                Event.Object => {
                 channelMessages.forEach(
                     (channelMessage: Event.ChannelMessage, idx: number):
-                    void => {
+                        void => {
                         if (idx === 0) {
-                        // newEvent.guilds.creator.statusMessage = msg1 !== null
-                        //     ? msg1
-                        //     : undefined;
+                            // newEvent.guilds.creator.statusMessage = msg1 !== null
+                            //     ? msg1
+                            //     : undefined;
                             newEvent.guilds
                                 .creator
                                 .scoreboardMessage = channelMessage !== null
                                     ? channelMessage
                                     : undefined;
                         } else if (newEvent.guilds.others !== undefined) {
-                        // newEvent.guilds.others[idx - 1].statusMessage = msg1 !== null
-                        //     ? msg1
-                        //     : undefined;
+                            // newEvent.guilds.others[idx - 1].statusMessage = msg1 !== null
+                            //     ? msg1
+                            //     : undefined;
                             newEvent.guilds.others[idx - 1]
                                 .scoreboardMessage = channelMessage !== null
                                     ? channelMessage
@@ -762,23 +763,29 @@ willUpdateScores$.pipe(
 
             const flattenedAccounts: Event.Account[] = flattenedParticipants.flatMap(
                 (participant: Event.Participant):
-                Event.Account[] => participant.runescapeAccounts
+                    Event.Account[] => participant.runescapeAccounts
             );
 
             const observables: Observable<hiscores.Player | null>[] = flattenedAccounts.flatMap(
                 (account: Event.Account):
-                Observable<hiscores.Player | null> => Network.hiscoresFetch$(
-                    account.rsn,
-                    forced,
-                )
+                    Observable<hiscores.Player | null> => Network.hiscoresFetch$(
+                        account.rsn,
+                        forced,
+                    )
             );
+            if (observables.length === 0) {
+                return saveAndNotifyUpdatedEventScoreboard(
+                    event,
+                    undefined,
+                );
+            }
 
             // un-flatmap
             let idx = 0;
             const inner: Observable<Event.Object> = forkJoin(observables).pipe(
                 concatMap(
                     (results: (hiscores.Player | null)[]):
-                    Observable<Event.Object> => {
+                        Observable<Event.Object> => {
                         // prepare a new event
                         const newEvent: Event.Object = { ...event, };
 
@@ -787,32 +794,32 @@ willUpdateScores$.pipe(
                             (team: Event.Team): Event.Team => {
                                 const newTeam: Event.Team = { ...team, };
                                 const newParticipants:
-                                Event.Participant[] = newTeam.participants.map(
-                                    (participant: Event.Participant):
-                                    Event.Participant => {
-                                        const newParticipant:
-                                        Event.Participant = { ...participant, };
-                                        const newAccounts:
-                                        Event.Account[] = newParticipant
-                                            .runescapeAccounts.map(
-                                                (account: Event.Account):
-                                                Event.Account => {
-                                                    const newAccount = { ...account, };
-                                                    const result: hiscores.Player | null = results[idx];
-                                                    if (result !== null) {
-                                                        newAccount.ending = result;
-                                                        if (newAccount.starting === undefined) {
-                                                            newAccount.starting = newAccount.ending;
+                                    Event.Participant[] = newTeam.participants.map(
+                                        (participant: Event.Participant):
+                                            Event.Participant => {
+                                            const newParticipant:
+                                                Event.Participant = { ...participant, };
+                                            const newAccounts:
+                                                Event.Account[] = newParticipant
+                                                    .runescapeAccounts.map(
+                                                        (account: Event.Account):
+                                                            Event.Account => {
+                                                            const newAccount = { ...account, };
+                                                            const result: hiscores.Player | null = results[idx];
+                                                            if (result !== null) {
+                                                                newAccount.ending = result;
+                                                                if (newAccount.starting === undefined) {
+                                                                    newAccount.starting = newAccount.ending;
+                                                                }
+                                                            }
+                                                            idx += 1;
+                                                            return newAccount;
                                                         }
-                                                    }
-                                                    idx += 1;
-                                                    return newAccount;
-                                                }
-                                            );
-                                        newParticipant.runescapeAccounts = newAccounts;
-                                        return newParticipant;
-                                    }
-                                );
+                                                    );
+                                            newParticipant.runescapeAccounts = newAccounts;
+                                            return newParticipant;
+                                        }
+                                    );
                                 newTeam.participants = newParticipants;
                                 return newTeam;
                             }
@@ -854,14 +861,10 @@ willEndEvent$.subscribe(
         endTimers[event.id] = undefined;
 
         // one last update to scoreboard
-        if (!Event.isEventCasual(event)
-            && !Event.isEventCustom(event)) {
-            Utils.logger.trace('Event is auto tracking score');
-            willUpdateScores$.next([
-                event,
-                true,
-            ]);
-        }
+        willUpdateScores$.next([
+            event,
+            true,
+        ]);
         didEndEvent$.next(event);
     }
 );
@@ -883,13 +886,22 @@ willAddEvent$.subscribe(
         Utils.logger.debug(`Event ${event.id} will be added.`);
         // fix all the event chains
         if (Utils.isInPast(event.when.start)) {
-            Utils.logger.info('Event started in the past');
+            Utils.logger.info('Event started in the past.');
             willStartEvent$.next(event);
         }
         if (Utils.isInPast(event.when.end)) {
-            Utils.logger.info('Event ended in the past');
+            Utils.logger.info('Event ended in the past.');
             willEndEvent$.next(event);
         }
+        if (Event.isEventCasual(event)
+            || Event.isEventCustom(event)) {
+            Utils.logger.info('Casual event added.');
+            willUpdateScores$.next([
+                event,
+                false,
+            ]);
+        }
+
         if (!Utils.isInPast(event.when.start)
             && !Utils.isInPast(event.when.end)) {
             scheduleEvents();
@@ -967,7 +979,8 @@ const init = async (): Promise<void> => {
     commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
     commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
     // commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
-    // commandReceived$(Command.ALL.HELP).subscribe(help);
+    commandReceived$(Command.ALL.HELP).subscribe(help);
+    commandReceived$(Command.ALL.FORCE_UPDATE).subscribe(forceUpdate);
     Utils.logger.info('Command listeners running');
 
     await Db.createTables();
@@ -984,7 +997,7 @@ const init = async (): Promise<void> => {
     setInterval(
         async (): Promise<void> => {
             const runningEvents:
-            (Event.Object[] | null) = await Db.fetchAllCurrentlyRunningEvents();
+                (Event.Object[] | null) = await Db.fetchAllCurrentlyRunningEvents();
             if (runningEvents === null) {
                 return;
             }

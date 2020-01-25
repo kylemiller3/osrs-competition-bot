@@ -358,7 +358,7 @@ export namespace Event {
 
         const now: Date = new Date();
         let status: string;
-        if (event.when.end >= new Date('9999-12-31')) {
+        if (event.when.end >= Utils.distantFuture) {
             status = '';
         } else if (Utils.isInPast(event.when.end)) {
             status = '(ended)';

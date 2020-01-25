@@ -15,9 +15,9 @@ class AdminSetChannelConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Set to which text channel?';
+                return 'Mention a channel to set text channel? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Could not find channel mention.\nExample: \'#general\'';
+                return 'Could not find channel mention.\nExample: \'#general\' Please try again.';
             default:
                 return null;
         }
