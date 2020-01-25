@@ -98,7 +98,7 @@ class EventDeleteConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Remove yourself from which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
+                return 'Event not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
                 return 'Are you sure you want to remove yourself from the event? You will lose all your points and have to sign up all your accounts again if you change your mind.';
             default:

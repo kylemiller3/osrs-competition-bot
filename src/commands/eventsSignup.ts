@@ -196,7 +196,7 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to signup for? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
-                return 'Not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
+                return 'Event not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q2E:
