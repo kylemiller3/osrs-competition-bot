@@ -8,11 +8,11 @@ const eventsListAll = async (
     msg: discord.Message
 ): Promise<void> => {
     // const now: Date = new Date();
-    const localEvents: Event.Obj[] | null = await Db.fetchAllGuildEvents(
+    const localEvents: Event.Standard[] | null = await Db.fetchAllGuildEvents(
         msg.guild.id,
         Db.mainDb
     );
-    const globalEvents: Event.Obj[] | null = await Db.fetchAllInvitedEvents(
+    const globalEvents: Event.Standard[] | null = await Db.fetchAllInvitedEvents(
         msg.guild.id,
     );
     if (localEvents === null
@@ -24,19 +24,18 @@ const eventsListAll = async (
     } else {
         const localContent: string = localEvents !== null
             ? localEvents.map(
-                (event: Event.Obj):
+                (event: Event.Standard):
                 string => {
-                    const status: string = Event.getStatusStr(event);
-                    const b = event.global;
+                    const status: string = event.getStatusString();
                     return `#${event.id} ${event.name} (${event.tracking.category})\n\t\tstatus: ${status}\n\t\tstarts: ${event.when.start.toUTCString()}\n\t\tends: ${event.when.end.toUTCString()}`;
                 }
             ).join('\n\t')
             : '';
         const globalContent: string = globalEvents !== null
             ? globalEvents.map(
-                (event: Event.Obj):
+                (event: Event.Standard):
                 string => {
-                    const status: string = Event.getStatusStr(event);
+                    const status: string = event.getStatusString();
                     let guildName: string | null = getDiscordGuildName(
                         gClient,
                         event.guilds.creator.discordId,

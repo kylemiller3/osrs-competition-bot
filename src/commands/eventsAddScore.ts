@@ -8,7 +8,7 @@ import {
 import { Db, } from '../database';
 
 class AddScoreConversation extends Conversation {
-    event: Event.Obj;
+    event: Event.Standard;
     user: discord.User;
     // async initAndParseParams(): Promise<void> {
     //     // we should probably standardize this
@@ -68,7 +68,7 @@ class AddScoreConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Obj | null = await Db.fetchCreatorEvent(
+                    const event: Event.Standard | null = await Db.fetchCreatorEvent(
                         eventId,
                         this.opMessage.guild.id
                     );

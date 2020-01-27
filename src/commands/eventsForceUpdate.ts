@@ -13,10 +13,10 @@ import { Utils, } from '../utils';
 import { willUpdateScores$, } from '../main';
 import { MessageWrapper, } from '../messageWrapper';
 
-const rateThrottle: Subject<[Event.Obj, discord.Message]> = new Subject();
+const rateThrottle: Subject<[Event.Standard, discord.Message]> = new Subject();
 rateThrottle.pipe(
     groupBy(
-        (eventAndMessage: [Event.Obj, discord.Message]): number => {
+        (eventAndMessage: [Event.Standard, discord.Message]): number => {
             if (eventAndMessage[0].id !== undefined) {
                 return eventAndMessage[0].id;
             }
@@ -24,8 +24,8 @@ rateThrottle.pipe(
         }
     ),
     mergeMap(
-        (group: GroupedObservable<number, [Event.Obj, discord.Message]>):
-        Observable<[Event.Obj, discord.Message]> => group.pipe(
+        (group: GroupedObservable<number, [Event.Standard, discord.Message]>):
+        Observable<[Event.Standard, discord.Message]> => group.pipe(
             tap(
                 (): void => {
                     Utils.logger.debug('force update request');
@@ -33,7 +33,7 @@ rateThrottle.pipe(
             ),
             throttleTime(1000 * 60 * 1),
             tap(
-                (eventAndMessage: [Event.Obj, discord.Message]):
+                (eventAndMessage: [Event.Standard, discord.Message]):
                 void => {
                     Utils.logger.debug('force update sending');
                     MessageWrapper.sendMessage({
@@ -52,7 +52,7 @@ rateThrottle.pipe(
 ).subscribe();
 
 class ForceUpdateConversation extends Conversation {
-    event: Event.Obj;
+    event: Event.Standard;
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
@@ -80,15 +80,15 @@ class ForceUpdateConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const creatorEvent: Event.Obj | null = await Db.fetchCreatorEvent(
+                    const creatorEvent: Event.Standard | null = await Db.fetchCreatorEvent(
                         eventId,
                         this.opMessage.guild.id,
                     );
-                    const invitedEvent: Event.Obj | null = await Db.fetchInvitedEvent(
+                    const invitedEvent: Event.Standard | null = await Db.fetchInvitedEvent(
                         eventId,
                         this.opMessage.guild.id,
                     );
-                    const event: Event.Obj | null = creatorEvent !== null
+                    const event: Event.Standard | null = creatorEvent !== null
                         ? creatorEvent
                         : invitedEvent;
                     if (event === null) {

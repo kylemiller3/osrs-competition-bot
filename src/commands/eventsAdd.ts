@@ -1,5 +1,4 @@
 import * as discord from 'discord.js';
-import { Event, } from '../event';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
@@ -7,9 +6,10 @@ import { Utils, } from '../utils';
 import { Db, } from '../database';
 import { Command, } from '../command';
 import { willAddEvent$, } from '../main';
+import { Event, } from '../event';
 
 class EventAddConversation extends Conversation {
-    event: Event.Obj;
+    event: Event.Standard;
     tracker: Event.Tracking;
     start: Date;
     end: Date;
@@ -331,50 +331,35 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q5:
             case CONVERSATION_STATE.Q5E: {
                 const global: boolean = Utils.isYes(qa.answer.content);
-                if (global) {
-                    const oneHourBeforeStart: Date = new Date(this.start);
-                    oneHourBeforeStart.setHours(oneHourBeforeStart.getHours() - 1);
-                    const oneWeekBeforeStart: Date = new Date(this.start);
-                    oneWeekBeforeStart.setHours(oneWeekBeforeStart.getHours() - 24 * 7);
-                    if (Utils.isInPast(oneHourBeforeStart)) {
-                        this.state = CONVERSATION_STATE.DONE;
-                        this.returnMessage = 'You must start at least an hour in advance for global events.';
-                        return;
-                    }
-                    if (Utils.isInFuture(oneWeekBeforeStart)) {
-                        this.state = CONVERSATION_STATE.DONE;
-                        this.returnMessage = 'You must start no later than one week for global events.';
-                        return;
-                    }
-                    const oneWeekBeforeEnd: Date = new Date(this.end);
-                    oneWeekBeforeEnd.setHours(oneWeekBeforeEnd.getHours() - 24 * 7);
-                    if (oneWeekBeforeEnd > this.start) {
-                        this.state = CONVERSATION_STATE.DONE;
-                        this.returnMessage = 'Global events are limited to one week in duration.';
-                        return;
-                    }
-                }
 
-                this.params.global = global;
-                this.event = {
-                    name: this.params.name as string,
-                    when: {
-                        start: this.start,
-                        end: this.end,
-                    },
-                    guilds: {
-                        creator: {
-                            discordId: qa.answer.guild.id,
+                if (!global) {
+                    this.event = new Event.Standard(
+                        this.params.name as string,
+                        this.start,
+                        this.end,
+                        {
+                            creator: {
+                                discordId: qa.answer.guild.id,
+                            },
                         },
-                    },
-                    teams: [],
-                    tracking: this.tracker as Event.Tracking,
-                    global: this.params.global,
-                };
-                if (this.params.global) {
-                    this.state = CONVERSATION_STATE.Q6;
-                } else {
+                        this.tracker,
+                        global,
+                    );
                     this.state = CONVERSATION_STATE.CONFIRM;
+                } else {
+                    this.event = new Event.Global(
+                        this.params.name as string,
+                        this.start,
+                        this.end,
+                        {
+                            creator: {
+                                discordId: qa.answer.guild.id,
+                            },
+                        },
+                        this.tracker,
+                        global,
+                    );
+                    this.state = CONVERSATION_STATE.Q6;
                 }
                 break;
             }
@@ -395,7 +380,9 @@ class EventAddConversation extends Conversation {
                 if (ids.length === 0) {
                     this.state = CONVERSATION_STATE.Q6E;
                 } else {
-                    this.event.invitations = ids;
+                    if (this.event instanceof Event.Global) {
+                        this.event.invitations = ids;
+                    }
                     this.state = CONVERSATION_STATE.CONFIRM;
                 }
                 break;
@@ -406,7 +393,7 @@ class EventAddConversation extends Conversation {
                     this.returnMessage = 'Cancelled.';
                 } else {
                     // save here
-                    const savedEvent: Event.Obj = await Db.upsertEvent(this.event);
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                     willAddEvent$.next(savedEvent);
                     Utils.logger.trace(`Saved event id ${savedEvent.id} to database.`);
                     this.returnMessage = 'Event successfully scheduled.';

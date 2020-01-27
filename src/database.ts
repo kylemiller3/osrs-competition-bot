@@ -22,19 +22,46 @@ export namespace Db {
 
     interface EventRow {
         id: number
-        event: Event.Obj
+        event: Event.Standard
     }
 
-    const eventRowToEvent = (
+    const rowToEvent = (
         eventRow: EventRow
-    ): Event.Obj => ({
-        id: eventRow.id,
-        ...eventRow.event,
-        when: {
-            start: new Date(eventRow.event.when.start),
-            end: new Date(eventRow.event.when.end),
-        },
-    });
+    ): Event.Standard => {
+        const event: Event.Standard = eventRow.event;
+        let returnEvent: Event.Standard;
+        if (event instanceof Event.Global) {
+            Utils.logger.debug('test');
+            returnEvent = new Event.Global(
+                event.name,
+                event.when.start,
+                event.when.end,
+                event.guilds,
+                event.tracking,
+                event.global,
+                event.invitations,
+            );
+        } else {
+            returnEvent = new Event.Standard(
+                event.name,
+                event.when.start,
+                event.when.end,
+                event.guilds,
+                event.tracking,
+                event.global,
+            );
+        }
+        returnEvent.id = eventRow.id;
+        return returnEvent;
+    };
+    // }({
+    //     id: eventRow.id,
+    //     ...eventRow.event,
+    //     when: {
+    //         start: new Date(eventRow.event.when.start),
+    //         end: new Date(eventRow.event.when.end),
+    //     },
+    // });
 
     enum SETTINGS_COL {
         GUILD_ID = 'guild_id',
@@ -285,24 +312,24 @@ export namespace Db {
         + 'RETURNING *',
     });
     export const upsertEvent = async (
-        event: Event.Obj,
+        event: Event.Standard,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj> => {
+    ): Promise<Event.Standard> => {
         if (event.id === undefined) {
-            const ret: {id: number; event: Event.Obj} = await db.one(
+            const ret: {id: number; event: Event.Standard} = await db.one(
                 insertNewEventStmt,
                 JSON.stringify(event),
             );
-            return { ...event, id: ret.id, };
+            return rowToEvent(ret);
         }
-        const ret: {id: number; event: Event.Obj} = await db.one(
+        const ret: {id: number; event: Event.Standard} = await db.one(
             updateEventStmt,
             [
                 event.id,
                 JSON.stringify(event),
             ],
         );
-        return { ...event, id: ret.id, };
+        return rowToEvent(ret);
     };
 
     const fetchAllEventsStartAscStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -330,12 +357,12 @@ export namespace Db {
     export const fetchAllEvents = async (
         db: pgp.IDatabase<unknown> = Db.mainDb,
         startAsc: boolean = true,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             startAsc ? fetchAllEventsStartAscStmt : fetchAllEventsEndAscStmt,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const fetchEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -351,13 +378,13 @@ export namespace Db {
     export const fetchEvent = async (
         id: number,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj | null> => {
+    ): Promise<Event.Standard | null> => {
         const ret: EventRow | null = await db.oneOrNone(
             fetchEventStmt,
             id,
         );
         if (ret === null) return null;
-        return eventRowToEvent(ret);
+        return rowToEvent(ret);
     };
 
     const fetchAllCreatorsGuildStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -373,13 +400,13 @@ export namespace Db {
     export const fetchAllCreatorEvents = async (
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllCreatorsGuildStmt,
             guildId,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const fetchCreatorEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -398,7 +425,7 @@ export namespace Db {
         id: number,
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj | null> => {
+    ): Promise<Event.Standard | null> => {
         const ret: EventRow | null = await db.oneOrNone(
             fetchCreatorEventStmt,
             [
@@ -407,7 +434,7 @@ export namespace Db {
             ]
         );
         if (ret === null) return null;
-        return eventRowToEvent(ret);
+        return rowToEvent(ret);
     };
 
     const fetchAllGuildEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -427,13 +454,13 @@ export namespace Db {
     export const fetchAllGuildEvents = async (
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllGuildEventsStmt,
             guildId,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const fetchGuildEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -456,7 +483,7 @@ export namespace Db {
         id: number,
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj | null> => {
+    ): Promise<Event.Standard | null> => {
         const ret: EventRow | null = await db.oneOrNone(
             fetchGuildEventStmt,
             [
@@ -465,7 +492,7 @@ export namespace Db {
             ]
         );
         if (ret === null) return null;
-        return eventRowToEvent(ret);
+        return rowToEvent(ret);
     };
 
     const fetchAllGlobalEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -480,12 +507,12 @@ export namespace Db {
     });
     export const fetchAllGlobalEvents = async (
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllGlobalEventsStmt,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const fetchGlobalEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -503,13 +530,13 @@ export namespace Db {
     export const fetchGlobalEvent = async (
         id: number,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj | null> => {
+    ): Promise<Event.Standard | null> => {
         const ret: EventRow | null = await db.oneOrNone(
             fetchGlobalEventStmt,
             id,
         );
         if (ret === null) return null;
-        return eventRowToEvent(ret);
+        return rowToEvent(ret);
     };
 
     const fetchAllInvitedEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -531,13 +558,13 @@ export namespace Db {
     export const fetchAllInvitedEvents = async (
         discordId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllInvitedEventsStmt,
             discordId,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const fetchInvitedEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -562,7 +589,7 @@ export namespace Db {
         id: number,
         discordId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj | null> => {
+    ): Promise<Event.Standard | null> => {
         const ret: EventRow | null = await db.oneOrNone(
             fetchInvitedEventStmt,
             [
@@ -571,7 +598,7 @@ export namespace Db {
             ],
         );
         if (ret === null) return null;
-        return eventRowToEvent(ret);
+        return rowToEvent(ret);
     };
 
     const fetchAllOfAParticipantsEventsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -588,13 +615,13 @@ export namespace Db {
     export const fetchAllOfAParticipantsEvents = async (
         discordId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllOfAParticipantsEventsStmt,
             discordId,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const eventsBetweenDatesStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -617,7 +644,7 @@ export namespace Db {
         dateA: Date,
         dateB: Date,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             eventsBetweenDatesStmt,
             [
@@ -626,7 +653,7 @@ export namespace Db {
             ]
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const eventsCurrentlyRunningStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -647,12 +674,12 @@ export namespace Db {
     });
     export const fetchAllCurrentlyRunningEvents = async (
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             eventsCurrentlyRunningStmt,
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const guildEventsBetweenDatesStmt: pgp.PreparedStatement = new PreparedStatement({
@@ -684,7 +711,7 @@ export namespace Db {
         dateA: Date,
         dateB: Date,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Event.Obj[] | null> => {
+    ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             guildEventsBetweenDatesStmt,
             [
@@ -694,7 +721,7 @@ export namespace Db {
             ],
         );
         if (ret === null) return null;
-        return ret.map(eventRowToEvent);
+        return ret.map(rowToEvent);
     };
 
     const deleteEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({

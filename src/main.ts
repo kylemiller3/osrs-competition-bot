@@ -57,90 +57,90 @@ export const messageReceived$: Observable<discord.Message> = fromEvent(
  * Observable of starting events
  * @category Observable
  */
-export const willStartEvent$: Subject<Event.Obj> = new Subject();
+export const willStartEvent$: Subject<Event.Standard> = new Subject();
 /**
  * Observable of started events
  * @category Observable
  */
-export const didStartEvent$: Subject<Event.Obj> = new Subject();
+export const didStartEvent$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of ending events
  * @category Observable
  */
-export const willEndEvent$: Subject<Event.Obj> = new Subject();
+export const willEndEvent$: Subject<Event.Standard> = new Subject();
 /**
  * Observable of ended events
  * @category Observable
  */
-export const didEndEvent$: Subject<Event.Obj> = new Subject();
+export const didEndEvent$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of updating scores
  * @category Observable
  */
-export const willUpdateScores$: Subject<[Event.Obj, boolean]> = new Subject();
+export const willUpdateScores$: Subject<[Event.Standard, boolean]> = new Subject();
 /**
  * Observable of updated scores
  * @category Observable
  */
-export const didUpdateScores$: Subject<Event.Obj> = new Subject();
+export const didUpdateScores$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of signing up players
  * @category Observable
  */
-export const willSignUpPlayer$: Subject<Event.Obj> = new Subject();
+export const willSignUpPlayer$: Subject<Event.Standard> = new Subject();
 /**
  * Observable of signed up player
  * @category Observable
  */
-export const didSignupPlayer$: Subject<Event.Obj> = new Subject();
+export const didSignupPlayer$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of unsigning up player
  * @category Observable
  */
-export const willUnsignupPlayer$: Subject<Event.Obj> = new Subject();
+export const willUnsignupPlayer$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of unsigned up player
  * @category Observable
  */
-export const didUnsignupPlayer$: Subject<Event.Obj> = new Subject();
+export const didUnsignupPlayer$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of adding events
  * @category Observable
  */
-export const willAddEvent$: Subject<Event.Obj> = new Subject();
+export const willAddEvent$: Subject<Event.Standard> = new Subject();
 /**
  * Observable of added events
  * @category Observable
  */
-export const didAddEvent$: Subject<Event.Obj> = new Subject();
+export const didAddEvent$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of deleting events
  * @category Observable
  */
-export const willDeleteEvent$: Subject<Event.Obj> = new Subject();
+export const willDeleteEvent$: Subject<Event.Standard> = new Subject();
 /**
  * Observable of deleted events
  * @category Observable
  */
-export const didDeleteEvent$: Subject<Event.Obj> = new Subject();
+export const didDeleteEvent$: Subject<Event.Standard> = new Subject();
 
 /**
  * Observable of editing events
  * @category Observable
  */
-export const willEditEvent$: Subject<Event.Obj> = new Subject();
+export const willEditEvent$: Subject<Event.Standard> = new Subject();
 /**
  * Observable of edited events
  * @category Observable
  */
-export const didEditEvent$: Subject<Event.Obj> = new Subject();
+export const didEditEvent$: Subject<Event.Standard> = new Subject();
 
 /**
  * Subject of injected Discord message events
@@ -392,12 +392,12 @@ const endTimers: Record<number, NodeJS.Timeout | undefined> = {};
  * @category Helper
  */
 const resumeRunningEvents = async (): Promise<void> => {
-    const events: Event.Obj[] | null = await Db.fetchAllCurrentlyRunningEvents();
+    const events: Event.Standard[] | null = await Db.fetchAllCurrentlyRunningEvents();
     if (events === null) {
         return;
     }
     events.forEach(
-        (event: Event.Obj): void => {
+        (event: Event.Standard): void => {
             willStartEvent$.next(event);
         }
     );
@@ -539,9 +539,9 @@ const refreshMessage = async (
 };
 
 const saveAndNotifyUpdatedEventScoreboard = (
-    event: Event.Obj,
+    event: Event.Standard,
     lastError: Error | undefined,
-): Observable<Event.Obj> => {
+): Observable<Event.Standard> => {
     const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
         ? [
             event.guilds.creator,
@@ -561,21 +561,10 @@ const saveAndNotifyUpdatedEventScoreboard = (
                 Utils.logger.warn('Discord guild not available');
                 return of(null);
             }
-            const scoreboard: Event.TeamScoreboard[] = Event.getEventTeamsScoreboards(
-                event
-            );
-            const deferredRefreshObservable: Observable<Event.ChannelMessage | null> = defer(
+            const deferredRefreshScoreboardObservable: Observable<Event.ChannelMessage | null> = defer(
                 (): Observable<Event.ChannelMessage | null> => from(
-                    Event.getEventScoreboardString(
-                        event,
-                        lastError,
-                        guild.id,
-                        scoreboard,
-                        scoreboard,
-                        event.tracking.category,
-                        'what',
-                        false,
-                        'regular',
+                    event.getEventScoreboardString(
+                        eventGuild.discordId
                     )
                 ).pipe(
                     mergeMap(
@@ -595,17 +584,17 @@ const saveAndNotifyUpdatedEventScoreboard = (
                     )
                 )
             );
-            return deferredRefreshObservable;
+            return deferredRefreshScoreboardObservable;
         }
     );
-    const newEvent: Event.Obj = { ...event, };
-    const ret: Observable<Event.Obj> = concat(
+    const newEvent: Event.Standard = { ...event, };
+    const ret: Observable<Event.Standard> = concat(
         observables
     ).pipe(
         combineAll(),
         map(
             (channelMessages: (Event.ChannelMessage | null)[]):
-            Event.Obj => {
+            Event.Standard => {
                 channelMessages.forEach(
                     (channelMessage: Event.ChannelMessage, idx: number):
                     void => {
@@ -633,12 +622,12 @@ const saveAndNotifyUpdatedEventScoreboard = (
             }
         ),
         mergeMap(
-            (eventToSave: Event.Obj): Observable<Event.Obj> => from(
+            (eventToSave: Event.Standard): Observable<Event.Standard> => from(
                 Db.upsertEvent(eventToSave)
             )
         ),
         tap(
-            (savedEvent: Event.Obj): void => {
+            (savedEvent: Event.Standard): void => {
                 didUpdateScores$.next(savedEvent);
             }
         ),
@@ -651,7 +640,7 @@ const scheduleEvents = async (): Promise<void> => {
     const twentyFiveHours: Date = new Date();
     twentyFiveHours.setHours(twentyFiveHours.getHours() + 25);
 
-    let events: Event.Obj[] | null = await Db.fetchAllEventsBetweenDates(
+    let events: Event.Standard[] | null = await Db.fetchAllEventsBetweenDates(
         now, twentyFiveHours,
     );
 
@@ -661,7 +650,7 @@ const scheduleEvents = async (): Promise<void> => {
 
     // schedule timers if not exists
     events.forEach(
-        (event: Event.Obj): void => {
+        (event: Event.Standard): void => {
             if (event.id === undefined) {
                 Utils.logger.error('event id is undefined');
                 return;
@@ -673,7 +662,7 @@ const scheduleEvents = async (): Promise<void> => {
                 startTimers[event.id] = setTimeout(
                     async (): Promise<void> => {
                         if (event.id !== undefined) {
-                            const updatedEvent: Event.Obj | null = await Db.fetchEvent(event.id);
+                            const updatedEvent: Event.Standard | null = await Db.fetchEvent(event.id);
                             if (updatedEvent !== null) {
                                 willStartEvent$.next(updatedEvent);
                             }
@@ -688,7 +677,7 @@ const scheduleEvents = async (): Promise<void> => {
                 endTimers[event.id] = setTimeout(
                     async (): Promise<void> => {
                         if (event.id !== undefined) {
-                            const updatedEvent: Event.Obj | null = await Db.fetchEvent(event.id);
+                            const updatedEvent: Event.Standard | null = await Db.fetchEvent(event.id);
                             if (updatedEvent !== null) {
                                 willEndEvent$.next(updatedEvent);
                             }
@@ -716,7 +705,7 @@ MessageWrapper.sentMessages$.subscribe(
 // when an event will start
 willStartEvent$.pipe(
     map(
-        (event: Event.Obj): void => {
+        (event: Event.Standard): void => {
             Utils.logger.debug(`Event ${event.id} is starting.`);
 
             // release start timer
@@ -750,7 +739,7 @@ willStartEvent$.pipe(
             //     eventGuilds,
             //     event,
             // ).subscribe(
-            //     async (updatedEvent: Event.Object): Promise<void> => {
+            //     async (updatedEvent: Event.Standardect): Promise<void> => {
             //         // save event
             //         await Db.upsertEvent(updatedEvent);
             //         didUpdateScores$.next(updatedEvent);
@@ -764,8 +753,8 @@ willStartEvent$.pipe(
 // and save updated event to db
 willUpdateScores$.pipe(
     concatMap(
-        (obj: [Event.Obj, boolean]): Observable<Event.Obj> => {
-            const event: Event.Obj = obj[0];
+        (obj: [Event.Standard, boolean]): Observable<Event.Standard> => {
+            const event: Event.Standard = obj[0];
             const forced: boolean = obj[1];
             Utils.logger.debug(`Event ${event.id} scores will update.`);
 
@@ -801,12 +790,12 @@ willUpdateScores$.pipe(
 
             // un-flatmap
             let idx = 0;
-            const inner: Observable<Event.Obj> = forkJoin(observables).pipe(
+            const inner: Observable<Event.Standard> = forkJoin(observables).pipe(
                 concatMap(
                     (results: (hiscores.Player | null)[]):
-                    Observable<Event.Obj> => {
+                    Observable<Event.Standard> => {
                         // prepare a new event
-                        const newEvent: Event.Obj = { ...event, };
+                        const newEvent: Event.Standard = { ...event, };
 
                         // cascade remake of teams
                         const newTeams: Event.Team[] = newEvent.teams.map(
@@ -852,7 +841,7 @@ willUpdateScores$.pipe(
                 ),
             ).pipe(
                 catchError(
-                    (error: Error): Observable<Event.Obj> => saveAndNotifyUpdatedEventScoreboard(
+                    (error: Error): Observable<Event.Standard> => saveAndNotifyUpdatedEventScoreboard(
                         event,
                         error,
                     )
@@ -864,13 +853,13 @@ willUpdateScores$.pipe(
 ).subscribe();
 
 didStartEvent$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} did start.`);
     }
 );
 
 willEndEvent$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} will end.`);
         if (event.id === undefined) {
             Utils.logger.error('event id is undefined');
@@ -889,19 +878,19 @@ willEndEvent$.subscribe(
 );
 
 didEndEvent$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} did end.`);
     }
 );
 
 didUpdateScores$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} scores did update.`);
     }
 );
 
 willAddEvent$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} will be added.`);
         // fix all the event chains
         if (Utils.isInPast(event.when.start)) {
@@ -934,13 +923,13 @@ willAddEvent$.subscribe(
 );
 
 didAddEvent$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} has been added.`);
     }
 );
 
 willSignUpPlayer$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} will signup player.`);
         // update the board
         willUpdateScores$.next([
@@ -952,13 +941,13 @@ willSignUpPlayer$.subscribe(
 );
 
 didSignupPlayer$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} did signup player.`);
     }
 );
 
 willUnsignupPlayer$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} will unsignup player.`);
         // update the board
         willUpdateScores$.next([
@@ -970,7 +959,7 @@ willUnsignupPlayer$.subscribe(
 );
 
 didUnsignupPlayer$.subscribe(
-    (event: Event.Obj): void => {
+    (event: Event.Standard): void => {
         Utils.logger.debug(`Event ${event.id} did unsignup player`);
     }
 );
@@ -1017,18 +1006,18 @@ const init = async (): Promise<void> => {
     setInterval(
         async (): Promise<void> => {
             const runningEvents:
-            (Event.Obj[] | null) = await Db.fetchAllCurrentlyRunningEvents();
+            (Event.Standard[] | null) = await Db.fetchAllCurrentlyRunningEvents();
             if (runningEvents === null) {
                 return;
             }
-            const filteredEvents: Event.Obj[] = runningEvents.filter(
+            const filteredEvents: Event.Standard[] = runningEvents.filter(
                 Utils.isDefinedFilter
             );
-            const autoUpdateEvents: Event.Obj[] = filteredEvents.filter(
-                (eventToFilter: Event.Obj): boolean => !Event.isEventCustom(eventToFilter)
+            const autoUpdateEvents: Event.Standard[] = filteredEvents.filter(
+                (eventToFilter: Event.Standard): boolean => !Event.isEventCustom(eventToFilter)
             );
             autoUpdateEvents.forEach(
-                (autoEvent: Event.Obj): void => {
+                (autoEvent: Event.Standard): void => {
                     willUpdateScores$.next([
                         autoEvent,
                         false,

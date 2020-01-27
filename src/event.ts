@@ -1,14 +1,13 @@
-import {
-    hiscores,
-} from 'osrs-json-api';
-import {
-    getTagFromDiscordId, gClient, getDisplayNameFromDiscordId, getDiscordGuildName,
-} from './main';
+import { hiscores, } from 'osrs-json-api';
+import * as discord from 'discord.js';
 import { Utils, } from './utils';
+import {
+    gClient, getDisplayNameFromDiscordId, getTagFromDiscordId, getDiscordGuildName,
+} from './main';
+import { Network, } from './network';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Event {
-
     /**
      * All possible RuneScape Bosses to track
      * @category Tracking
@@ -105,6 +104,17 @@ export namespace Event {
     | 'master'
 
     /**
+     * Enum of all possible [[Tracking]] options
+     * @category Tracking
+     */
+    export type TrackingCategory = 'skills'
+    | 'bh'
+    | 'lms'
+    | 'clues'
+    | 'custom'
+    | 'bosses'
+
+    /**
      * Contract for an [[Event]]'s participant
      * @category Event
      */
@@ -124,17 +134,6 @@ export namespace Event {
         starting?: hiscores.Player
         ending?: hiscores.Player
     }
-
-    /**
-     * Enum of all possible [[Tracking]] options
-     * @category Tracking
-     */
-    export type TrackingCategory = 'skills'
-    | 'bh'
-    | 'lms'
-    | 'clues'
-    | 'custom'
-    | 'bosses'
 
     /**
      * Contract for information on a Team
@@ -182,71 +181,44 @@ export namespace Event {
         scoreboardMessage?: ChannelMessage
     }
 
+    /**
+     * Contract of the information necessary to keep track of
+     * the creator guild and other competing guilds
+     * @category Event
+     */
     export interface CompetingGuilds {
         creator: Guild
         others?: Guild[]
     }
 
-    /**
-     * Contract for a RuneScape Event
-     * @category Event
-     */
-    export interface Obj {
-        id?: number
-        name: string
-        when: When
-        guilds: CompetingGuilds
-        teams: Team[]
-        tracking: Tracking
-        global: boolean
-        invitations?: string[]
-    }
+    // scoreboards
 
     /**
-     * Gets the [[Tracking]] enum for the given [[Event]]
-     * @param event The event to check what we tracked
-     * @returns The tracking enum that represents what we tracked
-     * @category Helper
+     * Contract of the information necessary to keep track of
+     * individual stat scores
+     * @category Scoreboard
      */
-    export const getEventTracking = (
-        event: Event.Obj
-    ): TrackingCategory => {
-        if (event.tracking === undefined) return 'custom';
-        return event.tracking.category;
-    };
-
-    /**
-     * Checks an event to see if it is long running
-     * @param event The event to check
-     */
-    export const isLongRunningEvent = (
-        event: Event.Obj,
-    ): boolean => event.when.end >= Utils.distantFuture;
-
-    /**
-     * Checks an event to see if it is a [[EventType.CUSTOM]] type
-     * @param event The event to check
-     * @returns True if the event is a custom event
-     * @category Event Property
-     */
-    export const isEventCustom = (
-        event: Event.Obj
-    ): boolean => getEventTracking(event) === 'custom';
-
-
-    // Process event scoreboards here
-
     export interface WhatScoreboard {
         lhs: string
         whatScore: number
     }
 
+    /**
+     * Contract of the information necessary to keep track of
+     * individual account scores
+     * @category Scoreboard
+     */
     export interface AccountScoreboard {
         lhs: string
         accountScore: number
         whatsScores: WhatScoreboard[] | undefined
     }
 
+    /**
+     * Contract of the information necessary to keep track of
+     * individual participant scores
+     * @category Scoreboard
+     */
     export interface ParticipantScoreboard {
         lhs: string
         customScore: number
@@ -254,6 +226,11 @@ export namespace Event {
         accountsScores: AccountScoreboard[]
     }
 
+    /**
+     * Contract of the top level information necessary to keep track of
+     * each team's score
+     * @category Scoreboard
+     */
     export interface TeamScoreboard {
         lhs: string
         teamScore: number
@@ -261,283 +238,719 @@ export namespace Event {
     }
 
     /**
-     * Gets the status string based on current time for the event
-     * @param event The event to get the status from
-     * @returns A string
+     * A non-global event base class
      */
-    export const getStatusStr = (
-        event: Event.Obj,
-    ): string => {
-        const now: Date = new Date();
-        let status: string;
-        if (Utils.isInFuture(event.when.start)) {
-            status = 'sign-ups';
-        } else if (Utils.isInPast(event.when.end)) {
-            status = 'ended';
-        } else if (Event.isLongRunningEvent(event)) {
-            status = 'active (∞ hrs left)';
-        } else {
-            status = `active (${Number(((event.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
+    export class Standard {
+        id?: number
+        name: string
+        when: When
+        guilds: CompetingGuilds
+        teams: Team[]
+        tracking: Tracking
+        global: boolean
+
+        constructor(
+            name: string,
+            start: Date,
+            end: Date,
+            guilds: CompetingGuilds,
+            tracking: Tracking,
+            global: boolean,
+        ) {
+            this.name = name;
+            this.when.start = new Date(start);
+            this.when.end = new Date(end);
+            this.guilds = { ...guilds, };
+            this.tracking = { ...tracking, };
+            this.global = global;
         }
-        return status;
-    };
 
-    export const getEventScoreboardString = async (
-        event: Event.Obj,
-        error: Error | undefined = undefined,
-        guildId: string,
-        currentScoreboard: TeamScoreboard[],
-        lastScoreboard: TeamScoreboard[],
-        eventType: TrackingCategory,
-        granularity: 'teams' | 'participants' | 'accounts' | 'what',
-        inversion: boolean = false,
-        mode: 'regular' | 'shortened', // boss mode is likely too long make a special case
-        numEntries: number = 3,
-    ): Promise<string> => {
-        // format the string here
-        const tabLength = 2;
-        const lhsPaddingLength = 6;
-        const diffPadding = 2;
+        getEventTracking(): TrackingCategory {
+            return this.tracking.category;
+        }
 
-        const lhsPad: string = new Array(lhsPaddingLength + 1).join(' ');
-        const tab: string = new Array(tabLength + 1).join(' ');
+        isLongRunning(): boolean {
+            return this.when.end >= Utils.distantFuture;
+        }
 
-        const promises: Promise<string>[] = currentScoreboard.flatMap(
-            (team: TeamScoreboard):
-            Promise<string>[] => team.participantsScores.flatMap(
-                (participant: ParticipantScoreboard):
-                Promise<string> => {
-                    const displayName: string | null = getDisplayNameFromDiscordId(
-                        gClient,
-                        guildId,
-                        participant.lhs,
-                    );
-                    if (displayName === null) {
-                        return getTagFromDiscordId(
-                            gClient,
-                            participant.lhs,
-                        );
-                    }
-                    return Promise.resolve(displayName);
-                }
-            )
-        );
-        const tags: string[] = await Promise.all(promises);
+        isCustom(): boolean {
+            return this.tracking.category === 'custom';
+        }
 
-        let idx = 0;
-        const str: string = currentScoreboard.map(
-            (team: TeamScoreboard, idi: number): string => {
-                const participantsStr = team.participantsScores.map(
-                    (participant: ParticipantScoreboard): string => {
-                        const accountsStr = participant.accountsScores.map(
-                            (account: AccountScoreboard): string => {
-                                if (account.whatsScores !== undefined) {
-                                    const whatStr = account.whatsScores.map(
-                                        (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore.toLocaleString('en-us')}`
-                                    ).join(`\n${tab}${tab}${tab}`);
-                                    if (account.accountScore !== 0) {
-                                        return `${account.lhs}${tab}${account.accountScore.toLocaleString('en-us')}\n${tab}${tab}${tab}${whatStr}`;
-                                    }
-                                    return `${account.lhs}\n${tab}${tab}${tab}${whatStr}`;
-                                }
-                                return account.lhs;
-                            }
-                        ).join(`\n${tab}${tab}`);
-                        let ret: string;
-                        if (participant.participantScore !== 0) {
-                            ret = `${tags[idx]}${tab}${participant.participantScore.toLocaleString('en-us')}\n${tab}${tab}${accountsStr}`;
-                        } else {
-                            ret = `${tags[idx]}\n${tab}${tab}${accountsStr}`;
-                        }
-                        idx += 1;
-                        return ret;
-                    }
-                ).join(`\n${tab}`);
-                if (team.teamScore !== 0) {
-                    return `${idi + 1}. Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
-                }
-                return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}`;
+        validate(): ('the name is over 50 characters'
+        | 'the name is blank'
+        | 'the event ends before it starts'
+        | 'the event ends within an hour from now'
+        | 'the global event starts within 30 minutes'
+        | 'custom events are not allowed for global events'
+        | 'the global event is scheduled over a week in advance'
+        | 'global events are limited to one week in duration')[] {
+            const oneHourFromNow = new Date();
+            oneHourFromNow.setHours(oneHourFromNow.getHours() + 1);
+
+            const nameTooLong: boolean = this.name.length >= 50;
+            const nameIsBlank: boolean = this.name.length === 0;
+            const endingDateBeforeStart = this.when.start >= this.when.end;
+            const endsTooSoon = this.when.end < oneHourFromNow;
+
+            let failReasons: ('the name is over 50 characters'
+            | 'the name is blank'
+            | 'the event ends before it starts'
+            | 'the event ends within an hour from now')[] = [];
+            if (nameTooLong) {
+                failReasons = failReasons.concat('the name is over 50 characters');
             }
-        ).join('\n');
-
-        const status: string = getStatusStr(event);
-
-        // if (error !== undefined) {
-        //     const lastUpdatedStr: string = lastUpdateSuccess === null
-        //         ? 'Updated: never'
-        //         : `Updated: ${lastUpdateSuccess.toLocaleString('en-us')}`;
-        //     return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}\nError: ${error.message}\n${lastUpdatedStr}`;
-        // }
-        // lastUpdateSuccess = new Date();
-        // return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}\nUpdated: ${lastUpdateSuccess.toLocaleString('en-us')}`;
-        let ret: string;
-        if (error !== undefined) {
-            ret = `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toUTCString()} ${status}\n\n${str}\n\n${error}`;
-        } else {
-            ret = `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toUTCString()} ${status}\n\n${str}\n\nUpdated: ${new Date().toUTCString()}`;
+            if (nameIsBlank) {
+                failReasons = failReasons.concat('the name is blank');
+            }
+            if (endingDateBeforeStart) {
+                failReasons = failReasons.concat('the event ends before it starts');
+            }
+            if (endsTooSoon) {
+                failReasons = failReasons.concat('the event ends within an hour from now');
+            }
+            return failReasons;
         }
-        if (event.global) {
-            const combinedGuilds = event.guilds.others !== undefined
-                ? [
-                    event.guilds.creator,
-                    ...event.guilds.others,
-                ]
-                : [
-                    event.guilds.creator,
-                ];
-            const competitors: string = combinedGuilds.map(
-                (guild: Event.Guild): string => {
-                    let guildName: string | null = getDiscordGuildName(
-                        gClient,
-                        guild.discordId,
+
+        addScore(scoreToAdd: number, participantId: string): boolean {
+            let teamIdx = -1;
+            let participantIdx = -1;
+            this.teams.forEach(
+                (team: Team, idx: number): void => {
+                    team.participants.forEach(
+                        (participant: Participant, idi: number): void => {
+                            if (participant.discordId === participantId) {
+                                teamIdx = idx;
+                                participantIdx = idi;
+                            }
+                        }
                     );
-                    guildName = guildName !== null
-                        ? `${guildName} `
-                        : '';
-                    return `${guildName}${guild.discordId}`;
                 }
-            ).join('\n\t');
-            return ret.concat(`\n\nCompetitors:\n\t${competitors}`);
+            );
+            if (teamIdx !== -1 && participantIdx !== -1) {
+                this.teams[teamIdx].participants[participantIdx].customScore += scoreToAdd;
+                return true;
+            }
+            return false;
         }
-        return ret;
-    };
 
-    /**
-     * Creates a scoreboard object from an event.
-     * This function tallies cumulative point total and sorts the scoreboard.
-     * @param event The event to score
-     * @returns An array of sorted scoreboards for teams
-     */
-    export const getEventTeamsScoreboards = (
-        event: Event.Obj,
-    ): TeamScoreboard[] => {
-        // get the tracking category
-        const categoryKey: TrackingCategory = event.tracking.category;
+        end(): boolean {
+            this.when.end = new Date();
+            return true;
+        }
 
-        // get the tracking what list
-        const whatKeys: string[] | undefined = event.tracking.what;
+        async signupParticipant(
+            participantId: string,
+            guildId: string,
+            rsn: string,
+            teamName?: string
+        ): Promise<
+            'this rsn is already signed up'
+            | 'osrs hiscores cannot be reached'
+            | 'osrs account cannot be found'
+            | 'team name needs to be supplied'
+            | 'teams are locked 10 minutes before a global event starts'
+            | 'participant has no access to this event'
+            | undefined
+            > {
+            const findRsn = (participant: Event.Participant):
+            boolean => participant.runescapeAccounts.some(
+                (account: Event.Account):
+                boolean => account.rsn.toLowerCase() === rsn.toLowerCase()
+            );
 
-        const add = (acc: number, x: number): number => acc + x;
-        const teamsScores: TeamScoreboard[] | undefined = event.teams.map(
-            (team: Team): TeamScoreboard => {
-                const participantsScores: ParticipantScoreboard[] = team.participants.map(
-                    (participant: Participant): ParticipantScoreboard => {
-                        const accountsScores:
-                        AccountScoreboard[] = participant.runescapeAccounts.map(
-                            (account: Account): AccountScoreboard => {
-                                const whatsScores:
-                                WhatScoreboard[] | undefined = whatKeys === undefined
-                                    ? undefined
-                                    : whatKeys.map(
-                                        (whatKey: string): WhatScoreboard => {
-                                            if (account.ending !== undefined
-                                                && account.starting !== undefined) {
-                                                // case of a new boss or skill or something
-                                                // we may not have the starting defined
-                                                if (account.ending[categoryKey] !== undefined
-                                                    && account.ending[categoryKey][whatKey] !== undefined
-                                                    && (account.starting[categoryKey] === undefined
-                                                    || account.starting[categoryKey][whatKey] === undefined)
-                                                ) {
-                                                    if (categoryKey === 'skills') {
+            const rsnIdx: number = this.teams.findIndex(
+                (team: Event.Team):
+                boolean => team.participants.some(
+                    findRsn
+                )
+            );
+
+            const rsnJdx: number = rsnIdx !== -1
+                ? this.teams[rsnIdx].participants.findIndex(
+                    findRsn
+                ) : -1;
+
+            if (rsnIdx !== -1 && rsnJdx !== -1) {
+                // we found the rsn in use already
+                return 'this rsn is already signed up';
+            }
+
+            let success = true;
+            const hiscore: hiscores.Player | null = await Network.hiscoresFetch$(
+                rsn,
+                false
+            ).toPromise().catch(
+                (): null => {
+                    success = false;
+                    return null;
+                }
+            );
+            if (!success) {
+                return 'osrs hiscores cannot be reached';
+            }
+
+            if (hiscore === null) {
+                return 'osrs account cannot be found';
+            }
+
+            // is the participant already on a team?
+            const participantIdx: number = this.teams.findIndex(
+                (team: Event.Team):
+                boolean => team.participants.some(
+                    (participant: Event.Participant):
+                    boolean => participant.discordId === participantId
+                )
+            );
+
+            const participantJdx: number = participantIdx !== -1
+                ? this.teams[participantIdx].participants.findIndex(
+                    (participant: Event.Participant):
+                    boolean => participant.discordId === participantId
+                ) : -1;
+
+            if (participantIdx !== -1 && participantJdx !== -1) {
+                // we know the team to signup for
+                const participant: Event.Participant = this
+                    .teams[participantIdx]
+                    .participants[participantJdx];
+                this
+                    .teams[participantIdx]
+                    .participants[participantJdx]
+                    .runescapeAccounts = participant
+                        .runescapeAccounts.concat({
+                            rsn,
+                        });
+                return undefined;
+            }
+
+            // we need the teamname supplied
+            if (teamName === undefined) {
+                return 'team name needs to be supplied';
+            }
+
+            // we either add a new team or we add to the found team
+            const teamIdx: number = this.teams.findIndex(
+                (team: Event.Team):
+                boolean => team.name.toLowerCase() === teamName.toLowerCase()
+            );
+
+            const participant: Participant = {
+                discordId: participantId,
+                customScore: 0,
+                runescapeAccounts: [
+                    {
+                        rsn,
+                    },
+                ],
+            };
+            if (teamIdx === -1) {
+                // if we didn't find the team
+                // create a new team
+                const team: Team = {
+                    name: teamName,
+                    guildId,
+                    participants: [
+                        participant,
+                    ],
+                };
+                this.teams = [
+                    ...this.teams,
+                    team,
+                ];
+                return undefined;
+            }
+
+            // we found the team
+            // so add the participant to the team
+            this.teams[teamIdx].participants = [
+                ...this.teams[teamIdx].participants,
+                participant,
+            ];
+            return undefined;
+
+
+            // if (invited) {
+            //     if (this.guilds.others === undefined) {
+            //         this.guilds.others = [
+            //             {
+            //                 discordId: guildId,
+            //             },
+            //         ];
+            //     } else {
+            //         const invitedGuildIdx = this.guilds.others.findIndex(
+            //             (invitedGuild: Guild): boolean => invitedGuild.discordId === guildId
+            //         );
+            //         if (invitedGuildIdx === -1) {
+            //             this.guilds.others = [
+            //                 ...this.guilds.others,
+            //                 {
+            //                     discordId: guildId,
+            //                 },
+            //             ];
+            //         }
+            //     }
+            // }
+            // return true;
+        }
+
+        unsignupParticipant(participantId: string): 'participant was not signed-up'
+        | undefined {
+            // did we find the user?
+            const findUser = (participant: Event.Participant):
+            boolean => participant.discordId === participantId;
+
+            const userIdx: number = this.teams.findIndex(
+                (team: Event.Team):
+                boolean => team.participants.some(
+                    findUser
+                )
+            );
+            const userJdx: number = userIdx !== -1
+                ? this.teams[userIdx].participants.findIndex(
+                    findUser
+                ) : -1;
+            if (userJdx === -1) {
+                // participant not found
+                return 'participant was not signed-up';
+            }
+
+            // remove the user
+            this.teams[userIdx].participants.splice(
+                userJdx, 1
+            );
+            // if no participants remove the team
+            if (this.teams[userIdx].participants.length === 0) {
+                this.teams.splice(
+                    userIdx, 1
+                );
+            }
+            return undefined;
+        }
+
+        /**
+         * Gets the status string based on current time for the event
+         * @returns A status string
+         */
+        getStatusString(): string {
+            if (Utils.isInFuture(this.when.start)) {
+                return 'sign-ups';
+            }
+            if (Utils.isInPast(this.when.end)) {
+                return 'ended';
+            }
+            if (this.isLongRunning()) {
+                return 'active (∞ hrs left)';
+            }
+            const now: Date = new Date();
+            return `active (${Number(((this.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
+        }
+
+        async listParticipants(): Promise<string> {
+            // need to get tag in some instances
+            const retMsgsResolver: Promise<string>[] = this.teams.map(
+                async (team: Event.Team): Promise<string> => {
+                    const participantResolver:
+                    Promise<discord.User | string>[] = team.participants.map(
+                        (participant: Event.Participant):
+                        Promise<discord.User | string> => gClient
+                            .fetchUser(
+                                participant.discordId
+                            ).catch(
+                                (error: Error): string => {
+                                    Utils.logger.error(`${error} when fetching player`);
+                                    return participant.discordId;
+                                }
+                            )
+                    );
+                    const discordUsers: (discord.User | string)[] = await Promise.all(
+                        participantResolver
+                    );
+
+                    const participantStr: string = discordUsers.map(
+                        (user: discord.User | string, idx: number): string => {
+                            const participant:
+                            Event.Participant = team.participants[idx];
+                            const rsnStrs: string = participant.runescapeAccounts.map(
+                                (account: Event.Account): string => `\t\trsn: ${account.rsn}`
+                            ).join('\n');
+                            if (user instanceof discord.User) {
+                                return `\tDiscord: ${user.tag}\n${rsnStrs}\n`;
+                            }
+                            return `\tError: Discord Id: ${user}\n${rsnStrs}\n`;
+                        }
+                    ).join('\n');
+                    return `Team ${team.name}:\n${participantStr}`;
+                }
+            );
+            const retMsgs: string[] = await Promise.all(retMsgsResolver);
+            return `Event ${this.name}:\n${retMsgs.join('\n')}`;
+        }
+
+        getTeamsScoreboards(): TeamScoreboard[] {
+            // get the tracking category
+            const categoryKey: TrackingCategory = this.tracking.category;
+
+            // get the tracking what list
+            const whatKeys: string[] | undefined = this.tracking.what;
+
+            const add = (acc: number, x: number): number => acc + x;
+            const teamsScores: TeamScoreboard[] | undefined = this.teams.map(
+                (team: Team): TeamScoreboard => {
+                    const participantsScores: ParticipantScoreboard[] = team.participants.map(
+                        (participant: Participant): ParticipantScoreboard => {
+                            const accountsScores:
+                            AccountScoreboard[] = participant.runescapeAccounts.map(
+                                (account: Account): AccountScoreboard => {
+                                    const whatsScores:
+                                    WhatScoreboard[] | undefined = whatKeys === undefined
+                                        ? undefined
+                                        : whatKeys.map(
+                                            (whatKey: string): WhatScoreboard => {
+                                                if (account.ending !== undefined
+                                                    && account.starting !== undefined) {
+                                                    // case of a new boss or skill or something
+                                                    // we may not have the starting defined
+                                                    if (account.ending[categoryKey] !== undefined
+                                                        && account.ending[categoryKey][whatKey] !== undefined
+                                                        && (account.starting[categoryKey] === undefined
+                                                        || account.starting[categoryKey][whatKey] === undefined)
+                                                    ) {
+                                                        if (categoryKey === 'skills') {
+                                                            const ending = account
+                                                                .ending
+                                                                .skills[whatKey]
+                                                                .xp;
+                                                            return {
+                                                                lhs: whatKey,
+                                                                whatScore: ending,
+                                                            };
+                                                        }
                                                         const ending = account
-                                                            .ending
-                                                            .skills[whatKey]
-                                                            .xp;
+                                                            .ending[categoryKey][whatKey]
+                                                            .score;
                                                         return {
                                                             lhs: whatKey,
                                                             whatScore: ending,
                                                         };
                                                     }
+                                                    if (categoryKey === 'skills') {
+                                                        const ending = account
+                                                            .ending
+                                                            .skills[whatKey]
+                                                            .xp;
+                                                        const starting = account
+                                                            .starting
+                                                            .skills[whatKey]
+                                                            .xp;
+                                                        return {
+                                                            lhs: whatKey,
+                                                            whatScore: ending - starting,
+                                                        };
+                                                    }
                                                     const ending = account
                                                         .ending[categoryKey][whatKey]
                                                         .score;
-                                                    return {
-                                                        lhs: whatKey,
-                                                        whatScore: ending,
-                                                    };
-                                                }
-                                                if (categoryKey === 'skills') {
-                                                    const ending = account
-                                                        .ending
-                                                        .skills[whatKey]
-                                                        .xp;
                                                     const starting = account
-                                                        .starting
-                                                        .skills[whatKey]
-                                                        .xp;
+                                                        .starting[categoryKey][whatKey]
+                                                        .score;
                                                     return {
                                                         lhs: whatKey,
                                                         whatScore: ending - starting,
                                                     };
                                                 }
-                                                const ending = account
-                                                    .ending[categoryKey][whatKey]
-                                                    .score;
-                                                const starting = account
-                                                    .starting[categoryKey][whatKey]
-                                                    .score;
                                                 return {
                                                     lhs: whatKey,
-                                                    whatScore: ending - starting,
+                                                    whatScore: 0,
                                                 };
                                             }
-                                            return {
-                                                lhs: whatKey,
-                                                whatScore: 0,
-                                            };
-                                        }
-                                    ).sort(
-                                        (a: WhatScoreboard, b: WhatScoreboard):
-                                        number => b.whatScore - a.whatScore
-                                    );
-                                const accountScore: number = whatsScores === undefined
-                                    ? 0
-                                    : whatsScores.map(
-                                        (what: WhatScoreboard): number => what.whatScore
-                                    ).reduce(add);
-                                return {
-                                    lhs: account.rsn,
-                                    accountScore,
-                                    whatsScores,
-                                };
-                            }
-                        ).sort(
-                            (a: AccountScoreboard, b: AccountScoreboard):
-                            number => b.accountScore - a.accountScore
-                        );
-                        const customScore: number = participant.customScore;
-                        const participantScore: number = accountsScores.map(
-                            (account: AccountScoreboard): number => account.accountScore,
-                            customScore,
-                        ).reduce(add);
+                                        ).sort(
+                                            (a: WhatScoreboard, b: WhatScoreboard):
+                                            number => b.whatScore - a.whatScore
+                                        );
+                                    const accountScore: number = whatsScores === undefined
+                                        ? 0
+                                        : whatsScores.map(
+                                            (what: WhatScoreboard): number => what.whatScore
+                                        ).reduce(add);
+                                    return {
+                                        lhs: account.rsn,
+                                        accountScore,
+                                        whatsScores,
+                                    };
+                                }
+                            ).sort(
+                                (a: AccountScoreboard, b: AccountScoreboard):
+                                number => b.accountScore - a.accountScore
+                            );
+                            const customScore: number = participant.customScore;
+                            const participantScore: number = accountsScores.map(
+                                (account: AccountScoreboard): number => account.accountScore,
+                                customScore,
+                            ).reduce(add);
 
-                        return {
-                            lhs: participant.discordId,
-                            customScore,
-                            participantScore,
-                            accountsScores,
-                        };
-                    }
-                ).sort(
-                    (a: ParticipantScoreboard, b: ParticipantScoreboard):
-                    number => b.participantScore - a.participantScore
-                );
-                const teamScore: number = participantsScores.map(
+                            return {
+                                lhs: participant.discordId,
+                                customScore,
+                                participantScore,
+                                accountsScores,
+                            };
+                        }
+                    ).sort(
+                        (a: ParticipantScoreboard, b: ParticipantScoreboard):
+                        number => b.participantScore - a.participantScore
+                    );
+                    const teamScore: number = participantsScores.map(
+                        (participant: ParticipantScoreboard):
+                        number => participant.participantScore
+                    ).reduce(add);
+
+                    return {
+                        lhs: team.name,
+                        teamScore,
+                        participantsScores,
+                    };
+                }
+            ).sort(
+                (a: TeamScoreboard, b: TeamScoreboard):
+                number => b.teamScore - a.teamScore
+            );
+            return teamsScores;
+        }
+
+        async getEventScoreboardString(
+            guildId: string,
+            // granularity: 'teams' | 'participants' | 'accounts' | 'what',
+            // inversion: boolean = false,
+            // mode: 'regular' | 'shortened', // boss mode is likely too long make a special case
+            // numEntries: number = 3,
+        ): Promise<string> {
+            // format the string here
+            const tabLength = 2;
+            // const lhsPaddingLength = 6;
+            // const diffPadding = 2;
+
+            // const lhsPad: string = new Array(lhsPaddingLength + 1).join(' ');
+            const tab: string = new Array(tabLength + 1).join(' ');
+            const currentScoreboard: TeamScoreboard[] = this.getTeamsScoreboards();
+            const promises: Promise<string>[] = currentScoreboard.flatMap(
+                (team: TeamScoreboard):
+                Promise<string>[] => team.participantsScores.flatMap(
                     (participant: ParticipantScoreboard):
-                    number => participant.participantScore
-                ).reduce(add);
+                    Promise<string> => {
+                        const displayName: string | null = getDisplayNameFromDiscordId(
+                            gClient,
+                            guildId,
+                            participant.lhs,
+                        );
+                        if (displayName === null) {
+                            return getTagFromDiscordId(
+                                gClient,
+                                participant.lhs,
+                            );
+                        }
+                        return Promise.resolve(displayName);
+                    }
+                )
+            );
+            const tags: string[] = await Promise.all(promises);
 
-                return {
-                    lhs: team.name,
-                    teamScore,
-                    participantsScores,
-                };
+            let idx = 0;
+            const str: string = currentScoreboard.map(
+                (team: TeamScoreboard, idi: number): string => {
+                    const participantsStr = team.participantsScores.map(
+                        (participant: ParticipantScoreboard): string => {
+                            const accountsStr = participant.accountsScores.map(
+                                (account: AccountScoreboard): string => {
+                                    if (account.whatsScores !== undefined) {
+                                        const whatStr = account.whatsScores.map(
+                                            (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore.toLocaleString('en-us')}`
+                                        ).join(`\n${tab}${tab}${tab}`);
+                                        if (account.accountScore !== 0) {
+                                            return `${account.lhs}${tab}${account.accountScore.toLocaleString('en-us')}\n${tab}${tab}${tab}${whatStr}`;
+                                        }
+                                        return `${account.lhs}\n${tab}${tab}${tab}${whatStr}`;
+                                    }
+                                    return account.lhs;
+                                }
+                            ).join(`\n${tab}${tab}`);
+                            let ret: string;
+                            if (participant.participantScore !== 0) {
+                                ret = `${tags[idx]}${tab}${participant.participantScore.toLocaleString('en-us')}\n${tab}${tab}${accountsStr}`;
+                            } else {
+                                ret = `${tags[idx]}\n${tab}${tab}${accountsStr}`;
+                            }
+                            idx += 1;
+                            return ret;
+                        }
+                    ).join(`\n${tab}`);
+                    if (team.teamScore !== 0) {
+                        return `${idi + 1}. Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
+                    }
+                    return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}`;
+                }
+            ).join('\n');
+            return str;
+        }
+    }
+
+    /**
+     * Global type behavior subclass
+     */
+    export class Global extends Standard {
+        invitations?: string[]
+
+        constructor(
+            name: string,
+            start: Date,
+            end: Date,
+            guilds: CompetingGuilds,
+            tracking: Tracking,
+            global: boolean,
+            invitations?: string[],
+        ) {
+            super(
+                name,
+                start,
+                end,
+                guilds,
+                tracking,
+                global,
+            );
+
+            this.invitations = invitations;
+        }
+
+
+        validate(): ('the name is over 50 characters'
+        | 'the name is blank'
+        | 'the event ends before it starts'
+        | 'the event ends within an hour from now'
+        | 'the global event starts within 30 minutes'
+        | 'custom events are not allowed for global events'
+        | 'the global event is scheduled over a week in advance'
+        | 'global events are limited to one week in duration')[] {
+            let failReasons: ('the name is over 50 characters'
+            | 'the name is blank'
+            | 'the event ends before it starts'
+            | 'the event ends within an hour from now'
+            | 'the global event starts within 30 minutes'
+            | 'custom events are not allowed for global events'
+            | 'the global event is scheduled over a week in advance'
+            | 'global events are limited to one week in duration')[] = super.validate();
+
+            const thirtyMinutesBeforeStart: Date = new Date(this.when.start);
+            thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
+            if (Utils.isInPast(thirtyMinutesBeforeStart)) {
+                failReasons = failReasons.concat('the global event starts within 30 minutes');
             }
-        ).sort(
-            (a: TeamScoreboard, b: TeamScoreboard):
-            number => b.teamScore - a.teamScore
-        );
-        return teamsScores;
-    };
+
+            const oneWeekBeforeStart: Date = new Date(this.when.start);
+            oneWeekBeforeStart.setHours(oneWeekBeforeStart.getHours() - 24 * 7);
+            if (Utils.isInFuture(oneWeekBeforeStart)) {
+                failReasons = failReasons.concat('the global event is scheduled over a week in advance');
+            }
+
+            const oneWeekBeforeEnd: Date = new Date(this.when.end);
+            oneWeekBeforeEnd.setHours(oneWeekBeforeEnd.getHours() - 24 * 7);
+            if (oneWeekBeforeEnd > this.when.start) {
+                failReasons = failReasons.concat('global events are limited to one week in duration');
+            }
+
+            return failReasons;
+        }
+
+        /* eslint-disable @typescript-eslint/no-unused-vars */
+        /* eslint-disable class-methods-use-this */
+        addScore(customScore: number): boolean {
+            return false;
+        }
+
+        end(): boolean {
+            return false;
+        }
+        /* eslint-enable class-methods-use-this */
+        /* eslint-enable @typescript-eslint/no-unused-vars */
+
+        async signupParticipant(
+            participantId: string,
+            guildId: string,
+            rsn: string,
+            teamName?: string
+        ): Promise<
+            'this rsn is already signed up'
+            | 'osrs hiscores cannot be reached'
+            | 'osrs account cannot be found'
+            | 'team name needs to be supplied'
+            | 'teams are locked 10 minutes before a global event starts'
+            | 'participant has no access to this event'
+            | undefined
+            > {
+            // participant eligibility should be determined by the database
+            // this shouldn't be called if they are not eligible
+            // check anyway
+            if (this.guilds.others === undefined || !this.guilds.others.some(
+                (guild: Guild): boolean => guild.discordId === guildId
+            )) {
+                Utils.logger.error(`Database did not filter out this participant for event ${this.id} and guild ${guildId}`);
+                return 'participant has no access to this event';
+            }
+
+            // we may need to override the teamname for a cross guild event
+            // before we pass it to super
+            // find a team with the same guildId
+            // we should actually take care of this with joinEvent
+            // -1 should not be possible
+            const teamIdx: number = this.teams.findIndex(
+                (team: Team): boolean => team.guildId === guildId
+            );
+            const processedTeamName = teamIdx !== -1
+                ? this.teams[teamIdx].name
+                : teamName;
+
+            // make sure teams are not locked
+            const tenMinutesBeforeStart: Date = new Date(this.when.start);
+            tenMinutesBeforeStart.setMinutes(tenMinutesBeforeStart.getMinutes() - 10);
+            if (Utils.isInPast(tenMinutesBeforeStart)) {
+                return 'teams are locked 10 minutes before a global event starts';
+            }
+
+            // this goes last since it mutates the event
+            const failReason: Promise<
+            'this rsn is already signed up'
+            | 'osrs hiscores cannot be reached'
+            | 'osrs account cannot be found'
+            | 'team name needs to be supplied'
+            | 'teams are locked 10 minutes before a global event starts'
+            | 'participant has no access to this event'
+            | undefined
+            > = super.signupParticipant(
+                participantId,
+                guildId,
+                rsn,
+                processedTeamName,
+            );
+            return failReason;
+        }
+
+        async getEventScoreboardString(
+            guildId: string,
+            error?: Error,
+            lastScoreboard?: TeamScoreboard[],
+            // granularity: 'teams' | 'participants' | 'accounts' | 'what',
+            // inversion: boolean = false,
+            // mode: 'regular' | 'shortened', // boss mode is likely too long make a special case
+            // numEntries: number = 3,
+        ): Promise<string> {
+            const scoreboard: string = await super.getEventScoreboardString(
+                guildId,
+            );
+
+            const guildNameStrs: string = this.teams.map(
+                (team: Team): string => `${team.name} - ${getDiscordGuildName}`
+            ).join('\n');
+            getDiscordGuildName(gClient, guildId);
+            return scoreboard.concat(`\n\n${guildNameStrs}`);
+        }
+    }
 }

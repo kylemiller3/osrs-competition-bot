@@ -14,7 +14,7 @@ import { Event, } from '../event';
  */
 // const getParticipantScore = (
 //     participant: Event.Participant,
-//     event: Event.Object,
+//     event: Event.Standardect,
 //     tracking: Event.TrackingCategory,
 // ): number => {
 //     const keys: string[] = event.tracker.what as string[];

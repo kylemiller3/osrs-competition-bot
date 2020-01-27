@@ -11,200 +11,9 @@ import { willSignUpPlayer$, } from '../main';
 import { Utils, } from '../utils';
 
 class EventsSignupConversation extends Conversation {
-    id: number;
+    event: Event.Standard;
     rsn: string;
     teamName: string
-
-    private async signupToEventWithRsnAndTeam(
-        id: number,
-        rsn: string,
-        teamName?: string,
-    ): Promise<CONVERSATION_STATE> {
-        // p1
-        if (Number.isNaN(id)) {
-            return CONVERSATION_STATE.Q1E;
-        }
-        const creatorEvent: Event.Obj | null = await Db.fetchCreatorEvent(
-            id,
-            this.opMessage.guild.id,
-        );
-        const invitedEvent: Event.Obj | null = await Db.fetchInvitedEvent(
-            id,
-            this.opMessage.guild.id,
-        );
-        if (invitedEvent !== null) {
-            // we need to add a new other object
-            if (invitedEvent.guilds.others === undefined) {
-                invitedEvent.guilds.others = [
-                    {
-                        discordId: this.opMessage.guild.id,
-                    },
-                ];
-            } else {
-                invitedEvent.guilds.others = [
-                    ...invitedEvent.guilds.others,
-                    {
-                        discordId: this.opMessage.guild.id,
-                    },
-                ];
-            }
-        }
-
-        const event: Event.Obj | null = creatorEvent !== null
-            ? creatorEvent
-            : invitedEvent;
-
-        if (event === null || Utils.isInPast(event.when.end)) {
-            return CONVERSATION_STATE.Q1E;
-        }
-
-        const thirtyMinsBeforeStart: Date = new Date(event.when.start);
-        thirtyMinsBeforeStart.setMinutes(thirtyMinsBeforeStart.getMinutes() - 30);
-        if (event.global
-            && Utils.isInPast(thirtyMinsBeforeStart)) {
-            this.returnMessage = 'Sorry, teams are locked 30 minutes before a global event starts.';
-            return CONVERSATION_STATE.DONE;
-        }
-
-        // p2
-        const findRsn = (participant: Event.Participant):
-        boolean => participant.runescapeAccounts.some(
-            (account: Event.Account):
-            boolean => account.rsn.toLowerCase() === rsn.toLowerCase()
-        );
-
-        const rsnIdx: number = event.teams.findIndex(
-            (team: Event.Team):
-            boolean => team.participants.some(
-                findRsn
-            )
-        );
-
-        const rsnJdx: number = rsnIdx !== -1
-            ? event.teams[rsnIdx].participants.findIndex(
-                findRsn
-            ) : -1;
-
-        if (rsnIdx !== -1 && rsnJdx !== -1) {
-            // we found the rsn in use already
-            const participant: Event.Participant = event.teams[rsnIdx]
-                .participants[rsnJdx];
-            const user: discord.User = await this.opMessage.client
-                .fetchUser(participant.discordId);
-            this.returnMessage = `This rsn is already signed up by ${user.tag}`;
-            return CONVERSATION_STATE.DONE;
-        }
-
-        let success = true;
-        const hiscore: hiscores.Player | null = await Network.hiscoresFetch$(
-            rsn,
-            false
-        ).toPromise().catch(
-            (): null => {
-                success = false;
-                return null;
-            }
-        );
-        if (!success) {
-            this.returnMessage = 'Can\'t reach OSRS hiscores. Try again later.';
-            return CONVERSATION_STATE.DONE;
-        }
-
-        if (hiscore === null) {
-            return CONVERSATION_STATE.Q2E;
-        }
-
-        // is the participant already on a team?
-        const participantIdx: number = event.teams.findIndex(
-            (team: Event.Team):
-            boolean => team.participants.some(
-                (participant: Event.Participant):
-                boolean => participant.discordId === this.opMessage.author.id
-            )
-        );
-
-        const participantJdx: number = participantIdx !== -1
-            ? event.teams[participantIdx].participants.findIndex(
-                (participant: Event.Participant):
-                boolean => participant.discordId === this.opMessage.author.id
-            ) : -1;
-
-        const newEvent: Event.Obj = { ...event, };
-        if (participantIdx !== -1 && participantJdx !== -1) {
-            // we know the team to signup for
-            const participant: Event.Participant = newEvent
-                .teams[participantIdx]
-                .participants[participantJdx];
-            newEvent
-                .teams[participantIdx]
-                .participants[participantJdx]
-                .runescapeAccounts = participant
-                    .runescapeAccounts.concat({
-                        rsn,
-                    });
-            // save event
-            const savedEvent: Event.Obj = await Db.upsertEvent(newEvent);
-            willSignUpPlayer$.next(savedEvent);
-
-            this.returnMessage = 'Signed up for team';
-            return CONVERSATION_STATE.DONE;
-        } if (teamName === undefined) {
-            // we should ask the user what team they are going to signup for
-            return CONVERSATION_STATE.Q3;
-        }
-
-        // p3
-        const teamIdx: number = event.teams.findIndex(
-            (team: Event.Team):
-            boolean => team.name.toLowerCase() === teamName.toLowerCase()
-        );
-        if (teamIdx === -1) {
-            // if we didn't find the team
-            // create a new team
-            const team: Event.Team = {
-                name: teamName,
-                guildId: this.opMessage.guild.id,
-                participants: [
-                    {
-                        discordId: this.opMessage.author.id,
-                        customScore: 0,
-                        runescapeAccounts: [
-                            {
-                                rsn,
-                            },
-                        ],
-                    },
-                ],
-            };
-            newEvent.teams = event.teams.concat(team);
-        } else {
-            // we found the team
-            // so add the participant to the new team
-            const participant: Event.Participant = {
-                discordId: this.opMessage.author.id,
-                customScore: 0,
-                runescapeAccounts: [
-                    {
-                        rsn,
-                    },
-                ],
-            };
-            newEvent
-                .teams[teamIdx]
-                .participants = event
-                    .teams[teamIdx]
-                    .participants.concat(
-                        participant
-                    );
-        }
-
-        // save event
-        const savedEvent: Event.Obj = await Db.upsertEvent(newEvent);
-        willSignUpPlayer$.next(savedEvent);
-
-        this.returnMessage = 'Signed up for team';
-        return CONVERSATION_STATE.DONE;
-    }
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
@@ -216,15 +25,31 @@ class EventsSignupConversation extends Conversation {
             return Promise.resolve(false);
         }
 
-        this.state = CONVERSATION_STATE.DONE;
-        const stateCheck: CONVERSATION_STATE = await this.signupToEventWithRsnAndTeam(
+        const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
             id,
+            this.opMessage.guild.id,
+        );
+        if (guildEvent === null) {
+            this.state = CONVERSATION_STATE.Q1E;
+            return Promise.resolve(false);
+        }
+
+        this.state = CONVERSATION_STATE.DONE;
+        const error: 'this rsn is already signed up'
+        | 'osrs hiscores cannot be reached'
+        | 'osrs account cannot be found'
+        | 'team name needs to be supplied'
+        | 'teams are locked 10 minutes before a global event starts'
+        | 'participant has no access to this event'
+        | undefined = await guildEvent.signupParticipant(
+            this.opMessage.author.id,
+            this.opMessage.guild.id,
             rsn,
             team,
         );
 
-        if (stateCheck !== CONVERSATION_STATE.DONE) {
-            this.returnMessage = 'No team specified';
+        if (error !== undefined) {
+            return Promise.resolve(false);
         }
 
         return Promise.resolve(true);
@@ -251,58 +76,106 @@ class EventsSignupConversation extends Conversation {
 
     async consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
-            case CONVERSATION_STATE.Q1: {
-                this.id = Number.parseInt(qa.answer.content, 10);
+            case CONVERSATION_STATE.Q1:
+            case CONVERSATION_STATE.Q1E: {
+                const id = Number.parseInt(qa.answer.content, 10);
+                const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
+                    id,
+                    this.opMessage.guild.id,
+                );
+                if (guildEvent === null) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    return;
+                }
+
+                this.event = guildEvent;
                 this.state = CONVERSATION_STATE.Q2;
                 break;
             }
-            case CONVERSATION_STATE.Q2: {
-                this.rsn = qa.answer.content;
-                this.state = await this.signupToEventWithRsnAndTeam(
-                    this.id,
-                    this.rsn,
-                    this.teamName,
-                );
-                break;
-            }
-            case CONVERSATION_STATE.Q3: {
-                this.teamName = qa.answer.content;
-                this.state = await this.signupToEventWithRsnAndTeam(
-                    this.id,
-                    this.rsn,
-                    this.teamName,
-                );
-                break;
-            }
-
-            case CONVERSATION_STATE.Q1E: {
-                this.id = Number.parseInt(qa.answer.content, 10);
-                this.state = await this.signupToEventWithRsnAndTeam(
-                    this.id,
-                    this.rsn,
-                    this.teamName,
-                );
-                break;
-            }
+            case CONVERSATION_STATE.Q2:
             case CONVERSATION_STATE.Q2E: {
                 this.rsn = qa.answer.content;
-                this.state = await this.signupToEventWithRsnAndTeam(
-                    this.id,
+                const error: 'this rsn is already signed up'
+                | 'osrs hiscores cannot be reached'
+                | 'osrs account cannot be found'
+                | 'team name needs to be supplied'
+                | 'teams are locked 10 minutes before a global event starts'
+                | 'participant has no access to this event'
+                | undefined = await this.event.signupParticipant(
+                    this.opMessage.author.id,
+                    this.opMessage.guild.id,
                     this.rsn,
-                    this.teamName,
                 );
+
+                switch (error) {
+                    case 'this rsn is already signed up':
+                    case 'teams are locked 10 minutes before a global event starts':
+                    case 'participant has no access to this event':
+                    case 'osrs hiscores cannot be reached': {
+                        this.returnMessage = `Failed to sign up because ${error}.`;
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+                    case 'osrs account cannot be found': {
+                        this.returnMessage = `The ${error}. Please try again.`;
+                        this.state = CONVERSATION_STATE.Q2E;
+                        break;
+                    }
+                    case 'team name needs to be supplied': {
+                        this.state = CONVERSATION_STATE.Q3;
+                        break;
+                    }
+                    case undefined: {
+                        this.returnMessage = 'Successfully signed-up up for event';
+                        this.state = CONVERSATION_STATE.DONE;
+                        const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                        willSignUpPlayer$.next(savedEvent);
+                        break;
+                    }
+                    default: {
+                        Utils.logger.error(`${error} case not handled`);
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+                }
                 break;
             }
+            case CONVERSATION_STATE.Q3:
             case CONVERSATION_STATE.Q3E: {
                 this.teamName = qa.answer.content;
-                this.state = await this.signupToEventWithRsnAndTeam(
-                    this.id,
+                const error: 'this rsn is already signed up'
+                | 'osrs hiscores cannot be reached'
+                | 'osrs account cannot be found'
+                | 'team name needs to be supplied'
+                | 'teams are locked 10 minutes before a global event starts'
+                | 'participant has no access to this event'
+                | undefined = await this.event.signupParticipant(
+                    this.opMessage.author.id,
+                    this.opMessage.guild.id,
                     this.rsn,
-                    this.teamName,
                 );
+                switch (error) {
+                    case 'osrs hiscores cannot be reached': {
+                        this.returnMessage = `Failed to sign up because ${error}.`;
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+                    case undefined: {
+                        this.returnMessage = 'Successfully signed-up up for event';
+                        this.state = CONVERSATION_STATE.DONE;
+                        const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                        willSignUpPlayer$.next(savedEvent);
+                        break;
+                    }
+                    // everything else should be filtered out from q2
+                    default: {
+                        Utils.logger.error(`${error} case not handled`);
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+                }
                 break;
             }
-
             default:
                 break;
         }

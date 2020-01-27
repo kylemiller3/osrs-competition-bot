@@ -9,7 +9,7 @@ import { Utils, } from '../utils';
 import { willStartEvent$, willEndEvent$, } from '../main';
 
 class EventEditConversation extends Conversation {
-    event: Event.Obj;
+    event: Event.Standard;
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
@@ -59,7 +59,7 @@ class EventEditConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Obj | null = await Db.fetchCreatorEvent(
+                    const event: Event.Standard | null = await Db.fetchCreatorEvent(
                         idToEdit,
                         this.opMessage.guild.id,
                     );

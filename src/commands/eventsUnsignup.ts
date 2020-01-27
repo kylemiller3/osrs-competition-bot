@@ -7,7 +7,6 @@ import { Event, } from '../event';
 import { Utils, } from '../utils';
 import { Db, } from '../database';
 import { willUnsignupPlayer$, } from '../main';
-import { eventNames } from 'cluster';
 
 class EventUnsignupConversation extends Conversation {
     id: number;
@@ -20,7 +19,7 @@ class EventUnsignupConversation extends Conversation {
         if (Number.isNaN(id)) {
             return CONVERSATION_STATE.Q1E;
         }
-        const event: Event.Obj | null = await Db.fetchGuildEvent(
+        const event: Event.Standard | null = await Db.fetchGuildEvent(
             id,
             this.opMessage.guild.id,
         );
@@ -70,7 +69,7 @@ class EventUnsignupConversation extends Conversation {
                 userIdx, 1
             );
         }
-        const saved: Event.Obj = await Db.upsertEvent(event);
+        const saved: Event.Standard = await Db.upsertEvent(event);
         this.returnMessage = 'Removed.';
         willUnsignupPlayer$.next(saved);
         return CONVERSATION_STATE.DONE;

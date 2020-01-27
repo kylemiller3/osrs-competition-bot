@@ -9,7 +9,7 @@ import { Utils, } from '../utils';
 import { willEndEvent$, } from '../main';
 
 class EventEndConversation extends Conversation {
-    event: Event.Obj;
+    event: Event.Standard;
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
         return Promise.resolve(false);
@@ -36,7 +36,7 @@ class EventEndConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Obj | null = await Db.fetchCreatorEvent(
+                    const event: Event.Standard | null = await Db.fetchCreatorEvent(
                         idToEdit,
                         this.opMessage.guild.id,
                     );
@@ -65,7 +65,7 @@ class EventEndConversation extends Conversation {
                     this.returnMessage = 'Event has already ended.';
                 } else {
                     this.event.when.end = new Date();
-                    const savedEvent: Event.Obj = await Db.upsertEvent(this.event);
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                     willEndEvent$.next(savedEvent);
                     // Utils.logger.trace(`Ended event id ${obj.id}.`);
                     this.returnMessage = 'Event successfully ended.';
