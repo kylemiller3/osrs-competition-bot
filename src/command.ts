@@ -119,7 +119,7 @@ export namespace Command {
                 usage: '(comma separated lists) skills AND skill1 skill2... OR bh OR lms OR clues AND difficulty1 difficulty2... OR custom OR bosses AND boss list...',
                 expectedType: ParamType.STRING,
                 required: false,
-                default: 'casual',
+                default: 'custom',
             },
             global: {
                 description: 'Cross guild event.',
@@ -520,6 +520,56 @@ export namespace Command {
     };
 
     /**
+     * The resulting dictionary after parsing [[ALL.JOIN_GLOBAL]]
+     * @category Parsing Interfaces
+     */
+    export interface JoinGlobal extends Record<string, string | number | boolean> {
+        id: number
+    }
+    /**
+     * Implementation of the force update command description
+     * @category User Implementations
+     */
+    const joinGlobal: Description = {
+        description: 'Allows your Guild to signup for a global event.',
+        accessControl: onlyAdmin,
+        command: '.joinglobal',
+        params: {
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
+                expectedType: ParamType.NUMBER,
+                required: true,
+            },
+        },
+    };
+
+    /**
+     * The resulting dictionary after parsing [[ALL.JOIN_GLOBAL]]
+     * @category Parsing Interfaces
+     */
+    export interface UnjoinGlobal extends Record<string, string | number | boolean> {
+        id: number
+    }
+    /**
+     * Implementation of the force update command description
+     * @category User Implementations
+     */
+    const unjoinGlobal: Description = {
+        description: 'Removes and forcefully removes your Guild\'s participants from a global event.',
+        accessControl: onlyAdmin,
+        command: '.unjoinglobal',
+        params: {
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
+                expectedType: ParamType.NUMBER,
+                required: true,
+            },
+        },
+    };
+
+    /**
      * The resulting dictionary after parsing [[ALL.ADMIN_SET_CHANNEL]]
      * @category Parsing Interfaces
      */
@@ -574,6 +624,8 @@ export namespace Command {
         HELP,
         // USERS_STATS,
         FORCE_UPDATE,
+        JOIN_GLOBAL,
+        UNJOIN_GLOBAL,
     }
 
     const lookup: Record<Command.ALL, Description> = {
@@ -594,6 +646,8 @@ export namespace Command {
         [Command.ALL.HELP]: help,
         // [Command.ALL.USERS_STATS]: usersStats,
         [Command.ALL.FORCE_UPDATE]: forceUpdate,
+        [Command.ALL.JOIN_GLOBAL]: joinGlobal,
+        [Command.ALL.UNJOIN_GLOBAL]: unjoinGlobal,
     };
 
     /**

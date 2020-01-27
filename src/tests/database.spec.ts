@@ -696,7 +696,7 @@ const accountA: Event.Account = {
     },
 };
 
-const insertEventA: Event.Object = {
+const insertEventA: Event.Obj = {
     guilds: {
         creator: {
             discordId: 'testA',
@@ -709,13 +709,13 @@ const insertEventA: Event.Object = {
     name: 'undefined test',
     teams: [],
     tracking: {
-        category: 'casual',
+        category: 'custom',
         what: undefined,
     },
     global: false,
 };
 
-const insertEventB: Event.Object = {
+const insertEventB: Event.Obj = {
     global: false,
     guilds: {
         creator: {
@@ -759,6 +759,7 @@ const insertEventB: Event.Object = {
     teams: [
         {
             name: 'team spaghetti',
+            guildId: '',
             participants: [
                 {
                     discordId: 'discord1',
@@ -775,6 +776,7 @@ const insertEventB: Event.Object = {
         },
         {
             name: 'team meatballs',
+            guildId: '',
             participants: [
                 {
                     discordId: 'discord2',
@@ -797,12 +799,12 @@ const insertEventB: Event.Object = {
     },
 };
 
-const settingsA: Settings.Object = {
+const settingsA: Settings.Obj = {
     guildId: 'guild 1',
     channelId: 'channel 1',
 };
 
-const settingsB: Settings.Object = {
+const settingsB: Settings.Obj = {
     guildId: 'guild 2',
     channelId: 'channel 2',
 };
@@ -829,8 +831,8 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Upsert event', async (): Promise<void> => {
-        let a: Event.Object;
-        let b: Event.Object;
+        let a: Event.Obj;
+        let b: Event.Obj;
         it('should not throw an error.', async (): Promise<void> => {
             b = await Db.upsertEvent(insertEventB, Db.testDb);
             a = await Db.upsertEvent(
@@ -856,7 +858,7 @@ describe('Postgres Database', (): void => {
             expect(b.name).to.equal(insertEventB.name);
         });
         it('should fail when starting date is greater than ending date.', async (): Promise<void> => {
-            const event: Event.Object = {
+            const event: Event.Obj = {
                 ...insertEventA,
                 when: {
                     start: new Date(1),
@@ -873,7 +875,7 @@ describe('Postgres Database', (): void => {
             assert(failed);
         });
         it('should fail when ending date is in the past.', async (): Promise<void> => {
-            const event: Event.Object = {
+            const event: Event.Obj = {
                 ...insertEventA,
                 when: {
                     start: new Date(1000),
@@ -890,7 +892,7 @@ describe('Postgres Database', (): void => {
             assert(failed);
         });
         it('should fail when starting and ending date is within 60 minutes.', async (): Promise<void> => {
-            const event: Event.Object = {
+            const event: Event.Obj = {
                 ...insertEventA,
                 when: {
                     start: new Date(1000),
@@ -907,11 +909,12 @@ describe('Postgres Database', (): void => {
             assert(failed);
         });
         it('should fail when no participants for a team are inserted.', async (): Promise<void> => {
-            const event: Event.Object = {
+            const event: Event.Obj = {
                 ...insertEventA,
                 teams: [
                     {
                         name: 'test',
+                        guildId: 'id',
                         participants: [],
                     },
                 ],
@@ -926,7 +929,7 @@ describe('Postgres Database', (): void => {
             assert(failed);
         });
         it('should update event name.', async (): Promise<void> => {
-            const b1: Event.Object = { ...insertEventB, name: 'updated event B', };
+            const b1: Event.Obj = { ...insertEventB, name: 'updated event B', };
             b = await Db.upsertEvent(
                 b1,
                 Db.testDb
@@ -936,7 +939,7 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetch all events', async (): Promise<void> => {
-        let fetchedEvents: Event.Object[];
+        let fetchedEvents: Event.Obj[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
             fetchedEvents = await Db.fetchAllEvents(Db.testDb);
@@ -946,7 +949,7 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetch event', async (): Promise<void> => {
-        let fetchedEvent: Event.Object | null;
+        let fetchedEvent: Event.Obj | null;
         it('should not return an event.', async (): Promise<void> => {
             fetchedEvent = await Db.fetchEvent(
                 3,
@@ -967,10 +970,10 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetching owned guild events', async (): Promise<void> => {
-        let fetchedEvents: Event.Object[];
+        let fetchedEvents: Event.Obj[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
-            fetchedEvents = await Db.fetchCreatorEvents(
+            fetchedEvents = await Db.fetchAllCreatorEvents(
                 'testA',
                 Db.testDb,
             );
@@ -985,7 +988,7 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetch all guild events', async (): Promise<void> => {
-        let fetchedEvents: Event.Object[];
+        let fetchedEvents: Event.Obj[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEvents(
@@ -1005,7 +1008,7 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetching all participant\'s events', async (): Promise<void> => {
-        let fetchedEvents: Event.Object[];
+        let fetchedEvents: Event.Obj[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
             fetchedEvents = await Db.fetchAllOfAParticipantsEvents(
@@ -1018,7 +1021,7 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetch all events between dates', async (): Promise<void> => {
-        let fetchedEvents: Event.Object[];
+        let fetchedEvents: Event.Obj[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
             fetchedEvents = await Db.fetchAllEventsBetweenDates(
@@ -1041,7 +1044,7 @@ describe('Postgres Database', (): void => {
         });
     });
     describe('Fetch all guild events between dates', async (): Promise<void> => {
-        let fetchedEvents: Event.Object[];
+        let fetchedEvents: Event.Obj[];
         it('should return a list of events.', async (): Promise<void> => {
             // @ts-ignore
             fetchedEvents = await Db.fetchAllGuildEventsBetweenDates(
@@ -1105,8 +1108,8 @@ describe('Postgres Database', (): void => {
             );
         });
         it('should update a channel id.', async (): Promise<void> => {
-            const a: Settings.Object = { ...settingsB, channelId: 'changed', };
-            const b: Settings.Object = await Db.upsertSettings(
+            const a: Settings.Obj = { ...settingsB, channelId: 'changed', };
+            const b: Settings.Obj = await Db.upsertSettings(
                 a,
                 Db.testDb,
             );
@@ -1116,14 +1119,14 @@ describe('Postgres Database', (): void => {
     });
     describe('Fetch settings', async (): Promise<void> => {
         it('should not return a settings.', async (): Promise<void> => {
-            const s: Settings.Object | null = await Db.fetchSettings(
+            const s: Settings.Obj | null = await Db.fetchSettings(
                 'invalid',
                 Db.testDb,
             );
             expect(s).to.be.null;
         });
         it('should return correct settings.', async (): Promise<void> => {
-            const s: Settings.Object | null = await Db.fetchSettings(
+            const s: Settings.Obj | null = await Db.fetchSettings(
                 'guild 1',
                 Db.testDb,
             );

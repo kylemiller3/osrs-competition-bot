@@ -7,7 +7,7 @@ const eventsListActive = async (
     msg: discord.Message,
 ): Promise<void> => {
     const now: Date = new Date();
-    const events: Event.Object[] | null = await Db.fetchAllGuildEventsBetweenDates(
+    const events: Event.Obj[] | null = await Db.fetchAllGuildEventsBetweenDates(
         msg.guild.id,
         now,
         now,
@@ -20,7 +20,7 @@ const eventsListActive = async (
         });
     } else {
         const content: string = events.map(
-            (event: Event.Object):
+            (event: Event.Obj):
             string => `${event.id}. ${event.name}`
         ).join('\n');
 

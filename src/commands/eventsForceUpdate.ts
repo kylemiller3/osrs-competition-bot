@@ -1,7 +1,7 @@
 import * as discord from 'discord.js';
 import { Subject, GroupedObservable, Observable, } from 'rxjs';
 import {
-    groupBy, mergeMap, debounceTime, tap, throttleTime,
+    groupBy, mergeMap, tap, throttleTime,
 } from 'rxjs/operators';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
@@ -13,10 +13,10 @@ import { Utils, } from '../utils';
 import { willUpdateScores$, } from '../main';
 import { MessageWrapper, } from '../messageWrapper';
 
-const rateThrottle: Subject<[Event.Object, discord.Message]> = new Subject();
+const rateThrottle: Subject<[Event.Obj, discord.Message]> = new Subject();
 rateThrottle.pipe(
     groupBy(
-        (eventAndMessage: [Event.Object, discord.Message]): number => {
+        (eventAndMessage: [Event.Obj, discord.Message]): number => {
             if (eventAndMessage[0].id !== undefined) {
                 return eventAndMessage[0].id;
             }
@@ -24,8 +24,8 @@ rateThrottle.pipe(
         }
     ),
     mergeMap(
-        (group: GroupedObservable<number, [Event.Object, discord.Message]>):
-        Observable<[Event.Object, discord.Message]> => group.pipe(
+        (group: GroupedObservable<number, [Event.Obj, discord.Message]>):
+        Observable<[Event.Obj, discord.Message]> => group.pipe(
             tap(
                 (): void => {
                     Utils.logger.debug('force update request');
@@ -33,7 +33,7 @@ rateThrottle.pipe(
             ),
             throttleTime(1000 * 60 * 1),
             tap(
-                (eventAndMessage: [Event.Object, discord.Message]):
+                (eventAndMessage: [Event.Obj, discord.Message]):
                 void => {
                     Utils.logger.debug('force update sending');
                     MessageWrapper.sendMessage({
@@ -52,7 +52,7 @@ rateThrottle.pipe(
 ).subscribe();
 
 class ForceUpdateConversation extends Conversation {
-    event: Event.Object;
+    event: Event.Obj;
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
@@ -80,26 +80,39 @@ class ForceUpdateConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchCreatorEvent(
+                    const creatorEvent: Event.Obj | null = await Db.fetchCreatorEvent(
                         eventId,
                         this.opMessage.guild.id,
                     );
+                    const invitedEvent: Event.Obj | null = await Db.fetchInvitedEvent(
+                        eventId,
+                        this.opMessage.guild.id,
+                    );
+                    const event: Event.Obj | null = creatorEvent !== null
+                        ? creatorEvent
+                        : invitedEvent;
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
-                    } else {
-                        this.event = event;
-                        if (Utils.isInPast(this.event.when.end)) {
-                            // confirm if event already ended
-                            this.state = CONVERSATION_STATE.Q1C;
-                            return;
-                        }
-                        rateThrottle.next([
-                            this.event,
-                            this.opMessage,
-                        ]);
-                        this.returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
-                        this.state = CONVERSATION_STATE.DONE;
+                        break;
                     }
+                    if (event.global
+                        && Utils.isInPast(event.when.end)) {
+                        this.returnMessage = 'Sorry, this command is disabled for global events after they end.';
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+                    this.event = event;
+                    if (Utils.isInPast(this.event.when.end)) {
+                        // confirm if event already ended
+                        this.state = CONVERSATION_STATE.Q1C;
+                        return;
+                    }
+                    rateThrottle.next([
+                        this.event,
+                        this.opMessage,
+                    ]);
+                    this.returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
+                    this.state = CONVERSATION_STATE.DONE;
                 }
                 break;
             }

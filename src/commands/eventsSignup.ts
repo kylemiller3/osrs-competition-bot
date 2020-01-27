@@ -24,12 +24,46 @@ class EventsSignupConversation extends Conversation {
         if (Number.isNaN(id)) {
             return CONVERSATION_STATE.Q1E;
         }
-        const event: Event.Object | null = await Db.fetchGuildEvent(
+        const creatorEvent: Event.Obj | null = await Db.fetchCreatorEvent(
             id,
             this.opMessage.guild.id,
         );
+        const invitedEvent: Event.Obj | null = await Db.fetchInvitedEvent(
+            id,
+            this.opMessage.guild.id,
+        );
+        if (invitedEvent !== null) {
+            // we need to add a new other object
+            if (invitedEvent.guilds.others === undefined) {
+                invitedEvent.guilds.others = [
+                    {
+                        discordId: this.opMessage.guild.id,
+                    },
+                ];
+            } else {
+                invitedEvent.guilds.others = [
+                    ...invitedEvent.guilds.others,
+                    {
+                        discordId: this.opMessage.guild.id,
+                    },
+                ];
+            }
+        }
+
+        const event: Event.Obj | null = creatorEvent !== null
+            ? creatorEvent
+            : invitedEvent;
+
         if (event === null || Utils.isInPast(event.when.end)) {
             return CONVERSATION_STATE.Q1E;
+        }
+
+        const thirtyMinsBeforeStart: Date = new Date(event.when.start);
+        thirtyMinsBeforeStart.setMinutes(thirtyMinsBeforeStart.getMinutes() - 30);
+        if (event.global
+            && Utils.isInPast(thirtyMinsBeforeStart)) {
+            this.returnMessage = 'Sorry, teams are locked 30 minutes before a global event starts.';
+            return CONVERSATION_STATE.DONE;
         }
 
         // p2
@@ -95,7 +129,7 @@ class EventsSignupConversation extends Conversation {
                 boolean => participant.discordId === this.opMessage.author.id
             ) : -1;
 
-        const newEvent: Event.Object = { ...event, };
+        const newEvent: Event.Obj = { ...event, };
         if (participantIdx !== -1 && participantJdx !== -1) {
             // we know the team to signup for
             const participant: Event.Participant = newEvent
@@ -109,7 +143,7 @@ class EventsSignupConversation extends Conversation {
                         rsn,
                     });
             // save event
-            const savedEvent: Event.Object = await Db.upsertEvent(newEvent);
+            const savedEvent: Event.Obj = await Db.upsertEvent(newEvent);
             willSignUpPlayer$.next(savedEvent);
 
             this.returnMessage = 'Signed up for team';
@@ -129,6 +163,7 @@ class EventsSignupConversation extends Conversation {
             // create a new team
             const team: Event.Team = {
                 name: teamName,
+                guildId: this.opMessage.guild.id,
                 participants: [
                     {
                         discordId: this.opMessage.author.id,
@@ -164,7 +199,7 @@ class EventsSignupConversation extends Conversation {
         }
 
         // save event
-        const savedEvent: Event.Object = await Db.upsertEvent(newEvent);
+        const savedEvent: Event.Obj = await Db.upsertEvent(newEvent);
         willSignUpPlayer$.next(savedEvent);
 
         this.returnMessage = 'Signed up for team';
@@ -204,7 +239,7 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q2E:
-                return 'Cannot find Runescape name on hiscores. Maybe the Runescape hiscores are down? Please try again.';
+                return 'Cannot find Runescape name on hiscores. Please try again.';
             case CONVERSATION_STATE.Q3:
                 return 'Which team would you like to join?';
             case CONVERSATION_STATE.Q3E:

@@ -1,7 +1,9 @@
 import {
     hiscores,
 } from 'osrs-json-api';
-import { getTagFromDiscordId, gClient, getDisplayNameFromDiscordId, } from './main';
+import {
+    getTagFromDiscordId, gClient, getDisplayNameFromDiscordId, getDiscordGuildName,
+} from './main';
 import { Utils, } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -107,7 +109,7 @@ export namespace Event {
      * @category Event
      */
     export interface Participant {
-        discordId: string
+        discordId: string // their discord id
         customScore: number
         runescapeAccounts: Account[]
     }
@@ -127,8 +129,7 @@ export namespace Event {
      * Enum of all possible [[Tracking]] options
      * @category Tracking
      */
-    export type TrackingCategory = 'casual'
-    | 'skills'
+    export type TrackingCategory = 'skills'
     | 'bh'
     | 'lms'
     | 'clues'
@@ -137,11 +138,11 @@ export namespace Event {
 
     /**
      * Contract for information on a Team
-     * for a non-casual [[Event]]
      * @category Event
      */
     export interface Team {
         name: string
+        guildId: string
         participants: Participant[]
     }
 
@@ -190,7 +191,7 @@ export namespace Event {
      * Contract for a RuneScape Event
      * @category Event
      */
-    export interface Object {
+    export interface Obj {
         id?: number
         name: string
         when: When
@@ -198,6 +199,7 @@ export namespace Event {
         teams: Team[]
         tracking: Tracking
         global: boolean
+        invitations?: string[]
     }
 
     /**
@@ -207,9 +209,9 @@ export namespace Event {
      * @category Helper
      */
     export const getEventTracking = (
-        event: Event.Object
+        event: Event.Obj
     ): TrackingCategory => {
-        if (event.tracking === undefined) return 'casual';
+        if (event.tracking === undefined) return 'custom';
         return event.tracking.category;
     };
 
@@ -218,28 +220,8 @@ export namespace Event {
      * @param event The event to check
      */
     export const isLongRunningEvent = (
-        event: Event.Object,
-    ): boolean => event.when.end === undefined;
-
-    /**
-     * Checks an event to see if [[Event.Team]] is defined
-     * @param event The event to check
-     * @returns True if the event is a team event
-     * @category Event Property
-     */
-    export const isTeamEvent = (
-        event: Event.Object,
-    ): boolean => event.teams !== undefined;
-
-    /**
-     * Checks an [[Event]] to see if it is casual
-     * @param event The event to check
-     * @returns True if the event is a causal event
-     * @category Event Property
-     */
-    export const isEventCasual = (
-        event: Event.Object,
-    ): boolean => getEventTracking(event) === 'casual';
+        event: Event.Obj,
+    ): boolean => event.when.end >= Utils.distantFuture;
 
     /**
      * Checks an event to see if it is a [[EventType.CUSTOM]] type
@@ -248,7 +230,7 @@ export namespace Event {
      * @category Event Property
      */
     export const isEventCustom = (
-        event: Event.Object
+        event: Event.Obj
     ): boolean => getEventTracking(event) === 'custom';
 
 
@@ -278,8 +260,30 @@ export namespace Event {
         participantsScores: ParticipantScoreboard[]
     }
 
+    /**
+     * Gets the status string based on current time for the event
+     * @param event The event to get the status from
+     * @returns A string
+     */
+    export const getStatusStr = (
+        event: Event.Obj,
+    ): string => {
+        const now: Date = new Date();
+        let status: string;
+        if (Utils.isInFuture(event.when.start)) {
+            status = 'sign-ups';
+        } else if (Utils.isInPast(event.when.end)) {
+            status = 'ended';
+        } else if (Event.isLongRunningEvent(event)) {
+            status = 'active (∞ hrs left)';
+        } else {
+            status = `active (${Number(((event.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
+        }
+        return status;
+    };
+
     export const getEventScoreboardString = async (
-        event: Event.Object,
+        event: Event.Obj,
         error: Error | undefined = undefined,
         guildId: string,
         currentScoreboard: TeamScoreboard[],
@@ -356,17 +360,7 @@ export namespace Event {
             }
         ).join('\n');
 
-        const now: Date = new Date();
-        let status: string;
-        if (event.when.end >= Utils.distantFuture) {
-            status = '';
-        } else if (Utils.isInPast(event.when.end)) {
-            status = '(ended)';
-        } else if (Utils.isInPast(event.when.start)) {
-            status = `(${Number(((event.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
-        } else {
-            status = '(sign-ups)';
-        }
+        const status: string = getStatusStr(event);
 
         // if (error !== undefined) {
         //     const lastUpdatedStr: string = lastUpdateSuccess === null
@@ -376,14 +370,46 @@ export namespace Event {
         // }
         // lastUpdateSuccess = new Date();
         // return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}\nUpdated: ${lastUpdateSuccess.toLocaleString('en-us')}`;
+        let ret: string;
         if (error !== undefined) {
-            return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}\n\n${error}`;
+            ret = `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toUTCString()} ${status}\n\n${str}\n\n${error}`;
+        } else {
+            ret = `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toUTCString()} ${status}\n\n${str}\n\nUpdated: ${new Date().toUTCString()}`;
         }
-        return `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toLocaleString('en-us')} ${status}\n\n${str}\n\nUpdated: ${new Date().toLocaleString('en-us')}`;
+        if (event.global) {
+            const combinedGuilds = event.guilds.others !== undefined
+                ? [
+                    event.guilds.creator,
+                    ...event.guilds.others,
+                ]
+                : [
+                    event.guilds.creator,
+                ];
+            const competitors: string = combinedGuilds.map(
+                (guild: Event.Guild): string => {
+                    let guildName: string | null = getDiscordGuildName(
+                        gClient,
+                        guild.discordId,
+                    );
+                    guildName = guildName !== null
+                        ? `${guildName} `
+                        : '';
+                    return `${guildName}${guild.discordId}`;
+                }
+            ).join('\n\t');
+            return ret.concat(`\n\nCompetitors:\n\t${competitors}`);
+        }
+        return ret;
     };
 
+    /**
+     * Creates a scoreboard object from an event.
+     * This function tallies cumulative point total and sorts the scoreboard.
+     * @param event The event to score
+     * @returns An array of sorted scoreboards for teams
+     */
     export const getEventTeamsScoreboards = (
-        event: Event.Object,
+        event: Event.Obj,
     ): TeamScoreboard[] => {
         // get the tracking category
         const categoryKey: TrackingCategory = event.tracking.category;

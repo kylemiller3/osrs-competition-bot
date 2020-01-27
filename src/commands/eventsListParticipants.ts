@@ -8,7 +8,7 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 
 class ListParticipantsConversation extends Conversation {
-    event: Event.Object;
+    event: Event.Obj;
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
         return Promise.resolve(false);
@@ -33,7 +33,7 @@ class ListParticipantsConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchGuildEvent(
+                    const event: Event.Obj | null = await Db.fetchGuildEvent(
                         idToEdit,
                         this.opMessage.guild.id,
                     );

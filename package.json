@@ -1,7 +1,7 @@
 {
-  "name": "osrs-discord-competition-bot",
-  "version": "2.0.0",
-  "description": "Runs competitions for osrs on Discord.",
+  "name": "osrs-competition-discord-bot",
+  "version": "1.0.0",
+  "description": "Automatically runs competitive events (skills, bosses, bounty hunter etc,) and tracks scores on Discord Guilds.",
   "main": "main.js",
   "scripts": {
     "build": "tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",

@@ -1,2 +1,2 @@
-# OSRS competition bot
-Automatically runs competitions for osrs clan events
+# OSRS Competition Discord Bot
+Automatically runs competitive events (skills, bosses, bounty hunter etc,) and tracks scores on Discord Guilds.

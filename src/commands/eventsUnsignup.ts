@@ -7,8 +7,9 @@ import { Event, } from '../event';
 import { Utils, } from '../utils';
 import { Db, } from '../database';
 import { willUnsignupPlayer$, } from '../main';
+import { eventNames } from 'cluster';
 
-class EventDeleteConversation extends Conversation {
+class EventUnsignupConversation extends Conversation {
     id: number;
 
     private async unsignupToEvent(
@@ -19,25 +20,22 @@ class EventDeleteConversation extends Conversation {
         if (Number.isNaN(id)) {
             return CONVERSATION_STATE.Q1E;
         }
-        const event: Event.Object | null = await Db.fetchGuildEvent(
+        const event: Event.Obj | null = await Db.fetchGuildEvent(
             id,
             this.opMessage.guild.id,
         );
-        let access = false;
-        if (event !== null) {
-            const standard: boolean = event.guilds.creator.discordId
-                === this.opMessage.guild.id;
-            const global: boolean = event.global === true
-                && event.guilds.others !== undefined
-                && event.guilds.others.some(
-                    (guild: Event.Guild):
-                    boolean => guild.discordId === this.opMessage.guild.id
-                );
-            access = standard || global;
-        }
-        if (event === null || access === false) {
+        if (event === null) {
             return CONVERSATION_STATE.Q1E;
         }
+
+        const thirtyMinsBeforeStart: Date = new Date(event.when.start);
+        thirtyMinsBeforeStart.setMinutes(thirtyMinsBeforeStart.getMinutes() - 30);
+        if (event.global
+            && Utils.isInPast(thirtyMinsBeforeStart)) {
+            this.returnMessage = 'Sorry, teams are locked 30 minutes before a global event starts.';
+            return CONVERSATION_STATE.DONE;
+        }
+
         // did we find the user?
         const findUser = (participant: Event.Participant):
         boolean => participant.discordId.toLowerCase()
@@ -72,7 +70,7 @@ class EventDeleteConversation extends Conversation {
                 userIdx, 1
             );
         }
-        const saved: Event.Object = await Db.upsertEvent(event);
+        const saved: Event.Obj = await Db.upsertEvent(event);
         this.returnMessage = 'Removed.';
         willUnsignupPlayer$.next(saved);
         return CONVERSATION_STATE.DONE;
@@ -137,7 +135,7 @@ void => {
         msg.content,
     );
 
-    const eventDeleteConversation = new EventDeleteConversation(
+    const eventDeleteConversation = new EventUnsignupConversation(
         msg,
         params,
     );

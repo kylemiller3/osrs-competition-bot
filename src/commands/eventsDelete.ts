@@ -8,7 +8,7 @@ import { Db, } from '../database';
 import { Utils, } from '../utils';
 
 class EventDeleteConversation extends Conversation {
-    event: Event.Object;
+    event: Event.Obj;
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
@@ -36,16 +36,23 @@ class EventDeleteConversation extends Conversation {
                 if (Number.isNaN(idToDelete)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchCreatorEvent(
+                    const event: Event.Obj | null = await Db.fetchCreatorEvent(
                         idToDelete,
                         this.opMessage.guild.id,
                     );
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
-                    } else {
-                        this.event = event;
-                        this.state = CONVERSATION_STATE.CONFIRM;
+                        break;
                     }
+                    if (event.global
+                        && Utils.isInPast(event.when.start)) {
+                        this.returnMessage = 'Global events are locked after they start.';
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+
+                    this.event = event;
+                    this.state = CONVERSATION_STATE.CONFIRM;
                 }
                 break;
             }

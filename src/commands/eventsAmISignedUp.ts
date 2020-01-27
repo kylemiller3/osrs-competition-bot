@@ -7,9 +7,9 @@ import { Db, } from '../database';
 import { Command, } from '../command';
 
 class AmISignedUpConversation extends Conversation {
-    events: Event.Object[] = [];
+    events: Event.Obj[] = [];
     static isSignedUp(
-        event: Event.Object,
+        event: Event.Obj,
         discordId: string,
     ): boolean {
         const signedUp: boolean = event.teams.some(
@@ -46,7 +46,7 @@ class AmISignedUpConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Object | null = await Db.fetchGuildEvent(
+                    const event: Event.Obj | null = await Db.fetchGuildEvent(
                         eventId,
                         this.opMessage.guild.id,
                     );
