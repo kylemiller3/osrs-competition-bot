@@ -1127,3 +1127,5 @@ const init = async (): Promise<void> => {
 init();
 
 // TODO:
+// Update add command code
+// Change global join to specify team name immediately
