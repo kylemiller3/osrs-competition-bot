@@ -86,7 +86,7 @@ Shorthand: *.forceunsignup id=(event id)*
 Shorthand: *.signup id=(event id) rsn=(Runescape name) team=(any teamname) *
   * You must have a valid Runescape name on the Hiscores to signup.
   * You cannot signup the same Runescape name but you may have more than one Runescape account to your name.
-  * Do not change your Runescape name after you have signed up or tracking will cease to work.
+  * Changing your Runescape name after you have signed up will cause tracking to cease working.
   * You may change your Discord name after you have signed up.
   * Sometimes the Hiscores are slow or are down. Be patient for a response.
   * Team names must be supplied. Other players can join your team by specifying the same team name.
