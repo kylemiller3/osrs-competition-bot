@@ -14,8 +14,9 @@ To run this bot you must install Postgresql v9.5 or later with node v11.0.0 or l
     export const privateKey = 'your discord bot private key';
     export const dbPassword = 'the database password you chose';
     ```
-4. Run *npm start*
-5. Follow standard Discord procedure to [create and invite your bot.](https://discordapp.com/developers/applications/)
+4. Follow standard Discord procedure to [create and invite your bot.](https://discordapp.com/developers/applications/)
+5. Run *npm start*
+
 
 ## Standard user guide
 ### Setup for Discord Guild administrators
