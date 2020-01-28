@@ -6,6 +6,7 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
+import { willDeleteEvent$ } from '../main';
 
 class EventDeleteConversation extends Conversation {
     event: Event.Standard;
@@ -22,7 +23,7 @@ class EventDeleteConversation extends Conversation {
             case CONVERSATION_STATE.Q1E:
                 return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to delete event ${this.event.name}? This cannot be undone.`;
+                return `Are you sure you want to delete event "${this.event.name}"? This cannot be undone.`;
             default:
                 return null;
         }
@@ -44,9 +45,8 @@ class EventDeleteConversation extends Conversation {
                         this.state = CONVERSATION_STATE.Q1E;
                         break;
                     }
-                    if (event.global
-                        && Utils.isInPast(event.when.start)) {
-                        this.returnMessage = 'Global events are locked after they start.';
+                    if (event.canDelete() !== undefined) {
+                        this.returnMessage = 'This event cannot be deleted anymore.';
                         this.state = CONVERSATION_STATE.DONE;
                         break;
                     }
@@ -62,7 +62,8 @@ class EventDeleteConversation extends Conversation {
                     this.returnMessage = 'Cancelled.';
                 } else {
                     if (this.event.id !== undefined) {
-                        Db.deleteEvent(this.event.id);
+                        await Db.deleteEvent(this.event.id);
+                        willDeleteEvent$.next(this.event);
                     }
                     this.returnMessage = 'Event deleted.';
                 }

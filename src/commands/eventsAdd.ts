@@ -334,28 +334,32 @@ class EventAddConversation extends Conversation {
 
                 if (!global) {
                     this.event = new Event.Standard(
+                        undefined,
                         this.params.name as string,
                         this.start,
                         this.end,
                         {
                             creator: {
-                                discordId: qa.answer.guild.id,
+                                guildId: qa.answer.guild.id,
                             },
                         },
+                        [],
                         this.tracker,
                         global,
                     );
                     this.state = CONVERSATION_STATE.CONFIRM;
                 } else {
                     this.event = new Event.Global(
+                        undefined,
                         this.params.name as string,
                         this.start,
                         this.end,
                         {
                             creator: {
-                                discordId: qa.answer.guild.id,
+                                guildId: qa.answer.guild.id,
                             },
                         },
+                        [],
                         this.tracker,
                         global,
                     );

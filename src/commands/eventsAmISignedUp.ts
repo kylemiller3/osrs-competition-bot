@@ -16,7 +16,7 @@ class AmISignedUpConversation extends Conversation {
             (team: Event.Team):
             boolean => team.participants.some(
                 (participant: Event.Participant):
-                boolean => participant.discordId === discordId
+                boolean => participant.userId === discordId
             )
         );
         return signedUp;

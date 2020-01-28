@@ -37,7 +37,7 @@ class EventUnsignupConversation extends Conversation {
 
         // did we find the user?
         const findUser = (participant: Event.Participant):
-        boolean => participant.discordId.toLowerCase()
+        boolean => participant.userId.toLowerCase()
                     === this.opMessage.author.id.toLowerCase();
 
         const userIdx: number = event.teams.findIndex(
@@ -108,7 +108,11 @@ class EventUnsignupConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 this.id = Number.parseInt(qa.answer.content, 10);
-                this.state = await this.unsignupToEvent(this.id);
+                if (Number.isNaN(this.id)) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                } else {
+                    this.state = await this.unsignupToEvent(this.id);
+                }
                 break;
             }
             case CONVERSATION_STATE.CONFIRM: {

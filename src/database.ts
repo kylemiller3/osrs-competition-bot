@@ -1,7 +1,6 @@
 import pgp, { PreparedStatement, } from 'pg-promise';
 // eslint-disable-next-line import/no-unresolved
 import pg from 'pg-promise/typescript/pg-subset';
-import { async, } from 'rxjs/internal/scheduler/async';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
@@ -30,28 +29,30 @@ export namespace Db {
     ): Event.Standard => {
         const event: Event.Standard = eventRow.event;
         let returnEvent: Event.Standard;
-        if (event instanceof Event.Global) {
-            Utils.logger.debug('test');
+        if (event instanceof Event.Global || event.global) {
             returnEvent = new Event.Global(
+                eventRow.id,
                 event.name,
                 event.when.start,
                 event.when.end,
                 event.guilds,
+                event.teams,
                 event.tracking,
                 event.global,
-                event.invitations,
+                (event as Event.Global).invitations,
             );
         } else {
             returnEvent = new Event.Standard(
+                eventRow.id,
                 event.name,
                 event.when.start,
                 event.when.end,
                 event.guilds,
+                event.teams,
                 event.tracking,
                 event.global,
             );
         }
-        returnEvent.id = eventRow.id;
         return returnEvent;
     };
     // }({
@@ -217,7 +218,7 @@ export namespace Db {
                 text: 'CREATE INDEX IF NOT EXISTS idx_creator_guild_id ON '
                         + `${TABLES.EVENTS}`
                         + '('
-                            + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId')`
+                            + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId')`
                         + ')',
             });
             task.none({
@@ -276,7 +277,7 @@ export namespace Db {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
                     + '('
-                        + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'discordId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' IS NULL`
+                        + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'guildId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' IS NULL`
                     + ')',
             });
             task.none({
@@ -316,9 +317,10 @@ export namespace Db {
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Standard> => {
         if (event.id === undefined) {
+            const json: string = JSON.stringify(event);
             const ret: {id: number; event: Event.Standard} = await db.one(
                 insertNewEventStmt,
-                JSON.stringify(event),
+                json,
             );
             return rowToEvent(ret);
         }
@@ -395,7 +397,7 @@ export namespace Db {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'WHERE '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`,
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text`,
     });
     export const fetchAllCreatorEvents = async (
         guildId: string,
@@ -419,7 +421,7 @@ export namespace Db {
             + 'WHERE '
             + `${EVENTS_COL.ID} = $1::bigint `
             + 'AND '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $2::text`,
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`,
     });
     export const fetchCreatorEvent = async (
         id: number,
@@ -445,9 +447,9 @@ export namespace Db {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'WHERE '
-            + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
+            + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
             + 'OR '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text `
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text `
             + 'ORDER BY '
             + `${EVENTS_COL.ID} DESC`,
     });
@@ -474,9 +476,9 @@ export namespace Db {
             + `${EVENTS_COL.ID} = $1::bigint `
             + 'AND'
             + '('
-                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $2::text)) `
+                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $2::text)) `
                 + 'OR '
-                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $2::text`
+                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`
             + ')',
     });
     export const fetchGuildEvent = async (
@@ -556,12 +558,12 @@ export namespace Db {
             + ')',
     });
     export const fetchAllInvitedEvents = async (
-        discordId: string,
+        guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllInvitedEventsStmt,
-            discordId,
+            guildId,
         );
         if (ret === null) return null;
         return ret.map(rowToEvent);
@@ -587,14 +589,14 @@ export namespace Db {
     });
     export const fetchInvitedEvent = async (
         id: number,
-        discordId: string,
+        guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Standard | null> => {
         const ret: EventRow | null = await db.oneOrNone(
             fetchInvitedEventStmt,
             [
                 id,
-                discordId,
+                guildId,
             ],
         );
         if (ret === null) return null;
@@ -610,15 +612,15 @@ export namespace Db {
             + `${TABLES.EVENTS}, `
             + `jsonb_array_elements(${EVENTS_COL.EVENT}->'teams') teams `
             + 'WHERE '
-            + 'teams->\'participants\' @> jsonb_build_array(jsonb_build_object(\'discordId\', $1::text))',
+            + 'teams->\'participants\' @> jsonb_build_array(jsonb_build_object(\'userId\', $1::text))',
     });
     export const fetchAllOfAParticipantsEvents = async (
-        discordId: string,
+        userId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Standard[] | null> => {
         const ret: EventRow[] | null = await db.manyOrNone(
             fetchAllOfAParticipantsEventsStmt,
-            discordId,
+            userId,
         );
         if (ret === null) return null;
         return ret.map(rowToEvent);
@@ -691,9 +693,9 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('discordId', $1::text)) `
+                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
                 + 'OR '
-                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'discordId' = $1::text`
+                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text`
             + ') '
             + 'AND '
             + '('

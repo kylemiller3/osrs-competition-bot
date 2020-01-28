@@ -119,7 +119,7 @@ export namespace Event {
      * @category Event
      */
     export interface Participant {
-        discordId: string // their discord id
+        userId: string // their discord id
         customScore: number
         runescapeAccounts: Account[]
     }
@@ -169,7 +169,7 @@ export namespace Event {
      */
     export interface ChannelMessage {
         channelId: string
-        messagesId: string[]
+        messageId: string[]
     }
 
     /**
@@ -177,7 +177,7 @@ export namespace Event {
      * @category Event
      */
     export interface Guild {
-        discordId: string
+        guildId: string
         scoreboardMessage?: ChannelMessage
     }
 
@@ -250,19 +250,33 @@ export namespace Event {
         global: boolean
 
         constructor(
+            id: number | undefined,
             name: string,
             start: Date,
             end: Date,
             guilds: CompetingGuilds,
+            teams: Team[],
             tracking: Tracking,
             global: boolean,
         ) {
+            this.id = id;
             this.name = name;
-            this.when.start = new Date(start);
-            this.when.end = new Date(end);
+            this.when = {
+                start: new Date(start),
+                end: new Date(end),
+            };
             this.guilds = { ...guilds, };
+            this.teams = [
+                ...teams,
+            ];
             this.tracking = { ...tracking, };
             this.global = global;
+        }
+
+        // eslint-disable-next-line class-methods-use-this
+        canDelete(): 'the global event has started already'
+        | undefined {
+            return undefined;
         }
 
         getEventTracking(): TrackingCategory {
@@ -319,7 +333,7 @@ export namespace Event {
                 (team: Team, idx: number): void => {
                     team.participants.forEach(
                         (participant: Participant, idi: number): void => {
-                            if (participant.discordId === participantId) {
+                            if (participant.userId === participantId) {
                                 teamIdx = idx;
                                 participantIdx = idi;
                             }
@@ -334,9 +348,17 @@ export namespace Event {
             return false;
         }
 
-        end(): boolean {
-            this.when.end = new Date();
-            return true;
+        end(): 'ending early is disabled for global events'
+        | 'the event has not started'
+        | 'the event has already ended'
+        | undefined {
+            if (Utils.isInFuture(this.when.start)) {
+                return 'the event has not started';
+            }
+            if (Utils.isInPast(this.when.end)) {
+                return 'the event has already ended';
+            }
+            return undefined;
         }
 
         async signupParticipant(
@@ -350,7 +372,6 @@ export namespace Event {
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
-            | 'participant has no access to this event'
             | undefined
             > {
             const findRsn = (participant: Event.Participant):
@@ -399,14 +420,14 @@ export namespace Event {
                 (team: Event.Team):
                 boolean => team.participants.some(
                     (participant: Event.Participant):
-                    boolean => participant.discordId === participantId
+                    boolean => participant.userId === participantId
                 )
             );
 
             const participantJdx: number = participantIdx !== -1
                 ? this.teams[participantIdx].participants.findIndex(
                     (participant: Event.Participant):
-                    boolean => participant.discordId === participantId
+                    boolean => participant.userId === participantId
                 ) : -1;
 
             if (participantIdx !== -1 && participantJdx !== -1) {
@@ -436,7 +457,7 @@ export namespace Event {
             );
 
             const participant: Participant = {
-                discordId: participantId,
+                userId: participantId,
                 customScore: 0,
                 runescapeAccounts: [
                     {
@@ -449,7 +470,7 @@ export namespace Event {
                 // create a new team
                 const team: Team = {
                     name: teamName,
-                    guildId,
+                    guildId: guildId,
                     participants: [
                         participant,
                     ],
@@ -498,7 +519,7 @@ export namespace Event {
         | undefined {
             // did we find the user?
             const findUser = (participant: Event.Participant):
-            boolean => participant.discordId === participantId;
+            boolean => participant.userId === participantId;
 
             const userIdx: number = this.teams.findIndex(
                 (team: Event.Team):
@@ -555,11 +576,11 @@ export namespace Event {
                         (participant: Event.Participant):
                         Promise<discord.User | string> => gClient
                             .fetchUser(
-                                participant.discordId
+                                participant.userId
                             ).catch(
                                 (error: Error): string => {
                                     Utils.logger.error(`${error} when fetching player`);
-                                    return participant.discordId;
+                                    return participant.userId;
                                 }
                             )
                     );
@@ -690,7 +711,7 @@ export namespace Event {
                             ).reduce(add);
 
                             return {
-                                lhs: participant.discordId,
+                                lhs: participant.userId,
                                 customScore,
                                 participantScore,
                                 accountsScores,
@@ -720,13 +741,14 @@ export namespace Event {
 
         async getEventScoreboardString(
             guildId: string,
+            deleted: boolean,
             // granularity: 'teams' | 'participants' | 'accounts' | 'what',
             // inversion: boolean = false,
             // mode: 'regular' | 'shortened', // boss mode is likely too long make a special case
             // numEntries: number = 3,
         ): Promise<string> {
             // format the string here
-            const tabLength = 2;
+            const tabLength = 3;
             // const lhsPaddingLength = 6;
             // const diffPadding = 2;
 
@@ -785,12 +807,21 @@ export namespace Event {
                         }
                     ).join(`\n${tab}`);
                     if (team.teamScore !== 0) {
-                        return `${idi + 1}. Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
+                        return `${idi + 1} Team ${team.lhs}${tab}${team.teamScore.toLocaleString('en-us')}\n${tab}${participantsStr}`;
                     }
-                    return `${idi + 1}. Team ${team.lhs}\n${tab}${participantsStr}`;
+                    return `${idi + 1} Team ${team.lhs}\n${tab}${participantsStr}`;
                 }
             ).join('\n');
-            return str;
+
+            const status: string = !deleted
+                ? this.getStatusString()
+                : '(DELETED EVENT)';
+            // if (error !== undefined) {
+            //     ret = `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toUTCString()} ${status}\n\n${str}\n\n${error}`;
+            // } else {
+            //     ret = `Event ${event.name} (${event.tracking.category})\n#${event.id} ${event.when.start.toUTCString()} ${status}\n\n${str}\n\nUpdated: ${new Date().toUTCString()}`;
+            // }
+            return `Event ${this.name} (${this.tracking.category})\n#${this.id} ${this.when.start.toUTCString()} ${status}\n\n${str}`;
         }
     }
 
@@ -801,19 +832,23 @@ export namespace Event {
         invitations?: string[]
 
         constructor(
+            id: number | undefined,
             name: string,
             start: Date,
             end: Date,
             guilds: CompetingGuilds,
+            teams: Team[],
             tracking: Tracking,
             global: boolean,
             invitations?: string[],
         ) {
             super(
+                id,
                 name,
                 start,
                 end,
                 guilds,
+                teams,
                 tracking,
                 global,
             );
@@ -821,6 +856,12 @@ export namespace Event {
             this.invitations = invitations;
         }
 
+        canDelete(): 'the global event has started already'
+        | undefined {
+            return Utils.isInPast(this.when.start)
+                ? 'the global event has started already'
+                : undefined;
+        }
 
         validate(): ('the name is over 50 characters'
         | 'the name is blank'
@@ -866,8 +907,11 @@ export namespace Event {
             return false;
         }
 
-        end(): boolean {
-            return false;
+        end(): 'ending early is disabled for global events'
+        | 'the event has not started'
+        | 'the event has already ended'
+        | undefined {
+            return 'ending early is disabled for global events';
         }
         /* eslint-enable class-methods-use-this */
         /* eslint-enable @typescript-eslint/no-unused-vars */
@@ -883,19 +927,8 @@ export namespace Event {
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
-            | 'participant has no access to this event'
             | undefined
             > {
-            // participant eligibility should be determined by the database
-            // this shouldn't be called if they are not eligible
-            // check anyway
-            if (this.guilds.others === undefined || !this.guilds.others.some(
-                (guild: Guild): boolean => guild.discordId === guildId
-            )) {
-                Utils.logger.error(`Database did not filter out this participant for event ${this.id} and guild ${guildId}`);
-                return 'participant has no access to this event';
-            }
-
             // we may need to override the teamname for a cross guild event
             // before we pass it to super
             // find a team with the same guildId
@@ -922,7 +955,6 @@ export namespace Event {
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
-            | 'participant has no access to this event'
             | undefined
             > = super.signupParticipant(
                 participantId,
@@ -935,8 +967,7 @@ export namespace Event {
 
         async getEventScoreboardString(
             guildId: string,
-            error?: Error,
-            lastScoreboard?: TeamScoreboard[],
+            deleted: boolean,
             // granularity: 'teams' | 'participants' | 'accounts' | 'what',
             // inversion: boolean = false,
             // mode: 'regular' | 'shortened', // boss mode is likely too long make a special case
@@ -944,13 +975,31 @@ export namespace Event {
         ): Promise<string> {
             const scoreboard: string = await super.getEventScoreboardString(
                 guildId,
+                deleted,
             );
 
-            const guildNameStrs: string = this.teams.map(
-                (team: Team): string => `${team.name} - ${getDiscordGuildName}`
+            const combinedGuilds = this.guilds.others !== undefined
+                ? [
+                    this.guilds.creator,
+                    ...this.guilds.others,
+                ]
+                : [
+                    this.guilds.creator,
+                ];
+            const competitors: string = combinedGuilds.map(
+                (guild: Event.Guild): string => {
+                    let guildName: string | null = getDiscordGuildName(
+                        gClient,
+                        guild.guildId,
+                    );
+                    guildName = guildName !== null
+                        ? `${guildName} `
+                        : '';
+                    return `${guildName}(id: ${guild.guildId})`;
+                }
             ).join('\n');
             getDiscordGuildName(gClient, guildId);
-            return scoreboard.concat(`\n\n${guildNameStrs}`);
+            return scoreboard.concat(`\n\n${competitors}`);
         }
     }
 }

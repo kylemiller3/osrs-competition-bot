@@ -19,7 +19,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
-                return 'Join which event id? (type .exit to stop command)';
+                return 'Leave which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:
                 return 'Could not find event. Did you join this event? Hint: find the event id with the listall command. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
@@ -34,6 +34,10 @@ class EventsUnjoinGlobalConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id: number = Number.parseInt(qa.answer.content, 10);
+                if (Number.isNaN(id)) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    break;
+                }
                 const event: Event.Standard | null = await Db.fetchGuildEvent(
                     id,
                     this.opMessage.guild.id,
@@ -64,34 +68,30 @@ class EventsUnjoinGlobalConversation extends Conversation {
                     break;
                 }
 
-                // filter out on the invite list
-                const newInvitees: Event.Guild[] = this.event.guilds.others.filter(
-                    (invitee: Event.Guild): boolean => invitee.discordId !== this.opMessage.guild.id
+                // filter out on the others list
+                const newOthers: Event.Guild[] = this.event.guilds.others.filter(
+                    (other: Event.Guild): boolean => other.guildId !== this.opMessage.guild.id
                 );
-                if (this.event.guilds.others.length === newInvitees.length) {
+                if (this.event.guilds.others.length === newOthers.length) {
                     this.state = CONVERSATION_STATE.DONE;
                     this.returnMessage = 'Your guild wasn\'t participating anyway.';
                     break;
                 }
-                this.event.guilds.others = newInvitees;
+                this.event.guilds.others = newOthers;
 
-                // update teams - removing all participants signed-up by this guild
-                const newTeams: Event.Team[] = this.event.teams.map(
-                    (team: Event.Team): Event.Team => {
-                        const newParticipants = team.participants.filter(
-                            (participant: Event.Participant):
-                            boolean => participant.discordId !== this.opMessage.guild.id
-                        );
-                        return {
-                            ...team,
-                            participants: newParticipants,
-                        };
-                    }
+                // update - removing all teams signed-up by this guild
+                const newTeams: Event.Team[] = this.event.teams.filter(
+                    (team: Event.Team): boolean => team.guildId !== this.opMessage.guild.id
                 );
                 this.event.teams = newTeams;
                 const savedEvent: Event.Standard = await Db.upsertEvent(
                     this.event,
                 );
+                // update this code later
+                // the leaving guild scoreboard is not updated
+                // messages are erased with the filtering of 'other'
+                // putting this.event will revive the event
+                // put in new custom behavior
                 willUpdateScores$.next([
                     savedEvent,
                     false,

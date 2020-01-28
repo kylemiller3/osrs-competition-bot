@@ -48,11 +48,11 @@ class ListParticipantsConversation extends Conversation {
                                     Promise<discord.User | string> => this.opMessage
                                         .client
                                         .fetchUser(
-                                            participant.discordId
+                                            participant.userId
                                         ).catch(
                                             (error: Error): string => {
                                                 Utils.logger.error(`${error} when fetching player`);
-                                                return participant.discordId;
+                                                return participant.userId;
                                             }
                                         )
                                 );

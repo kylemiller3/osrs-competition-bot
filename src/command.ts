@@ -533,7 +533,7 @@ export namespace Command {
     const joinGlobal: Description = {
         description: 'Allows your Guild to signup for a global event.',
         accessControl: onlyAdmin,
-        command: '.joinglobal',
+        command: '.gjoin',
         params: {
             id: {
                 description: 'The event\'s unique id.',
@@ -558,7 +558,7 @@ export namespace Command {
     const unjoinGlobal: Description = {
         description: 'Removes and forcefully removes your Guild\'s participants from a global event.',
         accessControl: onlyAdmin,
-        command: '.unjoinglobal',
+        command: '.gleave',
         params: {
             id: {
                 description: 'The event\'s unique id.',

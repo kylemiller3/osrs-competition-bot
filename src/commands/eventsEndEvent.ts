@@ -44,12 +44,6 @@ class EventEndConversation extends Conversation {
                         this.state = CONVERSATION_STATE.Q1E;
                         break;
                     }
-                    if (event.global
-                        && Utils.isInPast(event.when.start)) {
-                        this.returnMessage = 'Sorry, global events are locked after they start.';
-                        this.state = CONVERSATION_STATE.DONE;
-                        break;
-                    }
                     this.event = event;
                     this.state = CONVERSATION_STATE.CONFIRM;
                 }
@@ -58,19 +52,23 @@ class EventEndConversation extends Conversation {
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.returnMessage = 'Did not end event.';
-                } else if (Utils.isInFuture(this.event.when.start)) {
-                    this.returnMessage = 'Event has not started. Delete it instead';
-                } else if (Utils.isInPast(this.event.when.end)) {
-                    this.returnMessage = 'Event has already ended.';
+                    this.returnMessage = 'Cancelled.';
                 } else {
+                    const error: 'ending early is disabled for global events'
+                    | 'the event has not started'
+                    | 'the event has already ended'
+                    | undefined = this.event.end();
+                    if (error !== undefined) {
+                        this.returnMessage = error;
+                        this.state = CONVERSATION_STATE.DONE;
+                    }
+
                     this.event.when.end = new Date();
                     const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                     willEndEvent$.next(savedEvent);
-                    // Utils.logger.trace(`Ended event id ${obj.id}.`);
                     this.returnMessage = 'Event successfully ended.';
+                    this.state = CONVERSATION_STATE.DONE;
                 }
-                this.state = CONVERSATION_STATE.DONE;
                 break;
             }
             default:

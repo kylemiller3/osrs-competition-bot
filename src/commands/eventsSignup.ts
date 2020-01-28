@@ -30,7 +30,6 @@ class EventsSignupConversation extends Conversation {
             this.opMessage.guild.id,
         );
         if (guildEvent === null) {
-            this.state = CONVERSATION_STATE.Q1E;
             return Promise.resolve(false);
         }
 
@@ -52,6 +51,9 @@ class EventsSignupConversation extends Conversation {
             return Promise.resolve(false);
         }
 
+        this.returnMessage = 'Successfully signed-up up for event';
+        const savedEvent: Event.Standard = await Db.upsertEvent(guildEvent);
+        willSignUpPlayer$.next(savedEvent);
         return Promise.resolve(true);
     }
 
@@ -108,14 +110,13 @@ class EventsSignupConversation extends Conversation {
                 );
 
                 switch (error) {
-                    case 'this rsn is already signed up':
                     case 'teams are locked 10 minutes before a global event starts':
-                    case 'participant has no access to this event':
                     case 'osrs hiscores cannot be reached': {
                         this.returnMessage = `Failed to sign up because ${error}.`;
                         this.state = CONVERSATION_STATE.DONE;
                         break;
                     }
+                    case 'this rsn is already signed up':
                     case 'osrs account cannot be found': {
                         this.returnMessage = `The ${error}. Please try again.`;
                         this.state = CONVERSATION_STATE.Q2E;
@@ -153,6 +154,7 @@ class EventsSignupConversation extends Conversation {
                     this.opMessage.author.id,
                     this.opMessage.guild.id,
                     this.rsn,
+                    this.teamName,
                 );
                 switch (error) {
                     case 'osrs hiscores cannot be reached': {

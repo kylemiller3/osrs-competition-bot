@@ -427,7 +427,7 @@ const deleteMessages = async (
 
     // get message objects
     const discordMessagesPromises:
-    Promise<discord.Message | null>[] = eventMessage.messagesId.map(
+    Promise<discord.Message | null>[] = eventMessage.messageId.map(
         (messageId: string):
         Promise<discord.Message | null> => channel.fetchMessage(
             messageId,
@@ -529,9 +529,9 @@ const refreshMessage = async (
         return null;
     }
 
-    const messagePart = {
+    const messagePart: Event.ChannelMessage = {
         channelId: settings.channelId,
-        messagesId: response.messages
+        messageId: response.messages
             .filter(Utils.isDefinedFilter)
             .map((msg: discord.Message): string => msg.id),
     };
@@ -555,7 +555,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
         Observable<Event.ChannelMessage | null> => {
             const guild: discord.Guild | null = getGuildFromId(
                 gClient,
-                eventGuild.discordId
+                eventGuild.guildId
             );
             if (guild === null) {
                 Utils.logger.warn('Discord guild not available');
@@ -564,17 +564,23 @@ const saveAndNotifyUpdatedEventScoreboard = (
             const deferredRefreshScoreboardObservable: Observable<Event.ChannelMessage | null> = defer(
                 (): Observable<Event.ChannelMessage | null> => from(
                     event.getEventScoreboardString(
-                        eventGuild.discordId
+                        eventGuild.guildId,
+                        false,
                     )
                 ).pipe(
                     mergeMap(
                         (scoreboardStr: string):
                         Observable<Event.ChannelMessage | null> => {
+                            const now: Date = new Date();
+                            const footer: string = lastError === undefined
+                                ? `\n\nLast updated ${now.toUTCString()}`
+                                : `\n\nError ${lastError.message}`;
+
                             const msg2 = refreshMessage(
                                 gClient,
                                 guild,
                                 eventGuild.scoreboardMessage,
-                                `${scoreboardStr}`,
+                                `${scoreboardStr}${footer}`,
                                 {
                                     code: true,
                                 }
@@ -587,7 +593,29 @@ const saveAndNotifyUpdatedEventScoreboard = (
             return deferredRefreshScoreboardObservable;
         }
     );
-    const newEvent: Event.Standard = { ...event, };
+
+    const newEvent: Event.Standard = event instanceof Event.Global
+        ? new Event.Global(
+            event.id,
+            event.name,
+            event.when.start,
+            event.when.end,
+            event.guilds,
+            event.teams,
+            event.tracking,
+            event.global,
+            event.invitations,
+        )
+        : new Event.Standard(
+            event.id,
+            event.name,
+            event.when.start,
+            event.when.end,
+            event.guilds,
+            event.teams,
+            event.tracking,
+            event.global,
+        );
     const ret: Observable<Event.Standard> = concat(
         observables
     ).pipe(
@@ -716,7 +744,7 @@ willStartEvent$.pipe(
 
             // if we have a competitive event
             // track scoreboard automatically
-            if (!Event.isEventCustom(event)) {
+            if (!event.isCustom()) {
                 Utils.logger.trace('Event is auto tracking score');
                 willUpdateScores$.next([
                     event,
@@ -795,7 +823,28 @@ willUpdateScores$.pipe(
                     (results: (hiscores.Player | null)[]):
                     Observable<Event.Standard> => {
                         // prepare a new event
-                        const newEvent: Event.Standard = { ...event, };
+                        const newEvent: Event.Standard = event instanceof Event.Global
+                            ? new Event.Global(
+                                event.id,
+                                event.name,
+                                event.when.start,
+                                event.when.end,
+                                event.guilds,
+                                event.teams,
+                                event.tracking,
+                                event.global,
+                                event.invitations,
+                            )
+                            : new Event.Standard(
+                                event.id,
+                                event.name,
+                                event.when.start,
+                                event.when.end,
+                                event.guilds,
+                                event.teams,
+                                event.tracking,
+                                event.global,
+                            );
 
                         // cascade remake of teams
                         const newTeams: Event.Team[] = newEvent.teams.map(
@@ -901,7 +950,7 @@ willAddEvent$.subscribe(
             Utils.logger.info('Event ended in the past.');
             willEndEvent$.next(event);
         }
-        if (Event.isEventCustom(event)) {
+        if (event.isCustom()) {
             Utils.logger.info('Custom event added.');
             willUpdateScores$.next([
                 event,
@@ -960,7 +1009,55 @@ willUnsignupPlayer$.subscribe(
 
 didUnsignupPlayer$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} did unsignup player`);
+        Utils.logger.debug(`Event ${event.id} did unsignup player.`);
+    }
+);
+
+willDeleteEvent$.subscribe(
+    (event: Event.Standard): void => {
+        Utils.logger.debug(`Event ${event.id} will delete.`);
+        const combinedGuilds = event.guilds.others !== undefined
+            ? [
+                event.guilds.creator,
+                ...event.guilds.others,
+            ]
+            : [
+                event.guilds.creator,
+            ];
+        combinedGuilds.forEach(
+            async (guild: Event.Guild): Promise<void> => {
+                const discordGuild: discord.Guild | null = getGuildFromId(
+                    gClient,
+                    guild.guildId,
+                );
+                if (discordGuild === null) {
+                    return;
+                }
+                const content: string = await event.getEventScoreboardString(
+                    guild.guildId,
+                    true,
+                );
+                await refreshMessage(
+                    gClient,
+                    discordGuild,
+                    guild.scoreboardMessage,
+                    content,
+                    {
+                        code: true,
+                    }
+                );
+            }
+        );
+
+        didDeleteEvent$.next(
+            event,
+        );
+    }
+);
+
+didDeleteEvent$.subscribe(
+    (event: Event.Standard): void => {
+        Utils.logger.debug(`Event ${event.id} did delete`);
     }
 );
 
@@ -1014,7 +1111,7 @@ const init = async (): Promise<void> => {
                 Utils.isDefinedFilter
             );
             const autoUpdateEvents: Event.Standard[] = filteredEvents.filter(
-                (eventToFilter: Event.Standard): boolean => !Event.isEventCustom(eventToFilter)
+                (eventToFilter: Event.Standard): boolean => !eventToFilter.isCustom()
             );
             autoUpdateEvents.forEach(
                 (autoEvent: Event.Standard): void => {

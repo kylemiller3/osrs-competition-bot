@@ -23,7 +23,7 @@ class EventsJoinGlobalConversation extends Conversation {
             case CONVERSATION_STATE.Q1E:
                 return 'Could not find event. Hint: find the event id with the listall command. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to join ${this.event.name} now? Global events have special rules.`;
+                return `Are you sure you want to join "${this.event.name}" now? Global events have special rules.`;
             default:
                 return null;
         }
@@ -34,16 +34,31 @@ class EventsJoinGlobalConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id: number = Number.parseInt(qa.answer.content, 10);
+                const eventId = Number.parseInt(qa.answer.content, 10);
+                if (Number.isNaN(eventId)) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    break;
+                }
+
                 const event: Event.Standard | null = await Db.fetchInvitedEvent(
                     id,
                     this.opMessage.guild.id,
                 );
                 if (event === null) {
                     this.state = CONVERSATION_STATE.Q1E;
-                } else {
-                    this.state = CONVERSATION_STATE.CONFIRM;
-                    this.event = event;
+                    break;
                 }
+                if (event.guilds.others !== undefined
+                    && event.guilds.others.findIndex(
+                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id
+                    ) !== -1) {
+                    this.returnMessage = 'Your guild has already joined this event.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
+                }
+
+                this.state = CONVERSATION_STATE.CONFIRM;
+                this.event = event;
                 break;
             }
             case CONVERSATION_STATE.CONFIRM: {
@@ -56,7 +71,13 @@ class EventsJoinGlobalConversation extends Conversation {
                         this.event.guilds.others = [
                             ...this.event.guilds.others,
                             {
-                                discordId: this.opMessage.guild.id,
+                                guildId: this.opMessage.guild.id,
+                            },
+                        ];
+                    } else {
+                        this.event.guilds.others = [
+                            {
+                                guildId: this.opMessage.guild.id,
                             },
                         ];
                     }
