@@ -83,7 +83,7 @@ Shorthand: *.forceunsignup id=(event id)*
   * The resulting message will include the event ids of every event.
 
 **.signup** - Signs up for an event.
-Shorthand: *.signup id=(event id) rsn=(Runescape name) team=(any teamname) *
+Shorthand: *.signup id=(event id) rsn=(Runescape name) team=(any teamname)*
   * You must have a valid Runescape name on the Hiscores to signup.
   * You cannot signup the same Runescape name but you may have more than one Runescape account to your name.
   * Changing your Runescape name after you have signed up will cause tracking to cease working.
@@ -95,7 +95,7 @@ Shorthand: *.signup id=(event id) rsn=(Runescape name) team=(any teamname) *
   * Globally enabled events have one team per Discord Guild. You will automatically be signed up to the first Discord Team found with your Guild Id.
 
 **.unsignup** - Removes you from an event.
-Shorthand: *.unsignup id=(event id) *
+Shorthand: *.unsignup id=(event id)*
   * Globally enabled events have teams locked 10 minutes before they start.
   * Find the event id through the scoreboard or the *.listall* command.
 
