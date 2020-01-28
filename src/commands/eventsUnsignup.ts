@@ -6,76 +6,10 @@ import {
 import { Event, } from '../event';
 import { Utils, } from '../utils';
 import { Db, } from '../database';
-import { willUnsignupPlayer$, } from '../main';
+import { willUpdateScores$, } from '../main';
 
 class EventUnsignupConversation extends Conversation {
-    id: number;
-
-    private async unsignupToEvent(
-        id,
-        reallyUnsignup: boolean = false,
-    ): Promise<CONVERSATION_STATE> {
-        // p1
-        if (Number.isNaN(id)) {
-            return CONVERSATION_STATE.Q1E;
-        }
-        const event: Event.Standard | null = await Db.fetchGuildEvent(
-            id,
-            this.opMessage.guild.id,
-        );
-        if (event === null) {
-            return CONVERSATION_STATE.Q1E;
-        }
-
-        const thirtyMinsBeforeStart: Date = new Date(event.when.start);
-        thirtyMinsBeforeStart.setMinutes(thirtyMinsBeforeStart.getMinutes() - 30);
-        if (event.global
-            && Utils.isInPast(thirtyMinsBeforeStart)) {
-            this.returnMessage = 'Sorry, teams are locked 30 minutes before a global event starts.';
-            return CONVERSATION_STATE.DONE;
-        }
-
-        // did we find the user?
-        const findUser = (participant: Event.Participant):
-        boolean => participant.userId.toLowerCase()
-                    === this.opMessage.author.id.toLowerCase();
-
-        const userIdx: number = event.teams.findIndex(
-            (team: Event.Team):
-            boolean => team.participants.some(
-                findUser
-            )
-        );
-        const userJdx: number = userIdx !== -1
-            ? event.teams[userIdx].participants.findIndex(
-                findUser
-            ) : -1;
-        if (userJdx === -1) {
-            // not found
-            this.returnMessage = 'You weren\'t signed up anyway';
-            return CONVERSATION_STATE.DONE;
-        }
-
-        if (!reallyUnsignup) {
-            return CONVERSATION_STATE.CONFIRM;
-        }
-
-        // really unsignup
-        event.teams[userIdx].participants.splice(
-            userJdx, 1
-        );
-        if (event.teams[userIdx].participants.length === 0) {
-            event.teams.splice(
-                userIdx, 1
-            );
-        }
-        const saved: Event.Standard = await Db.upsertEvent(event);
-        this.returnMessage = 'Removed.';
-        willUnsignupPlayer$.next(saved);
-        return CONVERSATION_STATE.DONE;
-    }
-
-    // eslint-disable-next-line class-methods-use-this
+    event: Event.Standard;
     async init(): Promise<boolean> {
         const id = this.params.id as number | undefined;
         if (id === undefined) {
@@ -83,10 +17,32 @@ class EventUnsignupConversation extends Conversation {
         }
 
         this.state = CONVERSATION_STATE.DONE;
-        await this.unsignupToEvent(
+        const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
             id,
-            true
+            this.opMessage.guild.id,
         );
+
+        if (guildEvent === null) {
+            this.returnMessage = 'Removal from event failed because the event was not found.';
+            return Promise.resolve(false);
+        }
+
+        const error: 'participant was not signed-up'
+        | undefined = guildEvent.unsignupParticipant(
+            this.opMessage.author.id
+        );
+        if (error !== undefined) {
+            this.returnMessage = `Removal from event failed because ${error}.`;
+            return Promise.resolve(false);
+        }
+
+        const savedEvent: Event.Standard = await Db.upsertEvent(guildEvent);
+        this.returnMessage = 'Removed from event.';
+        this.state = CONVERSATION_STATE.DONE;
+        willUpdateScores$.next([
+            savedEvent,
+            false,
+        ]);
         return Promise.resolve(true);
     }
 
@@ -107,12 +63,22 @@ class EventUnsignupConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
-                this.id = Number.parseInt(qa.answer.content, 10);
-                if (Number.isNaN(this.id)) {
+                const id: number = Number.parseInt(qa.answer.content, 10);
+                if (Number.isNaN(id)) {
                     this.state = CONVERSATION_STATE.Q1E;
-                } else {
-                    this.state = await this.unsignupToEvent(this.id);
+                    break;
                 }
+
+                const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
+                    id,
+                    this.opMessage.guild.id,
+                );
+                if (guildEvent === null) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    break;
+                }
+                this.event = guildEvent;
+                this.state = CONVERSATION_STATE.CONFIRM;
                 break;
             }
             case CONVERSATION_STATE.CONFIRM: {
@@ -120,9 +86,23 @@ class EventUnsignupConversation extends Conversation {
                 if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Cancelled.';
                     this.state = CONVERSATION_STATE.DONE;
-                } else {
-                    this.state = await this.unsignupToEvent(this.id, true);
+                    break;
                 }
+                const error: 'participant was not signed-up'
+                | undefined = this.event.unsignupParticipant(
+                    this.opMessage.author.id
+                );
+                if (error !== undefined) {
+                    this.returnMessage = `Removal from event failed because ${error}.`;
+                    this.state = CONVERSATION_STATE.DONE;
+                }
+                const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                this.returnMessage = 'Removed from event.';
+                this.state = CONVERSATION_STATE.DONE;
+                willUpdateScores$.next([
+                    savedEvent,
+                    false,
+                ]);
                 break;
             }
             default:
