@@ -24,14 +24,14 @@ To run this bot you must install Postgresql v9.5 or later with node v11.0.0 or l
 3. Type command *.setchannel* and point it to the channel of your choosing.
 
 ### Event concepts
-**Event** - A basic event without enabling the global option. This event will be localized to your individual Discord guild. Use this unless you are going to compete with other Discord Guilds.
+**Event** - A basic event without enabling the global option. This event will be localized to your individual Discord Guild. Use this unless you are going to compete with other Discord Guilds.
 
 **Globally enabled event** - A special type of event with the global option enabled. This event has special rules and interactions with commands to prevent trolling and cheating. The creating Discord Guild is considered the owner of the event and can invite other Discord Guilds specifically through their Discord Guild id or leave the event open to any Discord Guild that wants to join.
 
 ### Administrator commands
-**.setchannel**   - Starts a new bot dialogue that sets the scoreboard update channel to the first channel mentioned.
+**.setchannel** - Sets the scoreboard update channel to the first channel mentioned.
 
-**.add** - Starts a new bot dialogue which schedules a new event and posts the scoreboard to the channel mentioned in *.setchannel*.
+**.add** - Schedules a new event and posts the scoreboard to the channel mentioned in *.setchannel*.
 > Event names cannot be blank.\
 > Event names must be less than 50 characters in length.\
 > Event must end after the event's start date.\
