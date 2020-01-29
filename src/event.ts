@@ -748,7 +748,7 @@ export namespace Event {
             // numEntries: number = 3,
         ): Promise<string> {
             // format the string here
-            const tabLength = 3;
+            const tabLength = 1;
             // const lhsPaddingLength = 6;
             // const diffPadding = 2;
 
@@ -760,11 +760,12 @@ export namespace Event {
                 Promise<string>[] => team.participantsScores.flatMap(
                     (participant: ParticipantScoreboard):
                     Promise<string> => {
-                        const displayName: string | null = getDisplayNameFromDiscordId(
-                            gClient,
-                            guildId,
-                            participant.lhs,
-                        );
+                        // const displayName: string | null = getDisplayNameFromDiscordId(
+                        //     gClient,
+                        //     guildId,
+                        //     participant.lhs,
+                        // );
+                        const displayName = null;
                         if (displayName === null) {
                             return getTagFromDiscordId(
                                 gClient,
