@@ -470,7 +470,7 @@ export namespace Event {
                 // create a new team
                 const team: Team = {
                     name: teamName,
-                    guildId: guildId,
+                    guildId,
                     participants: [
                         participant,
                     ],
@@ -785,9 +785,11 @@ export namespace Event {
                             const accountsStr = participant.accountsScores.map(
                                 (account: AccountScoreboard): string => {
                                     if (account.whatsScores !== undefined) {
-                                        const whatStr = account.whatsScores.map(
-                                            (what: WhatScoreboard): string => `${what.lhs}${tab}${what.whatScore.toLocaleString('en-us')}`
-                                        ).join(`\n${tab}${tab}${tab}`);
+                                        const whatStr: string = account.whatsScores.map(
+                                            (what: WhatScoreboard): string | null => (what.whatScore > 0
+                                                ? `${what.lhs}${tab}${what.whatScore.toLocaleString('en-us')}`
+                                                : null)
+                                        ).filter(Utils.isDefinedFilter).join(`\n${tab}${tab}${tab}`);
                                         if (account.accountScore !== 0) {
                                             return `${account.lhs}${tab}${account.accountScore.toLocaleString('en-us')}\n${tab}${tab}${tab}${whatStr}`;
                                         }
