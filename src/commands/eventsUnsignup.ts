@@ -16,7 +16,6 @@ class EventUnsignupConversation extends Conversation {
             return Promise.resolve(false);
         }
 
-        this.state = CONVERSATION_STATE.DONE;
         const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
             id,
             this.opMessage.guild.id,
@@ -24,7 +23,7 @@ class EventUnsignupConversation extends Conversation {
 
         if (guildEvent === null) {
             this.returnMessage = 'Removal from event failed because the event was not found.';
-            return Promise.resolve(false);
+            return Promise.resolve(true);
         }
 
         const error: 'participant was not signed-up'
@@ -33,7 +32,7 @@ class EventUnsignupConversation extends Conversation {
         );
         if (error !== undefined) {
             this.returnMessage = `Removal from event failed because ${error}.`;
-            return Promise.resolve(false);
+            return Promise.resolve(true);
         }
 
         const savedEvent: Event.Standard = await Db.upsertEvent(guildEvent);

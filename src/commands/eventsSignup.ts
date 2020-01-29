@@ -33,7 +33,6 @@ class EventsSignupConversation extends Conversation {
             return Promise.resolve(false);
         }
 
-        this.state = CONVERSATION_STATE.DONE;
         const error: 'this rsn is already signed up'
         | 'osrs hiscores cannot be reached'
         | 'osrs account cannot be found'
@@ -48,7 +47,8 @@ class EventsSignupConversation extends Conversation {
         );
 
         if (error !== undefined) {
-            return Promise.resolve(false);
+            this.returnMessage = `Signup failed because ${error}.`;
+            return Promise.resolve(true);
         }
 
         this.returnMessage = 'Successfully signed-up up for event';
