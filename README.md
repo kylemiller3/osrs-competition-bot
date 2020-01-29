@@ -55,12 +55,12 @@ To run this bot you must install Postgresql v9.5 or later with node v11.0.0 or l
   * Find the event id through the scoreboard or the *.listall* command.
 
 **.forcesignup** - Forces the Discord user mentioned to signup to the event. *Follows the same rules as .signup*.
-Shorthand: *.forcesignup id=(event id) rsn=(Runescape name) team=(any teamname) @discorduser*
+Shorthand: *.forcesignup id=(event id) rsn=(Runescape name) team=(any teamname) @MentionTheDiscordUserToSignup*
   * It is recommended you use a shorthand syntax for this command otherwise this command will start a bot dialogue for the mentioned user.
   * Find the event id through the scoreboard or the *.listall* command.
 
 **.forceunsignup** - Forces the Discord user mentioned to be removed from the event . *Follows the same rules as .unsignup*.
-Shorthand: *.forceunsignup id=(event id)*
+Shorthand: *.forceunsignup id=(event id) @MentionTheDiscordUserToUnsignup*
   * It is recommended you use a shorthand syntax for this command otherwise this command will start a bot dialogue for the mentioned user.
   * Find the event id through the scoreboard or the *.listall* command.
 
