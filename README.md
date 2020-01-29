@@ -33,6 +33,7 @@ To run this bot you must install Postgresql v9.5 or later with node v11.0.0 or l
 **.setchannel** - Sets the scoreboard update channel to the first channel mentioned.
 
 **.add** - Schedules a new event and posts the scoreboard to the channel mentioned in *.setchannel*.
+  * See "Event tracking category lists" for list of skills, bosses etc for event tracking.
   * Event names cannot be blank.
   * Event names must be less than 50 characters in length.
   * Event must end after the event's start date.
@@ -43,7 +44,6 @@ To run this bot you must install Postgresql v9.5 or later with node v11.0.0 or l
   * Globally enabled events disallow custom type events.
   * Globally enabled events are limited to one week in duration.
   * The event id is shown on the newly created scoreboard prefixed with a pound sign (#)
-  * See below for list of skills, bosses etc.
 
 **.delete** - Deletes an event.
   * Events can only be deleted by the Discord Guild that created them.
@@ -102,8 +102,8 @@ Shorthand: *.unsignup id=(event id)*
 **.help** - Shows a help message less detailed than this document.
 
 ## Event tracking category lists
-These are the valid case sensitive lists of categories and specifics for tracking when using the *.add* command
-Ex: *bosses Chaos Elemental, Cerberus, Giant Mole*
+These are the valid case sensitive lists of categories and specifics for tracking when using the *.add* command\
+Ex: **bosses Chaos Elemental, Cerberus, Giant Mole**
 
 ### bosses
 Abyssal Sire,
