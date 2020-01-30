@@ -49,7 +49,7 @@ export namespace MessageWrapper {
         tag: string
     }
 
-    const regex = /[\s\S]{1,1980}(?:\n|$)/g;
+    const regex = /[\s\S]{1,1950}(?:\n|$)/g;
     export const getMessageChunks = (
         content: string
     ): string[] => content.match(regex) || [];
