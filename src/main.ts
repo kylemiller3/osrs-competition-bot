@@ -5,7 +5,7 @@ import {
     fromEvent, Observable, Subject, merge, forkJoin, of, from, concat, defer,
 } from 'rxjs';
 import {
-    filter, tap, mergeMap, concatMap, map, combineAll, catchError,
+    filter, tap, mergeMap, concatMap, map, combineAll, catchError, delay,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { async, } from 'rxjs/internal/scheduler/async';
@@ -807,7 +807,9 @@ willUpdateScores$.pipe(
                 Observable<hiscores.Player | null> => Network.hiscoresFetch$(
                     account.rsn,
                     forced,
-                )
+                ).pipe(
+                    delay(3000),
+                ),
             );
             if (observables.length === 0) {
                 return saveAndNotifyUpdatedEventScoreboard(
