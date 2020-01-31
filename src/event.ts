@@ -871,7 +871,7 @@ export namespace Event {
                         ).length
                         + 1;
                     const spacesToInsertTeam: number = maxTeamStrLen - teamStrLen;
-                    const spacesTeam: string = new Array(spacesToInsertTeam + 1).join('.');
+                    const spacesTeam: string = new Array(spacesToInsertTeam + 1).join(' ');
                     const teamStr: string = team.teamScore > 0
                         ? `${team.lhs}${spacesTeam}${team.teamScore}`
                         : `${team.lhs}`;
@@ -887,7 +887,7 @@ export namespace Event {
                                     ).length
                                 + 1 * tabLength;
                             const spacesToInsertParticipant: number = maxTeamStrLen - participantStrLen;
-                            const spacesParticipant: string = new Array(spacesToInsertParticipant + 1).join('.');
+                            const spacesParticipant: string = new Array(spacesToInsertParticipant + 1).join(' ');
                             const participantStr: string = participant.participantScore > 0
                                 ? `${tab}${tags[idx]}${spacesParticipant}${participant.participantScore.toLocaleString('en-us')}`
                                 : `${tab}${tags[idx]}`;
@@ -905,7 +905,7 @@ export namespace Event {
                                             ).length
                                         + 2 * tabLength;
                                     const spacesToInsertAccount: number = maxTeamStrLen - accountStrLen;
-                                    const spacesAccount: string = new Array(spacesToInsertAccount + 1).join('.');
+                                    const spacesAccount: string = new Array(spacesToInsertAccount + 1).join(' ');
                                     const accountStr: string = account.accountScore > 0
                                         ? `${tab}${tab}${account.lhs}${spacesAccount}${account.accountScore.toLocaleString('en-us')}`
                                         : `${tab}${tab}${account.lhs}`;
@@ -923,7 +923,7 @@ export namespace Event {
                                                         ).length
                                                     + 3 * tabLength;
                                                 const spacesToInsertWhat: number = maxTeamStrLen - whatStrLen;
-                                                const spacesWhat: string = new Array(spacesToInsertWhat + 1).join('.');
+                                                const spacesWhat: string = new Array(spacesToInsertWhat + 1).join(' ');
                                                 const ret: string | null = what.whatScore > 0
                                                     ? `${tab}${tab}${tab}${what.lhs}${spacesWhat}${what.whatScore.toLocaleString('en-us')}`
                                                     : null;
@@ -940,8 +940,18 @@ export namespace Event {
                             return ret;
                         }
                     ).join('\n');
-                    const ret = `${idi + 1} ${teamStr}\n${participantsStr}`;
-                    return ret;
+                    switch (idi) {
+                        case 0:
+                            return `🥇${teamStr}\n${participantsStr}`;
+                        case 1:
+                            return `🥈${teamStr}\n${participantsStr}`;
+                        case 2:
+                            return `🥉${teamStr}\n${participantsStr}`;
+                        case maxTeamsLen.length - 1:
+                            return `🚮${teamStr}\n${participantsStr}`;
+                        default:
+                            return `${idi + 1} ${teamStr}\n${participantsStr}`;
+                    }
                 }
             ).join('\n');
 
