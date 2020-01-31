@@ -131,7 +131,7 @@ export namespace Network {
             ).pipe(
                 catchError(
                     (error: Error): Observable<null> => {
-                        Utils.logger.error(`${error.message}`);
+                        Utils.logger.error(`${error.name}`);
                         if (isInputError(error)) {
                             // consume this error
                             // not a real networking error
