@@ -841,7 +841,7 @@ export namespace Event {
             idx = 0;
             const str: string = currentScoreboard.map(
                 (team: TeamScoreboard, idi: number): string => {
-                    const maxTeamStrLen: number = maxTeamsLen[idi];
+                    const maxTeamStrLen: number = Math.max(...maxTeamsLen);
 
                     const teamStrLen: number = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length;
                     const spacesToInsertTeam: number = maxTeamStrLen - teamStrLen;
