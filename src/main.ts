@@ -809,6 +809,7 @@ willUpdateScores$.pipe(
                     forced,
                 ).pipe(
                     delay(1000),
+                    catchError((): Observable<null> => of(null)),
                 ),
             );
             if (observables.length === 0) {
