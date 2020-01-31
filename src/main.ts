@@ -809,7 +809,7 @@ willUpdateScores$.pipe(
                     forced,
                 ).pipe(
                     catchError((error: Error): Observable<null> => {
-                        Utils.logger.error(`There was still an error for player:${account.rsn} error:${error.name}`);
+                        Utils.logger.error(`There was still an error for player: ${account.rsn} error: ${error.name}`);
                         return of(null);
                     }),
                 ),
@@ -823,8 +823,7 @@ willUpdateScores$.pipe(
 
             // un-flatmap
             let idx = 0;
-            const inner: Observable<Event.Standard> = concat(observables).pipe(
-                combineAll(),
+            const inner: Observable<Event.Standard> = forkJoin(observables).pipe(
                 concatMap(
                     (results: (hiscores.Player | null)[]):
                     Observable<Event.Standard> => {
