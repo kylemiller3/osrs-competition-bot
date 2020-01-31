@@ -4,7 +4,7 @@ import {
 
 import { retryBackoff, } from 'backoff-rxjs';
 import {
-    timeout, catchError, publishReplay, refCount, tap, map,
+    timeout, catchError, publishReplay, refCount, tap, map, delay, retry,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { Utils, } from './utils';
@@ -46,6 +46,8 @@ export namespace Network {
                 const ret: Observable<T> = from(
                     bound()
                 ).pipe(
+                    delay(10000),
+                    retry(3),
                     // retryBackoff({
                     //     initialInterval: 10000,
                     //     maxInterval: 20000,
