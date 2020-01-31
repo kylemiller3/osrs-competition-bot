@@ -47,13 +47,13 @@ export namespace Network {
                     bound()
                 ).pipe(
                     retryBackoff({
-                        initialInterval: 1000,
-                        maxInterval: 10000,
+                        initialInterval: 10000,
+                        maxInterval: 20000,
                         maxRetries: 3,
                         shouldRetry,
                     }),
                     catchError((error: Error): Observable<T> => {
-                        Utils.logger.error(error);
+                        Utils.logger.error(error.message);
                         throw error;
                     }),
                 );

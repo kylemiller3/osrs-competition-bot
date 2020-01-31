@@ -5,7 +5,7 @@ import {
     fromEvent, Observable, Subject, merge, forkJoin, of, from, concat, defer,
 } from 'rxjs';
 import {
-    filter, tap, mergeMap, concatMap, map, combineAll, catchError, delay, toArray,
+    filter, tap, mergeMap, concatMap, map, combineAll, catchError, delay, toArray, retry,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { async, } from 'rxjs/internal/scheduler/async';
@@ -808,11 +808,12 @@ willUpdateScores$.pipe(
                     account.rsn,
                     forced,
                 ).pipe(
-                    delay(1000),
                     catchError((error: Error): Observable<null> => {
                         Utils.logger.error(`There was still an error: ${error.name}`);
                         return of(null);
                     }),
+                    // delay(10000),
+                    // retry(3),
                 ),
             );
             if (observables.length === 0) {
