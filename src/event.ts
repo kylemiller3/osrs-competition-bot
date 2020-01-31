@@ -858,79 +858,69 @@ export namespace Event {
             const str: string = currentScoreboard.map(
                 (team: TeamScoreboard, idi: number): string => {
                     const maxTeamStrLen: number = maxTeamsLen[idi];
-                    const teamStrLen: number = team
-                        .lhs
-                        .length
-                        + team
-                            .teamScore
-                            .toLocaleString(
-                                'en-us'
-                            ).length
-                        + idi.toLocaleString(
-                            'en-us'
-                        ).length
-                        + 1;
+                    let prefix: string;
+                    switch (idi) {
+                        case 0:
+                            prefix = '🥇 ';
+                            break;
+                        case 1:
+                            prefix = '🥈 ';
+                            break;
+                        case 2:
+                            prefix = '🥉 ';
+                            break;
+                        case maxTeamsLen.length - 1:
+                            prefix = '🚮 ';
+                            break;
+                        default:
+                            prefix = `${idi + 1} `;
+                            break;
+                    }
+                    const teamStrLen: number = `${prefix}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length;
                     const spacesToInsertTeam: number = maxTeamStrLen - teamStrLen;
-                    const spacesTeam: string = new Array(spacesToInsertTeam + 1).join(' ');
-                    const teamStr: string = team.teamScore > 0
-                        ? `${team.lhs}${spacesTeam}${team.teamScore}`
-                        : `${team.lhs}`;
-                    
+                    const spacesTeam: string = new Array(spacesToInsertTeam + 1).join('.');
+                    // const teamStr: string = team.teamScore > 0
+                    //     ? `${prefix}${team.lhs}${spacesTeam}${team.teamScore}`
+                    //     : `${prefix}${team.lhs}`;
+                    const teamStr = `${prefix}${team.lhs}${spacesTeam}${team.teamScore}`;
+
+
                     const participantsStr = team.participantsScores.map(
                         (participant: ParticipantScoreboard): string => {
-                            const participantStrLen: number = tags[idx]
-                                .length
-                                + participant
-                                    .participantScore
-                                    .toLocaleString(
-                                        'en-us'
-                                    ).length
-                                + 1 * tabLength;
+                            const participantStrLen: number = `${tab}${tags[idx]}${participant.participantScore.toLocaleString('en-us')}`.length;
                             const spacesToInsertParticipant: number = maxTeamStrLen - participantStrLen;
-                            const spacesParticipant: string = new Array(spacesToInsertParticipant + 1).join(' ');
-                            const participantStr: string = participant.participantScore > 0
-                                ? `${tab}${tags[idx]}${spacesParticipant}${participant.participantScore.toLocaleString('en-us')}`
-                                : `${tab}${tags[idx]}`;
+                            const spacesParticipant: string = new Array(spacesToInsertParticipant + 1).join('.');
+                            // const participantStr: string = participant.participantScore > 0
+                            //     ? `${tab}${tags[idx]}${spacesParticipant}${participant.participantScore.toLocaleString('en-us')}`
+                            //     : `${tab}${tags[idx]}`;
+                            const participantStr = `${tab}${tags[idx]}${spacesParticipant}${participant.participantScore.toLocaleString('en-us')}`;
                             idx += 1;
 
                             const accountsStr: string = participant.accountsScores.map(
                                 (account: AccountScoreboard): string => {
-                                    const accountStrLen: number = account
-                                        .lhs
-                                        .length
-                                        + account
-                                            .accountScore
-                                            .toLocaleString(
-                                                'en-us'
-                                            ).length
-                                        + 2 * tabLength;
+                                    const accountStrLen: number = `${tab}${tab}${account.lhs}${account.accountScore.toLocaleString('en-us')}`.length;
                                     const spacesToInsertAccount: number = maxTeamStrLen - accountStrLen;
-                                    const spacesAccount: string = new Array(spacesToInsertAccount + 1).join(' ');
-                                    const accountStr: string = account.accountScore > 0
-                                        ? `${tab}${tab}${account.lhs}${spacesAccount}${account.accountScore.toLocaleString('en-us')}`
-                                        : `${tab}${tab}${account.lhs}`;
+                                    const spacesAccount: string = new Array(spacesToInsertAccount + 1).join('.');
+                                    // const accountStr: string = account.accountScore > 0
+                                    //     ? `${tab}${tab}${account.lhs}${spacesAccount}${account.accountScore.toLocaleString('en-us')}`
+                                    //     : `${tab}${tab}${account.lhs}`;
+                                    const accountStr = `${tab}${tab}${account.lhs}${spacesAccount}${account.accountScore.toLocaleString('en-us')}`;
 
                                     if (account.whatsScores !== undefined) {
                                         const whatStr: string = account.whatsScores.map(
                                             (what: WhatScoreboard): string | null => {
-                                                const whatStrLen: number = what
-                                                    .lhs
-                                                    .length
-                                                    + what
-                                                        .whatScore
-                                                        .toLocaleString(
-                                                            'en-us'
-                                                        ).length
-                                                    + 3 * tabLength;
+                                                const whatStrLen: number = `${tab}${tab}${tab}${what.lhs}${what.whatScore.toLocaleString('en-us')}`.length;
                                                 const spacesToInsertWhat: number = maxTeamStrLen - whatStrLen;
-                                                const spacesWhat: string = new Array(spacesToInsertWhat + 1).join(' ');
+                                                const spacesWhat: string = new Array(spacesToInsertWhat + 1).join('.');
                                                 const ret: string | null = what.whatScore > 0
                                                     ? `${tab}${tab}${tab}${what.lhs}${spacesWhat}${what.whatScore.toLocaleString('en-us')}`
                                                     : null;
                                                 return ret;
                                             }
                                         ).filter(Utils.isDefinedFilter).join('\n');
-                                        const ret = `${accountStr}\n${whatStr}`;
+                                        const ret = whatStr.length > 0
+                                            ? `${accountStr}\n${whatStr}`
+                                            : `${accountStr}`;
                                         return ret;
                                     }
                                     return accountStr;
@@ -940,20 +930,10 @@ export namespace Event {
                             return ret;
                         }
                     ).join('\n');
-                    switch (idi) {
-                        case 0:
-                            return `🥇${teamStr}\n${participantsStr}`;
-                        case 1:
-                            return `🥈${teamStr}\n${participantsStr}`;
-                        case 2:
-                            return `🥉${teamStr}\n${participantsStr}`;
-                        case maxTeamsLen.length - 1:
-                            return `🚮${teamStr}\n${participantsStr}`;
-                        default:
-                            return `${idi + 1} ${teamStr}\n${participantsStr}`;
-                    }
+                    const ret = `${teamStr}\n${participantsStr}`;
+                    return ret;
                 }
-            ).join('\n');
+            ).join('\n\n');
 
             const status: string = !deleted
                 ? this.getStatusString()
