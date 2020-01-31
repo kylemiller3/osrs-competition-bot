@@ -809,11 +809,11 @@ willUpdateScores$.pipe(
                     forced,
                 ).pipe(
                     catchError((error: Error): Observable<null> => {
-                        Utils.logger.error(`There was still an error: ${error.name}`);
+                        Utils.logger.error(`There was still an error for player:${account.rsn} error:${error.name}`);
                         return of(null);
                     }),
-                    // delay(10000),
-                    // retry(3),
+                    delay(10000),
+                    retry(3),
                 ),
             );
             if (observables.length === 0) {

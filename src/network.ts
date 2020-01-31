@@ -46,12 +46,12 @@ export namespace Network {
                 const ret: Observable<T> = from(
                     bound()
                 ).pipe(
-                    retryBackoff({
-                        initialInterval: 10000,
-                        maxInterval: 20000,
-                        maxRetries: 3,
-                        shouldRetry,
-                    }),
+                    // retryBackoff({
+                    //     initialInterval: 10000,
+                    //     maxInterval: 20000,
+                    //     maxRetries: 3,
+                    //     shouldRetry,
+                    // }),
                     catchError((error: Error): Observable<T> => {
                         Utils.logger.error(error.message);
                         throw error;
