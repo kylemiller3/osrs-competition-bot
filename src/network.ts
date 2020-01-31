@@ -41,13 +41,14 @@ export namespace Network {
         bound: () => Promise<T>,
         shouldRetry: (error: Error) => boolean = (): boolean => true
     ): Observable<T> => {
-        const responseStream: Observable<T> = defer(
-            (): Observable<T> => of('').pipe(
+        // factory function because promises do not have retry functionality
+        const networkRequestFactory: Observable<T> = defer(
+            (): Observable<T> => of(null).pipe(
                 mergeMap((): Observable<T> => from(bound()))
             )
         );
 
-        const ret: Observable<T> = responseStream.pipe(
+        const ret: Observable<T> = networkRequestFactory.pipe(
             retryBackoff({
                 initialInterval: 1500,
                 maxInterval: 20000,
