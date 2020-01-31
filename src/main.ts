@@ -807,11 +807,6 @@ willUpdateScores$.pipe(
                 Observable<hiscores.Player | null> => Network.hiscoresFetch$(
                     account.rsn,
                     forced,
-                ).pipe(
-                    catchError((error: Error): Observable<null> => {
-                        Utils.logger.error(`There was still an error for player: ${account.rsn} error: ${error.name}`);
-                        return of(null);
-                    }),
                 ),
             );
             if (observables.length === 0) {
