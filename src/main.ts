@@ -810,8 +810,9 @@ willUpdateScores$.pipe(
                 ).pipe(
                     delay(1000),
                     catchError((error: Error): Observable<null> => {
-                        Utils.logger(`There was still an error: ${error.name}`)
-                    },
+                        Utils.logger.error(`There was still an error: ${error.name}`);
+                        return of(null);
+                    }),
                 ),
             );
             if (observables.length === 0) {
