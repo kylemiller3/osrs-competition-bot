@@ -42,7 +42,7 @@ export namespace Network {
         shouldRetry: (error: Error) => boolean = (): boolean => true
     ): Observable<T> => {
         const responseStream: Observable<T> = defer(
-            (): Observable<T> => from('').pipe(
+            (): Observable<T> => of('').pipe(
                 mergeMap((): Observable<T> => from(bound()))
             )
         );
