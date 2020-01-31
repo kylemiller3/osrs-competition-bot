@@ -119,7 +119,8 @@ export namespace Network {
                 error: Error
             ): boolean => error.message === 'Player not found! Check RSN or game mode.'
                 || error.message === 'RSN must be less or equal to 12 characters'
-                || error.message === 'RSN must be of type string';
+                || error.message === 'RSN must be of type string'
+                || error.message === 'Request failed with status code 503';
             const obs = genericNetworkFetch$<hiscores.Player | null>(
                 bound,
                 (error: Error): boolean => {
@@ -131,6 +132,7 @@ export namespace Network {
             ).pipe(
                 catchError(
                     (error: Error): Observable<null> => {
+                        Utils.logger.error(`${error.message}`);
                         if (isInputError(error)) {
                             // consume this error
                             // not a real networking error
