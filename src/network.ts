@@ -47,9 +47,9 @@ export namespace Network {
                     bound()
                 ).pipe(
                     retryBackoff({
-                        initialInterval: 50,
+                        initialInterval: 1000,
                         maxInterval: 10000,
-                        maxRetries: 10,
+                        maxRetries: 3,
                         shouldRetry,
                     }),
                     catchError((error: Error): Observable<T> => {
