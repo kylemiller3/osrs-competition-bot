@@ -1,10 +1,10 @@
 import {
-    Observable, defer, of, from,
+    Observable, defer, of, from, merge,
 } from 'rxjs';
 
 import { retryBackoff, } from 'backoff-rxjs';
 import {
-    timeout, catchError, publishReplay, refCount, tap, map, delay, retry,
+    timeout, catchError, publishReplay, refCount, tap, map, delay, retry, mergeMap,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
 import { Utils, } from './utils';
@@ -41,127 +41,126 @@ export namespace Network {
         bound: () => Promise<T>,
         shouldRetry: (error: Error) => boolean = (): boolean => true
     ): Observable<T> => {
-        const deferred: Observable<T> = defer(
-            (): Observable<T> => {
-                const ret: Observable<T> = from(
-                    bound()
-                ).pipe(
-                    delay(10000),
-                    retry(3),
-                    // retryBackoff({
-                    //     initialInterval: 10000,
-                    //     maxInterval: 20000,
-                    //     maxRetries: 3,
-                    //     shouldRetry,
-                    // }),
-                    catchError((error: Error): Observable<T> => {
-                        Utils.logger.error(error.message);
-                        throw error;
-                    }),
-                );
-                return ret;
-            }
+        const responseStream: Observable<T> = defer(
+            (): Observable<T> => from('').pipe(
+                mergeMap((): Observable<T> => from(bound()))
+            )
         );
-        return deferred;
+
+        const ret: Observable<T> = responseStream.pipe(
+            retryBackoff({
+                initialInterval: 1500,
+                maxInterval: 20000,
+                maxRetries: 5,
+                shouldRetry,
+            }),
+            catchError((error: Error): Observable<T> => {
+                Utils.logger.error(error.message);
+                throw error;
+            }),
+        );
+        return ret;
     };
+    return deferred;
+};
 
-    const CACHE_SIZE = 1000;
+const CACHE_SIZE = 1000;
 
-    /**
-     * Interface describing the Hiscore Cache
-     * @category Hiscore Cache
-     * @ignore
-     */
-    interface HiscoreCache {
-        observable: Observable<hiscores.Player | null>
-        date: Date
+/**
+ * Interface describing the Hiscore Cache
+ * @category Hiscore Cache
+ * @ignore
+ */
+interface HiscoreCache {
+    observable: Observable<hiscores.Player | null>
+    date: Date
+}
+
+/**
+ * Implementation of the [[HiscoreCache]]
+ * @category Hiscore Cache
+ * @ignore
+ */
+const hiscoreCache: Record<string, HiscoreCache | undefined> = {};
+
+/**
+* Fetches the supplied rsn from RuneScape API hiscores or cache.
+* Cache invalidates every 5 minutes. See [[hiscores.Player]]
+* @param rsn The rsn to lookup on hiscores
+* @param pullNew Forces a cache miss
+* @returns Observable of the RuneScape web API response
+* @category RuneScape API
+*/
+export const hiscoresFetch$ = (
+    rsn: string,
+    pullNew: boolean
+): Observable<hiscores.Player | null> => {
+    // eslint-disable-next-line no-control-regex
+    const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
+    Utils.logger.trace(`Looking up rsn '${asciiRsn}'`);
+    let cachedRsn = hiscoreCache[asciiRsn];
+    if (cachedRsn !== undefined) {
+        const date: Date = new Date(cachedRsn.date);
+        date.setMinutes(
+            date.getMinutes() + 5
+        );
+        if (Utils.isInPast(date) || pullNew) {
+            hiscoreCache[asciiRsn] = undefined;
+            cachedRsn = undefined;
+        }
     }
 
-    /**
-     * Implementation of the [[HiscoreCache]]
-     * @category Hiscore Cache
-     * @ignore
-     */
-    const hiscoreCache: Record<string, HiscoreCache | undefined> = {};
+    if (cachedRsn === undefined) {
+        const bound = hiscores.getPlayer.bind(
+            undefined,
+            asciiRsn,
+        );
 
-    /**
-    * Fetches the supplied rsn from RuneScape API hiscores or cache.
-    * Cache invalidates every 5 minutes. See [[hiscores.Player]]
-    * @param rsn The rsn to lookup on hiscores
-    * @param pullNew Forces a cache miss
-    * @returns Observable of the RuneScape web API response
-    * @category RuneScape API
-    */
-    export const hiscoresFetch$ = (
-        rsn: string,
-        pullNew: boolean
-    ): Observable<hiscores.Player | null> => {
-        // eslint-disable-next-line no-control-regex
-        const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
-        Utils.logger.trace(`Looking up rsn '${asciiRsn}'`);
-        let cachedRsn = hiscoreCache[asciiRsn];
-        if (cachedRsn !== undefined) {
-            const date: Date = new Date(cachedRsn.date);
-            date.setMinutes(
-                date.getMinutes() + 5
-            );
-            if (Utils.isInPast(date) || pullNew) {
-                hiscoreCache[asciiRsn] = undefined;
-                cachedRsn = undefined;
-            }
-        }
-
-        if (cachedRsn === undefined) {
-            const bound = hiscores.getPlayer.bind(
-                undefined,
-                asciiRsn,
-            );
-
-            const isInputError: (error: Error) => boolean = (
-                error: Error
-            ): boolean => error.message === 'Player not found! Check RSN or game mode.'
-                || error.message === 'RSN must be less or equal to 12 characters'
-                || error.message === 'RSN must be of type string';
-            const obs = genericNetworkFetch$<hiscores.Player | null>(
-                bound,
-                (error: Error): boolean => {
+        const isInputError: (error: Error) => boolean = (
+            error: Error
+        ): boolean => error.message === 'Player not found! Check RSN or game mode.'
+        || error.message === 'RSN must be less or equal to 12 characters'
+            || error.message === 'RSN must be of type string';
+        const obs = genericNetworkFetch$<hiscores.Player | null>(
+            bound,
+            (error: Error): boolean => {
+                if (isInputError(error)) {
+                    return false;
+                }
+                return true;
+            },
+        ).pipe(
+            catchError(
+                (error: Error): Observable<null> => {
+                    Utils.logger.error(`${error.name}`);
                     if (isInputError(error)) {
-                        return false;
+                        // consume this error
+                        // not a real networking error
+                        return of(null);
                     }
-                    return true;
-                },
-            ).pipe(
-                catchError(
-                    (error: Error): Observable<null> => {
-                        Utils.logger.error(`${error.name}`);
-                        if (isInputError(error)) {
-                            // consume this error
-                            // not a real networking error
-                            return of(null);
-                        }
-                        hiscoreCache[asciiRsn] = undefined;
-                        throw error;
-                    }
-                ),
-                publishReplay(1),
-                refCount(),
+                    hiscoreCache[asciiRsn] = undefined;
+                    throw error;
+                }
+            ),
+            publishReplay(1),
+            refCount(),
+        );
+
+        hiscoreCache[asciiRsn] = {
+            observable: obs,
+            date: new Date(),
+        };
+
+        const keys = Object.keys(hiscoreCache);
+        if (keys.length >= CACHE_SIZE) {
+            const idxToRemove: number = Math.floor(
+                (Math.random() * CACHE_SIZE)
             );
-
-            hiscoreCache[asciiRsn] = {
-                observable: obs,
-                date: new Date(),
-            };
-
-            const keys = Object.keys(hiscoreCache);
-            if (keys.length >= CACHE_SIZE) {
-                const idxToRemove: number = Math.floor(
-                    (Math.random() * CACHE_SIZE)
-                );
-                const keyToRemove: string = keys[idxToRemove];
-                hiscoreCache[keyToRemove] = undefined;
-            }
-            return obs;
+            const keyToRemove: string = keys[idxToRemove];
+            hiscoreCache[keyToRemove] = undefined;
         }
-        return cachedRsn.observable;
-    };
+        return obs;
+    }
+    return cachedRsn.observable;
+};
 }
