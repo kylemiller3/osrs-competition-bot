@@ -839,10 +839,12 @@ export namespace Event {
             );
 
             idx = 0;
-            const str: string = currentScoreboard.map(
+            const maxTeamStrLen: number = Math.max(...maxTeamsLen);
+            const dashesTeamSeparator: string = Number.isFinite(maxTeamStrLen)
+                ? new Array(maxTeamStrLen + 1).join('-')
+                : new Array(1).join('-');
+            const str: string = `${dashesTeamSeparator}\n`.concat(currentScoreboard.map(
                 (team: TeamScoreboard, idi: number): string => {
-                    const maxTeamStrLen: number = Math.max(...maxTeamsLen);
-
                     const teamStrLen: number = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length;
                     const spacesToInsertTeam: number = maxTeamStrLen - teamStrLen;
                     const spacesTeam: string = new Array(spacesToInsertTeam + 1).join(' ');
@@ -900,7 +902,7 @@ export namespace Event {
                     const ret = `${teamStr}\n${participantsStr}`;
                     return ret;
                 }
-            ).join('\n\n');
+            ).join(`\n${dashesTeamSeparator}\n`)).concat(`\n${dashesTeamSeparator}`);
 
             const status: string = !deleted
                 ? this.getStatusString()
