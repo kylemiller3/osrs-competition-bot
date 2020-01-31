@@ -49,7 +49,7 @@ export namespace Network {
                     retryBackoff({
                         initialInterval: 50,
                         maxInterval: 10000,
-                        maxRetries: 5,
+                        maxRetries: 10,
                         shouldRetry,
                     }),
                     catchError((error: Error): Observable<T> => {
@@ -119,8 +119,7 @@ export namespace Network {
                 error: Error
             ): boolean => error.message === 'Player not found! Check RSN or game mode.'
                 || error.message === 'RSN must be less or equal to 12 characters'
-                || error.message === 'RSN must be of type string'
-                || error.message === 'Request failed with status code 503';
+                || error.message === 'RSN must be of type string';
             const obs = genericNetworkFetch$<hiscores.Player | null>(
                 bound,
                 (error: Error): boolean => {
