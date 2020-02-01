@@ -898,6 +898,11 @@ willUpdateScores$.pipe(
                         );
                     }
                 ),
+                tap(
+                    (savedEvent: Event.Standard): void => {
+                        didUpdateScores$.next(savedEvent);
+                    }
+                ),
             ).pipe(
                 catchError(
                     (error: Error): Observable<Event.Standard> => saveAndNotifyUpdatedEventScoreboard(
