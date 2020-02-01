@@ -50,10 +50,14 @@ export namespace Network {
 
         const ret: Observable<T> = networkRequestFactory.pipe(
             retryBackoff({
-                initialInterval: 1500,
+                initialInterval: 100,
                 maxInterval: 20000,
                 maxRetries: 6,
                 shouldRetry,
+                backoffDelay: (
+                    (iteration: number, initialInterval: number):
+                    number => (2 ** iteration) + Math.random() * initialInterval
+                ),
             }),
             catchError((error: Error): Observable<T> => {
                 Utils.logger.warn(`Network Error: ${error.message}`);

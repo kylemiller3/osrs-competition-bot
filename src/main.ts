@@ -574,7 +574,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
                             const now: Date = new Date();
                             const footer: string = lastError === undefined
                                 ? `\n\nLast updated ${now.toUTCString()}`
-                                : `\n\nError ${lastError.message}`;
+                                : `\n\nNetwork Error: ${lastError.message}`;
 
                             const msg2 = refreshMessage(
                                 gClient,
