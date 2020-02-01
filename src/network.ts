@@ -56,7 +56,7 @@ export namespace Network {
                 shouldRetry,
                 backoffDelay: (
                     (iteration: number, initialInterval: number):
-                    number => (2 ** iteration) + Math.random() * initialInterval
+                    number => initialInterval * (2 ** iteration) + Math.random() * 1000
                 ),
             }),
             catchError((error: Error): Observable<T> => {
