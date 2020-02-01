@@ -734,7 +734,7 @@ MessageWrapper.sentMessages$.subscribe(
 willStartEvent$.pipe(
     map(
         (event: Event.Standard): void => {
-            Utils.logger.debug(`Event ${event.id} is starting.`);
+            Utils.logger.info(`Event ${event.id} is starting.`);
 
             // release start timer
             // should already be expired
@@ -745,7 +745,7 @@ willStartEvent$.pipe(
             // if we have a competitive event
             // track scoreboard automatically
             if (!event.isCustom()) {
-                Utils.logger.trace('Event is auto tracking score');
+                Utils.logger.debug('Event is auto tracking score');
                 willUpdateScores$.next([
                     event,
                     true,
@@ -784,7 +784,7 @@ willUpdateScores$.pipe(
         (obj: [Event.Standard, boolean]): Observable<Event.Standard> => {
             const event: Event.Standard = obj[0];
             const forced: boolean = obj[1];
-            Utils.logger.debug(`Event ${event.id} scores will update.`);
+            Utils.logger.info(`Event ${event.id} scores will update.`);
 
             if (Utils.isInFuture(event.when.start)) {
                 return saveAndNotifyUpdatedEventScoreboard(
@@ -807,6 +807,13 @@ willUpdateScores$.pipe(
                 Observable<hiscores.Player | null> => Network.hiscoresFetch$(
                     account.rsn,
                     forced,
+                ).pipe(
+                    catchError(
+                        (error: Error): Observable<null> => {
+                            Utils.logger.warn(`Error looking up ${account.rsn}: ${error.message}`);
+                            throw error;
+                        }
+                    ),
                 ),
             );
             if (observables.length === 0) {
@@ -903,13 +910,13 @@ willUpdateScores$.pipe(
 
 didStartEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} did start.`);
+        Utils.logger.info(`Event ${event.id} did start.`);
     }
 );
 
 willEndEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} will end.`);
+        Utils.logger.info(`Event ${event.id} will end.`);
         if (event.id === undefined) {
             Utils.logger.error('event id is undefined');
             return;
@@ -928,19 +935,19 @@ willEndEvent$.subscribe(
 
 didEndEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} did end.`);
+        Utils.logger.info(`Event ${event.id} did end.`);
     }
 );
 
 didUpdateScores$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} scores did update.`);
+        Utils.logger.info(`Event ${event.id} scores did update.`);
     }
 );
 
 willAddEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} will be added.`);
+        Utils.logger.info(`Event ${event.id} will be added.`);
         // fix all the event chains
         if (Utils.isInPast(event.when.start)) {
             Utils.logger.info('Event started in the past.');
@@ -973,13 +980,13 @@ willAddEvent$.subscribe(
 
 didAddEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} has been added.`);
+        Utils.logger.info(`Event ${event.id} has been added.`);
     }
 );
 
 willSignUpPlayer$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} will signup player.`);
+        Utils.logger.info(`Event ${event.id} will signup player.`);
         // update the board
         willUpdateScores$.next([
             event,
@@ -991,13 +998,13 @@ willSignUpPlayer$.subscribe(
 
 didSignupPlayer$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} did signup player.`);
+        Utils.logger.info(`Event ${event.id} did signup player.`);
     }
 );
 
 willUnsignupPlayer$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} will unsignup player.`);
+        Utils.logger.info(`Event ${event.id} will unsignup player.`);
         // update the board
         willUpdateScores$.next([
             event,
@@ -1009,13 +1016,13 @@ willUnsignupPlayer$.subscribe(
 
 didUnsignupPlayer$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} did unsignup player.`);
+        Utils.logger.info(`Event ${event.id} did unsignup player.`);
     }
 );
 
 willDeleteEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} will delete.`);
+        Utils.logger.info(`Event ${event.id} will delete.`);
         const combinedGuilds = event.guilds.others !== undefined
             ? [
                 event.guilds.creator,
@@ -1057,7 +1064,7 @@ willDeleteEvent$.subscribe(
 
 didDeleteEvent$.subscribe(
     (event: Event.Standard): void => {
-        Utils.logger.debug(`Event ${event.id} did delete`);
+        Utils.logger.info(`Event ${event.id} did delete`);
     }
 );
 
@@ -1121,7 +1128,7 @@ const init = async (): Promise<void> => {
                     ]);
                 }
             );
-        }, 1000 * 60 * 6
+        }, 1000 * 60 * 15
     );
 };
 init();

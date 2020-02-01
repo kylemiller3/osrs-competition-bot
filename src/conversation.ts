@@ -87,13 +87,13 @@ export abstract class Conversation {
             tap(
                 (msg: discord.Message):
                 void => {
-                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
+                    Utils.logger.debug(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
                 }
             ),
             catchError(
                 (error: Error):
                 Observable<discord.Message> => {
-                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
+                    Utils.logger.debug(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
                     throw (error);
                 }
             ),

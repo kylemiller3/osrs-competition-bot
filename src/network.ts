@@ -56,7 +56,7 @@ export namespace Network {
                 shouldRetry,
             }),
             catchError((error: Error): Observable<T> => {
-                Utils.logger.error(error.message);
+                Utils.logger.warn(`Network Error: ${error.message}`);
                 throw error;
             }),
         );
@@ -84,7 +84,7 @@ export namespace Network {
 
     /**
      * Fetches the supplied rsn from RuneScape API hiscores or cache.
-     * Cache invalidates every 5 minutes. See [[hiscores.Player]]
+     * Cache invalidates every 9 minutes. See [[hiscores.Player]]
      * @param rsn The rsn to lookup on hiscores
      * @param pullNew Forces a cache miss
      * @returns Observable of the RuneScape web API response
@@ -96,12 +96,11 @@ export namespace Network {
     ): Observable<hiscores.Player | null> => {
         // eslint-disable-next-line no-control-regex
         const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
-        Utils.logger.trace(`Looking up rsn '${asciiRsn}'`);
         let cachedRsn = hiscoreCache[asciiRsn];
         if (cachedRsn !== undefined) {
             const date: Date = new Date(cachedRsn.date);
             date.setMinutes(
-                date.getMinutes() + 5
+                date.getMinutes() + 9
             );
             if (Utils.isInPast(date) || pullNew) {
                 hiscoreCache[asciiRsn] = undefined;
@@ -131,7 +130,6 @@ export namespace Network {
             ).pipe(
                 catchError(
                     (error: Error): Observable<null> => {
-                        Utils.logger.error(`${error.name}`);
                         if (isInputError(error)) {
                             // consume this error
                             // not a real networking error
