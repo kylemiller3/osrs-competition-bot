@@ -52,7 +52,7 @@ export namespace Network {
             retryBackoff({
                 initialInterval: 1500,
                 maxInterval: 20000,
-                maxRetries: 5,
+                maxRetries: 6,
                 shouldRetry,
             }),
             catchError((error: Error): Observable<T> => {

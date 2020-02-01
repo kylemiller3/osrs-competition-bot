@@ -808,9 +808,12 @@ willUpdateScores$.pipe(
                     account.rsn,
                     forced,
                 ).pipe(
+                    tap(
+                        (): void => Utils.logger.debug(`Successfully updated rsn ${account.rsn}`),
+                    ),
                     catchError(
                         (error: Error): Observable<null> => {
-                            Utils.logger.warn(`Error looking up ${account.rsn}: ${error.message}`);
+                            Utils.logger.warn(`Failed to update rsn ${account.rsn}: ${error.message}`);
                             throw error;
                         }
                     ),

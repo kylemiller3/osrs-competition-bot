@@ -31,7 +31,7 @@ rateThrottle.pipe(
                     Utils.logger.debug('force update request');
                 }
             ),
-            throttleTime(1000 * 60 * 1),
+            throttleTime(1000 * 60 * 5),
             tap(
                 (eventAndMessage: [Event.Standard, discord.Message]):
                 void => {
@@ -111,7 +111,7 @@ class ForceUpdateConversation extends Conversation {
                         this.event,
                         this.opMessage,
                     ]);
-                    this.returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
+                    this.returnMessage = 'This command is rate limited to once every five minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
                     this.state = CONVERSATION_STATE.DONE;
                 }
                 break;
