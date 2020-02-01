@@ -52,7 +52,7 @@ export namespace Network {
             retryBackoff({
                 initialInterval: 100,
                 maxInterval: 20000,
-                maxRetries: 6,
+                maxRetries: 15,
                 shouldRetry,
                 backoffDelay: (
                     (iteration: number, initialInterval: number):
