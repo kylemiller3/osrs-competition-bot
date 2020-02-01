@@ -94,6 +94,7 @@ export namespace Network {
         rsn: string,
         pullNew: boolean
     ): Observable<hiscores.Player | null> => {
+        Utils.logger.debug(`Looking up user ${rsn}`);
         // eslint-disable-next-line no-control-regex
         const asciiRsn: string = rsn.replace(/[^\x00-\x7F]/g, '');
         let cachedRsn = hiscoreCache[asciiRsn];
@@ -131,6 +132,7 @@ export namespace Network {
                 catchError(
                     (error: Error): Observable<null> => {
                         if (isInputError(error)) {
+                            Utils.logger.debug(`The rsn could not be looked up because ${error.message}`);
                             // consume this error
                             // not a real networking error
                             return of(null);
