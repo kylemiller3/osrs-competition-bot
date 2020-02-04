@@ -1,8 +1,17 @@
 # OSRS Competition Discord Bot
 Automatically runs and keeps track of competitive skilling, bossing, bounty, clues, last man standing, and custom clan events posting scores to a Discord channel.
 
+## IMPORTANT NOTES
+This bot runs strictly off the OSRS hiscores. Sometimes the [hiscores](https://secure.runescape.com/m=hiscore_oldschool/a=13/overall.ws) will be down or slow. This bot attempts multiple times to grab the scores but sometimes it will fail. The bot will let you know on the scoreboard if the event updated or failed to update. With that in mind here are some **recommendations for Discord Guild Adminstrators**:
+	* Have your users logout before the event starts.
+	* Have your users logout before the event ends.
+	* If the [hiscores](https://secure.runescape.com/m=hiscore_oldschool/a=13/overall.ws) are slow the above steps may need to happen multiple times before the event starts for accurate scores. Sometimes logging out will not update the OSRS hiscores.
+	* I am not responsible for [hiscores](https://secure.runescape.com/m=hiscore_oldschool/a=13/overall.ws) not being updated and cannot fix this.
+	* If you notice a bug, open up an issue.
+	
+
 ## Setup for server administrators
-To run this bot you must install Postgresql v9.5 or later with node v11.0.0 or later.
+This sections is only applicable to hosting your own version of this bot. In order to run this bot you must install Postgresql v9.5 or later with node v11.0.0 or later.
 
 1. [Initialize your Postgresql database.](https://help.ubuntu.com/community/PostgreSQL) The bot expects the database to listen on *localhost:5432* with these credentials.
 	* database:  **osrs-competition-bot**
