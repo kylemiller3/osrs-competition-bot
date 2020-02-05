@@ -11,6 +11,8 @@ export namespace Utils {
         input: string
     ): boolean => input.toLowerCase() === 'yes'
         || input.toLowerCase() === 'y'
+        || input.toLowerCase() === 'ok'
+        || input.toLowerCase() === 'okay'
         || input.toLowerCase() === 'true'
         || input.toLowerCase() === 't'
         || input === '1';

@@ -39,7 +39,7 @@ class EventsSignupConversation extends Conversation {
         | 'team name needs to be supplied'
         | 'teams are locked 10 minutes before a global event starts'
         | 'participant has no access to this event'
-        | undefined = await guildEvent.signupParticipant(
+        | undefined = guildEvent.signupParticipant(
             this.opMessage.author.id,
             this.opMessage.guild.id,
             rsn,
@@ -103,7 +103,7 @@ class EventsSignupConversation extends Conversation {
                 | 'team name needs to be supplied'
                 | 'teams are locked 10 minutes before a global event starts'
                 | 'participant has no access to this event'
-                | undefined = await this.event.signupParticipant(
+                | undefined = this.event.signupParticipant(
                     this.opMessage.author.id,
                     this.opMessage.guild.id,
                     this.rsn,
@@ -150,7 +150,7 @@ class EventsSignupConversation extends Conversation {
                 | 'team name needs to be supplied'
                 | 'teams are locked 10 minutes before a global event starts'
                 | 'participant has no access to this event'
-                | undefined = await this.event.signupParticipant(
+                | undefined = this.event.signupParticipant(
                     this.opMessage.author.id,
                     this.opMessage.guild.id,
                     this.rsn,

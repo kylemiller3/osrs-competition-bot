@@ -361,19 +361,17 @@ export namespace Event {
             return undefined;
         }
 
-        async signupParticipant(
+        signupParticipant(
             participantId: string,
             guildId: string,
             rsn: string,
             teamName?: string
-        ): Promise<
-            'this rsn is already signed up'
+        ): 'this rsn is already signed up'
             | 'osrs hiscores cannot be reached'
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
-            | undefined
-            > {
+            | undefined {
             const findRsn = (participant: Event.Participant):
             boolean => participant.runescapeAccounts.some(
                 (account: Event.Account):
@@ -395,24 +393,6 @@ export namespace Event {
             if (rsnIdx !== -1 && rsnJdx !== -1) {
                 // we found the rsn in use already
                 return 'this rsn is already signed up';
-            }
-
-            let success = true;
-            const hiscore: hiscores.Player | null = await Network.hiscoresFetch$(
-                rsn,
-                false
-            ).toPromise().catch(
-                (): null => {
-                    success = false;
-                    return null;
-                }
-            );
-            if (!success) {
-                return 'osrs hiscores cannot be reached';
-            }
-
-            if (hiscore === null) {
-                return 'osrs account cannot be found';
             }
 
             // is the participant already on a team?
@@ -1007,19 +987,17 @@ export namespace Event {
         /* eslint-enable class-methods-use-this */
         /* eslint-enable @typescript-eslint/no-unused-vars */
 
-        async signupParticipant(
+        signupParticipant(
             participantId: string,
             guildId: string,
             rsn: string,
             teamName?: string
-        ): Promise<
-            'this rsn is already signed up'
+        ): 'this rsn is already signed up'
             | 'osrs hiscores cannot be reached'
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
-            | undefined
-            > {
+            | undefined {
             // we may need to override the teamname for a cross guild event
             // before we pass it to super
             // find a team with the same guildId
@@ -1040,14 +1018,12 @@ export namespace Event {
             }
 
             // this goes last since it mutates the event
-            const failReason: Promise<
-            'this rsn is already signed up'
+            const failReason: 'this rsn is already signed up'
             | 'osrs hiscores cannot be reached'
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
-            | undefined
-            > = super.signupParticipant(
+            | undefined = super.signupParticipant(
                 participantId,
                 guildId,
                 rsn,

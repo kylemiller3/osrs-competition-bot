@@ -1,9 +1,9 @@
 import * as discord from 'discord.js';
 import {
-    Subscription, Observable, merge, Subject,
+    Subscription, Observable, merge, Subject, concat, of, from,
 } from 'rxjs';
 import {
-    filter, timeout, map, tap, catchError, withLatestFrom, distinctUntilChanged,
+    filter, timeout, map, tap, catchError, withLatestFrom, distinctUntilChanged, switchMap, concatMap, throttleTime, auditTime, debounceTime,
 } from 'rxjs/operators';
 import { messageReceived$, } from './main';
 import { MessageWrapper, } from './messageWrapper';
@@ -83,6 +83,7 @@ export abstract class Conversation {
                 boolean => msg.author.id === this.opMessage.author.id
                 && msg.channel.id === this.opMessage.channel.id
             ),
+            debounceTime(500),
             timeout(60000),
             tap(
                 (msg: discord.Message):
@@ -156,23 +157,31 @@ export abstract class Conversation {
             this.errorInjector$,
         );
 
-        this.qaSub = this.nextQa$.subscribe(
-            async (qa: Qa):
-            Promise<void> => {
-                await this.consumeQa(qa);
-                const question: string | null = this.produceQ();
-                if (question !== null) {
-                    const sendInfo: MessageWrapper.SendInfo = {
-                        message: this.opMessage,
-                        content: question,
-                        options: this.returnOptions,
-                        tag: this.uuid,
-                    };
-                    MessageWrapper.sendMessages$.next(sendInfo);
-                } else {
-                    this.conversationDidEndSuccessfully();
+        this.qaSub = this.nextQa$.pipe(
+            switchMap(
+                (qa: Qa): Observable<void> => from(
+                    this.consumeQa(qa)
+                )
+            ),
+            concatMap(
+                (): Observable<void> => {
+                    const question: string | null = this.produceQ();
+                    if (question !== null) {
+                        const sendInfo: MessageWrapper.SendInfo = {
+                            message: this.opMessage,
+                            content: question,
+                            options: this.returnOptions,
+                            tag: this.uuid,
+                        };
+                        MessageWrapper.sendMessages$.next(sendInfo);
+                    } else {
+                        this.conversationDidEndSuccessfully();
+                    }
+                    return of();
                 }
-            },
+            ),
+        ).subscribe(
+            (): void => {},
             (error: Error): void => {
                 Utils.logger.trace(`Conversation ended ${error}`);
                 if (this.qaSub !== undefined) {
