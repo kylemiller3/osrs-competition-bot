@@ -1144,3 +1144,4 @@ init();
 // TODO:
 // Update add command code
 // Change global join to specify team name immediately
+// Set and enforce limits of users/events per guild

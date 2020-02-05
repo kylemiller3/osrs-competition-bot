@@ -831,7 +831,7 @@ export namespace Event {
                     // const teamStr: string = team.teamScore > 0
                     //     ? `${prefix}${team.lhs}${spacesTeam}${team.teamScore}`
                     //     : `${prefix}${team.lhs}`;
-                    const teamStr = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${spacesTeam}${team.teamScore}`;
+                    const teamStr = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${spacesTeam}${team.teamScore.toLocaleString('en-us')}`;
 
 
                     const participantsStr = team.participantsScores.map(
