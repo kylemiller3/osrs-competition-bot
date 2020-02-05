@@ -12,19 +12,19 @@ import { async, } from 'rxjs/internal/scheduler/async';
 import { privateKey, } from './auth';
 import { Command, } from './command';
 import { Utils, } from './utils';
-import adminSetChannel from './commands/adminSetChannel';
-import eventsAdd from './commands/eventsAdd';
-import eventsDelete from './commands/eventsDelete';
-import eventsEndEvent from './commands/eventsEndEvent';
-import eventsForceSignup from './commands/eventsForceSignup';
-import eventsForceUnsignup from './commands/eventsForceUnsignup';
+import setChannel from './commands/adminSetChannel';
+import addEvent from './commands/eventsAdd';
+import deleteEvent from './commands/eventsDelete';
+import endEvent from './commands/eventsEndEvent';
+import forceSignupEvent from './commands/eventsForceSignup';
+import forceUnsignupEvent from './commands/eventsForceUnsignup';
 import eventsAddScore from './commands/eventsAddScore';
 import eventsListActive from './commands/eventsListActive';
-import eventsListAll from './commands/eventsListAll';
+import listAllEvents from './commands/eventsListAll';
 import eventsListParticipants from './commands/eventsListParticipants';
 import eventsAmISignedUp from './commands/eventsAmISignedUp';
-import eventsSignup from './commands/eventsSignup';
-import eventsUnsignup from './commands/eventsUnsignup';
+import signupEvent from './commands/eventsSignup';
+import unsignupEvent from './commands/eventsUnsignup';
 import usersStats from './commands/usersStats';
 import help from './commands/help';
 import forceUpdate from './commands/eventsForceUpdate';
@@ -35,8 +35,8 @@ import { Event, } from './event';
 import { Network, } from './network';
 import { Settings, } from './settings';
 import { ConversationManager, } from './conversation';
-import joinGlobal from './commands/eventsJoinGlobal';
-import unjoinGlobal from './commands/eventsUnjoinGlobal';
+import joinGlobalEvent from './commands/eventsJoinGlobal';
+import unjoinGlobalEvent from './commands/eventsUnjoinGlobal';
 
 /**
  * Global discord client
@@ -286,53 +286,91 @@ export const getDisplayNameFromDiscordId = (
 };
 
 /**
- * Function that filters all Discord commands messages
+ * Function that dispatches all Discord commands messages
  * @category Observable
  */
-const commandReceived$ = (
-    command: Command.ALL
-): Observable<discord.Message> => mergedMessage$
-    .pipe(
-        tap(
-            (msg: discord.Message):
-            void => {
-                if (msg.content.toLowerCase().startsWith('.exit')) {
-                    ConversationManager.stopConversation(msg);
+const commandDispatch$: Observable<discord.Message> = mergedMessage$.pipe(
+    filter(
+        (msg: discord.Message):
+        boolean => msg.guild
+            && msg.guild.available
+    ),
+    tap(
+        (msg: discord.Message): void => {
+            if (msg.content.toLowerCase().startsWith('.exit')) {
+                ConversationManager.stopConversation(msg);
+            }
+
+            const validCommandKeys: string[] = Object.keys(
+                Command.ALL
+            ).filter(
+                (key: string): boolean => Number.isNaN(Number(key))
+            ).filter(
+                (key: string): boolean => Command.isValid(
+                    Command.ALL[key],
+                    msg.content
+                ),
+            );
+
+            if (validCommandKeys.length > 0) {
+                if (!Command.hasAccess(
+                    Command.ALL[validCommandKeys[0]],
+                    isAdmin(
+                        msg.guild,
+                        msg.author
+                    ),
+                )) {
+                    return;
+                }
+
+                switch (Command.ALL[validCommandKeys[0]]) {
+                    case Command.ALL.ADMIN_SET_CHANNEL:
+                        setChannel(msg);
+                        break;
+                    case Command.ALL.EVENTS_ADD:
+                        addEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_DELETE:
+                        deleteEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_END_EVENT:
+                        endEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_FORCE_SIGNUP:
+                        forceSignupEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_FORCE_UNSIGNUP:
+                        forceUnsignupEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_LIST_ALL:
+                        listAllEvents(msg);
+                        break;
+                    case Command.ALL.EVENTS_SIGNUP:
+                        signupEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_UNSIGNUP:
+                        unsignupEvent(msg);
+                        break;
+                    case Command.ALL.FORCE_UPDATE:
+                        forceUpdate(msg);
+                        break;
+                    case Command.ALL.HELP:
+                        help(msg);
+                        break;
+                    case Command.ALL.JOIN_GLOBAL:
+                        joinGlobalEvent(msg);
+                        break;
+                    case Command.ALL.UNJOIN_GLOBAL:
+                        unjoinGlobalEvent(msg);
+                        break;
+                    default:
+                        Utils.logger.error(`Unhandled command ${Command.ALL[validCommandKeys[0]]}`);
+                        break;
                 }
             }
-        ),
-        filter(
-            (msg: discord.Message):
-            boolean => msg.guild
-                && msg.guild.available
-                && Command.isValid(
-                    command,
-                    msg.content
-                )
-        ),
-        tap(
-            (msg: discord.Message):
-            void => {
-                Utils.logger.debug(`message: ${msg.content}`);
-                Utils.logger.debug(`author: ${msg.author.tag}`);
-                Utils.logger.debug(`guild: ${msg.guild.name}`);
-            }
-        ),
-        filter(
-            (msg: discord.Message):
-            boolean => Command.hasAccess(
-                command,
-                isAdmin(
-                    msg.guild,
-                    msg.author,
-                )
-            )
-        ),
-        tap(
-            ():
-            void => Utils.logger.debug('access: true')
-        ),
-    );
+        },
+    ),
+);
 
 /**
  * Creates a spoofed Discord Message to process
@@ -1083,25 +1121,26 @@ const init = async (): Promise<void> => {
     await gClient.login(privateKey);
 
     // register command listener
-    commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
-    commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
-    commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
-    // commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
-    commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
-    commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
-    commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);
-    // commandReceived$(Command.ALL.EVENTS_ADD_SCORE).subscribe(eventsAddScore);
-    // commandReceived$(Command.ALL.EVENTS_LIST_ACTIVE).subscribe(eventsListActive);
-    commandReceived$(Command.ALL.EVENTS_LIST_ALL).subscribe(eventsListAll);
-    // commandReceived$(Command.ALL.EVENTS_LIST_PARTICIPANTS).subscribe(eventsListParticipants);
-    // commandReceived$(Command.ALL.EVENTS_AMISIGNEDUP).subscribe(eventsAmISignedUp);
-    commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
-    commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
-    // commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
-    commandReceived$(Command.ALL.HELP).subscribe(help);
-    commandReceived$(Command.ALL.FORCE_UPDATE).subscribe(forceUpdate);
-    commandReceived$(Command.ALL.JOIN_GLOBAL).subscribe(joinGlobal);
-    commandReceived$(Command.ALL.UNJOIN_GLOBAL).subscribe(unjoinGlobal);
+    commandDispatch$.subscribe();
+    // commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
+    // commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
+    // commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
+    // // commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
+    // commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
+    // commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
+    // commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);
+    // // commandReceived$(Command.ALL.EVENTS_ADD_SCORE).subscribe(eventsAddScore);
+    // // commandReceived$(Command.ALL.EVENTS_LIST_ACTIVE).subscribe(eventsListActive);
+    // commandReceived$(Command.ALL.EVENTS_LIST_ALL).subscribe(eventsListAll);
+    // // commandReceived$(Command.ALL.EVENTS_LIST_PARTICIPANTS).subscribe(eventsListParticipants);
+    // // commandReceived$(Command.ALL.EVENTS_AMISIGNEDUP).subscribe(eventsAmISignedUp);
+    // commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
+    // commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
+    // // commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
+    // commandReceived$(Command.ALL.HELP).subscribe(help);
+    // commandReceived$(Command.ALL.FORCE_UPDATE).subscribe(forceUpdate);
+    // commandReceived$(Command.ALL.JOIN_GLOBAL).subscribe(joinGlobal);
+    // commandReceived$(Command.ALL.UNJOIN_GLOBAL).subscribe(unjoinGlobal);
     Utils.logger.info('Command listeners running');
 
     await Db.createTables();
