@@ -168,6 +168,14 @@ Shorthand: *.forceunsignup id=(event id) @MentionTheDiscordUserToUnsignup*
   * This command can only be use once per minute per event. Otherwise, this command is ignored.
   * Any administrator from any competing Guild can use this command.
   * Globally enabled events have this command disabled after the event has ended.
+  
+**.lock** - Locks signups for an event.
+  * Find the event id through the scoreboard or *.listall* command.
+  * Globally enabled events have this command disabled as they automatically lock.
+
+**.unlock** - Unlocks signups for an event.
+  * Find the event id through the scoreboard or *.listall* command.
+  * Globally enabled events have this command disabled as they automatically lock.
 
 **.gjoin** - Allows your Discord Guild to compete in a globally enabled event. This enables signups for everyone in your Discord Guild.
   * If your Guild created the event you do not need to run this command.
