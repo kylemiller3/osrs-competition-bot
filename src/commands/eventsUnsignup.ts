@@ -16,7 +16,7 @@ class EventUnsignupConversation extends Conversation {
             return Promise.resolve(false);
         }
 
-        const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
+        const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
             id,
             this.opMessage.guild.id,
         );
@@ -27,6 +27,7 @@ class EventUnsignupConversation extends Conversation {
         }
 
         const error: 'participant was not signed-up'
+        | 'teams have been locked by an administrator'
         | undefined = guildEvent.unsignupParticipant(
             this.opMessage.author.id
         );
@@ -68,7 +69,7 @@ class EventUnsignupConversation extends Conversation {
                     break;
                 }
 
-                const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
+                const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
                     id,
                     this.opMessage.guild.id,
                 );
@@ -88,12 +89,14 @@ class EventUnsignupConversation extends Conversation {
                     break;
                 }
                 const error: 'participant was not signed-up'
+                | 'teams have been locked by an administrator'
                 | undefined = this.event.unsignupParticipant(
                     this.opMessage.author.id
                 );
                 if (error !== undefined) {
                     this.returnMessage = `Removal from event failed because ${error}.`;
                     this.state = CONVERSATION_STATE.DONE;
+                    break;
                 }
                 const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                 this.returnMessage = 'Removed from event.';

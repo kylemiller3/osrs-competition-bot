@@ -248,6 +248,7 @@ export namespace Event {
         teams: Team[]
         tracking: Tracking
         global: boolean
+        adminLocked: boolean
 
         constructor(
             id: number | undefined,
@@ -258,6 +259,7 @@ export namespace Event {
             teams: Team[],
             tracking: Tracking,
             global: boolean,
+            locked: boolean,
         ) {
             this.id = id;
             this.name = name;
@@ -271,6 +273,7 @@ export namespace Event {
             ];
             this.tracking = { ...tracking, };
             this.global = global;
+            this.adminLocked = locked;
         }
 
         // eslint-disable-next-line class-methods-use-this
@@ -371,7 +374,12 @@ export namespace Event {
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
+            | 'teams have been locked by an administrator'
             | undefined {
+            if (this.adminLocked) {
+                return 'teams have been locked by an administrator';
+            }
+
             const findRsn = (participant: Event.Participant):
             boolean => participant.runescapeAccounts.some(
                 (account: Event.Account):
@@ -496,7 +504,11 @@ export namespace Event {
         }
 
         unsignupParticipant(participantId: string): 'participant was not signed-up'
+        | 'teams have been locked by an administrator'
         | undefined {
+            if (this.adminLocked) {
+                return 'teams have been locked by an administrator';
+            }
             // did we find the user?
             const findUser = (participant: Event.Participant):
             boolean => participant.userId === participantId;
@@ -911,6 +923,7 @@ export namespace Event {
             teams: Team[],
             tracking: Tracking,
             global: boolean,
+            locked: boolean,
             invitations?: string[],
         ) {
             super(
@@ -922,6 +935,7 @@ export namespace Event {
                 teams,
                 tracking,
                 global,
+                locked,
             );
 
             this.invitations = invitations;
@@ -997,6 +1011,7 @@ export namespace Event {
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
+            | 'teams have been locked by an administrator'
             | undefined {
             // we may need to override the teamname for a cross guild event
             // before we pass it to super
@@ -1023,6 +1038,7 @@ export namespace Event {
             | 'osrs account cannot be found'
             | 'team name needs to be supplied'
             | 'teams are locked 10 minutes before a global event starts'
+            | 'teams have been locked by an administrator'
             | undefined = super.signupParticipant(
                 participantId,
                 guildId,

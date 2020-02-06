@@ -6,7 +6,7 @@ import {
 } from '../conversation';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
-import { willDeleteEvent$ } from '../main';
+import { willDeleteEvent$, } from '../main';
 
 class EventDeleteConversation extends Conversation {
     event: Event.Standard;
@@ -37,7 +37,7 @@ class EventDeleteConversation extends Conversation {
                 if (Number.isNaN(idToDelete)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Standard | null = await Db.fetchCreatorEvent(
+                    const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         idToDelete,
                         this.opMessage.guild.id,
                     );

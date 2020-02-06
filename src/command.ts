@@ -606,6 +606,42 @@ export namespace Command {
         accessControl: anyUser,
     };
 
+    /**
+     * Implementation of the lock event command description
+     * @category User Implementations
+     */
+    const eventsLock: Description = {
+        description: 'Disallows signups for local events.',
+        accessControl: onlyAdmin,
+        command: '.lock',
+        params: {
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
+                expectedType: ParamType.NUMBER,
+                required: true,
+            },
+        },
+    };
+
+    /**
+     * Implementation of the unlock event command description
+     * @category User Implementations
+     */
+    const eventsUnlock: Description = {
+        description: 'Allows signups for local events.',
+        accessControl: onlyAdmin,
+        command: '.unlock',
+        params: {
+            id: {
+                description: 'The event\'s unique id.',
+                usage: 'event id',
+                expectedType: ParamType.NUMBER,
+                required: true,
+            },
+        },
+    };
+
     export enum ALL {
         ADMIN_SET_CHANNEL,
         EVENTS_ADD,
@@ -626,6 +662,8 @@ export namespace Command {
         FORCE_UPDATE,
         JOIN_GLOBAL,
         UNJOIN_GLOBAL,
+        EVENTS_LOCK,
+        EVENTS_UNLOCK,
     }
 
     const lookup: Record<Command.ALL, Description> = {
@@ -648,6 +686,8 @@ export namespace Command {
         [Command.ALL.FORCE_UPDATE]: forceUpdate,
         [Command.ALL.JOIN_GLOBAL]: joinGlobal,
         [Command.ALL.UNJOIN_GLOBAL]: unjoinGlobal,
+        [Command.ALL.EVENTS_LOCK]: eventsLock,
+        [Command.ALL.EVENTS_UNLOCK]: eventsUnlock,
     };
 
     /**

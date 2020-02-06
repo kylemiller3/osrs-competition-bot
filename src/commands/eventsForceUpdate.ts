@@ -80,7 +80,7 @@ class ForceUpdateConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const creatorEvent: Event.Standard | null = await Db.fetchCreatorEvent(
+                    const creatorEvent: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         eventId,
                         this.opMessage.guild.id,
                     );

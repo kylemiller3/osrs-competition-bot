@@ -33,7 +33,7 @@ class ListParticipantsConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Standard | null = await Db.fetchGuildEvent(
+                    const event: Event.Standard | null = await Db.fetchAnyGuildEvent(
                         idToEdit,
                         this.opMessage.guild.id,
                     );

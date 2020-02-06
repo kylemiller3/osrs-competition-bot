@@ -39,6 +39,7 @@ export namespace Db {
                 event.teams,
                 event.tracking,
                 event.global,
+                event.adminLocked,
                 (event as Event.Global).invitations,
             );
         } else {
@@ -51,6 +52,7 @@ export namespace Db {
                 event.teams,
                 event.tracking,
                 event.global,
+                event.adminLocked,
             );
         }
         return returnEvent;
@@ -423,7 +425,7 @@ export namespace Db {
             + 'AND '
             + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`,
     });
-    export const fetchCreatorEvent = async (
+    export const fetchLocallyCreatedEvent = async (
         id: number,
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
@@ -481,7 +483,7 @@ export namespace Db {
                 + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`
             + ')',
     });
-    export const fetchGuildEvent = async (
+    export const fetchAnyGuildEvent = async (
         id: number,
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,

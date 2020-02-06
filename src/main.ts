@@ -37,6 +37,8 @@ import { Settings, } from './settings';
 import { ConversationManager, } from './conversation';
 import joinGlobalEvent from './commands/eventsJoinGlobal';
 import unjoinGlobalEvent from './commands/eventsUnjoinGlobal';
+import lockEvent from './commands/lockEvent';
+import unlockEvent from './commands/unlockEvent';
 
 /**
  * Global discord client
@@ -363,6 +365,12 @@ const commandDispatch$: Observable<discord.Message> = mergedMessage$.pipe(
                     case Command.ALL.UNJOIN_GLOBAL:
                         unjoinGlobalEvent(msg);
                         break;
+                    case Command.ALL.EVENTS_LOCK:
+                        lockEvent(msg);
+                        break;
+                    case Command.ALL.EVENTS_UNLOCK:
+                        unlockEvent(msg);
+                        break;
                     default:
                         Utils.logger.error(`Unhandled command ${Command.ALL[validCommandKeys[0]]}`);
                         break;
@@ -642,6 +650,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
             event.teams,
             event.tracking,
             event.global,
+            event.adminLocked,
             event.invitations,
         )
         : new Event.Standard(
@@ -653,6 +662,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
             event.teams,
             event.tracking,
             event.global,
+            event.adminLocked,
         );
     const ret: Observable<Event.Standard> = concat(
         observables
@@ -881,6 +891,7 @@ willUpdateScores$.pipe(
                                 event.teams,
                                 event.tracking,
                                 event.global,
+                                event.adminLocked,
                                 event.invitations,
                             )
                             : new Event.Standard(
@@ -892,6 +903,7 @@ willUpdateScores$.pipe(
                                 event.teams,
                                 event.tracking,
                                 event.global,
+                                event.adminLocked,
                             );
 
                         // cascade remake of teams
@@ -1120,28 +1132,8 @@ didDeleteEvent$.subscribe(
 const init = async (): Promise<void> => {
     await gClient.login(privateKey);
 
-    // register command listener
     commandDispatch$.subscribe();
-    // commandReceived$(Command.ALL.ADMIN_SET_CHANNEL).subscribe(adminSetChannel);
-    // commandReceived$(Command.ALL.EVENTS_ADD).subscribe(eventsAdd);
-    // commandReceived$(Command.ALL.EVENTS_DELETE).subscribe(eventsDelete);
-    // // commandReceived$(Command.ALL.EVENTS_EDIT).subscribe(eventsEdit);
-    // commandReceived$(Command.ALL.EVENTS_END_EVENT).subscribe(eventsEndEvent);
-    // commandReceived$(Command.ALL.EVENTS_FORCE_SIGNUP).subscribe(eventsForceSignup);
-    // commandReceived$(Command.ALL.EVENTS_FORCE_UNSIGNUP).subscribe(eventsForceUnsignup);
-    // // commandReceived$(Command.ALL.EVENTS_ADD_SCORE).subscribe(eventsAddScore);
-    // // commandReceived$(Command.ALL.EVENTS_LIST_ACTIVE).subscribe(eventsListActive);
-    // commandReceived$(Command.ALL.EVENTS_LIST_ALL).subscribe(eventsListAll);
-    // // commandReceived$(Command.ALL.EVENTS_LIST_PARTICIPANTS).subscribe(eventsListParticipants);
-    // // commandReceived$(Command.ALL.EVENTS_AMISIGNEDUP).subscribe(eventsAmISignedUp);
-    // commandReceived$(Command.ALL.EVENTS_SIGNUP).subscribe(eventsSignup);
-    // commandReceived$(Command.ALL.EVENTS_UNSIGNUP).subscribe(eventsUnsignup);
-    // // commandReceived$(Command.ALL.USERS_STATS).subscribe(usersStats);
-    // commandReceived$(Command.ALL.HELP).subscribe(help);
-    // commandReceived$(Command.ALL.FORCE_UPDATE).subscribe(forceUpdate);
-    // commandReceived$(Command.ALL.JOIN_GLOBAL).subscribe(joinGlobal);
-    // commandReceived$(Command.ALL.UNJOIN_GLOBAL).subscribe(unjoinGlobal);
-    Utils.logger.info('Command listeners running');
+    Utils.logger.info('Command dispatcher running');
 
     await Db.createTables();
     await resumeRunningEvents();
@@ -1152,6 +1144,7 @@ const init = async (): Promise<void> => {
         scheduleEvents,
         1000 * 60 * 60 * 24,
     );
+    Utils.logger.info('Event scheduler running');
 
     // updates
     setInterval(
@@ -1177,6 +1170,7 @@ const init = async (): Promise<void> => {
             );
         }, 1000 * 60 * 15
     );
+    Utils.logger.info('Auto update scheduler running');
 };
 init();
 
@@ -1184,3 +1178,4 @@ init();
 // Update add command code
 // Change global join to specify team name immediately
 // Set and enforce limits of users/events per guild
+// Move lock/unlock checks to class abstraction

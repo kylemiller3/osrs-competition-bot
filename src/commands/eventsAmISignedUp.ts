@@ -46,7 +46,7 @@ class AmISignedUpConversation extends Conversation {
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Standard | null = await Db.fetchGuildEvent(
+                    const event: Event.Standard | null = await Db.fetchAnyGuildEvent(
                         eventId,
                         this.opMessage.guild.id,
                     );

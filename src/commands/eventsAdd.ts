@@ -346,6 +346,7 @@ class EventAddConversation extends Conversation {
                         [],
                         this.tracker,
                         global,
+                        false,
                     );
                     this.state = CONVERSATION_STATE.CONFIRM;
                 } else {
@@ -362,6 +363,7 @@ class EventAddConversation extends Conversation {
                         [],
                         this.tracker,
                         global,
+                        false,
                     );
                     this.state = CONVERSATION_STATE.Q6;
                 }

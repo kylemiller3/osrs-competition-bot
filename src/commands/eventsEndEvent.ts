@@ -36,7 +36,7 @@ class EventEndConversation extends Conversation {
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
-                    const event: Event.Standard | null = await Db.fetchCreatorEvent(
+                    const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         idToEdit,
                         this.opMessage.guild.id,
                     );

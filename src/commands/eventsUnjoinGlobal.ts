@@ -38,7 +38,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q1E;
                     break;
                 }
-                const event: Event.Standard | null = await Db.fetchGuildEvent(
+                const event: Event.Standard | null = await Db.fetchAnyGuildEvent(
                     id,
                     this.opMessage.guild.id,
                 );

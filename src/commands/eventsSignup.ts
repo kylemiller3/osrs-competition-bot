@@ -25,7 +25,7 @@ class EventsSignupConversation extends Conversation {
             return Promise.resolve(false);
         }
 
-        const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
+        const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
             id,
             this.opMessage.guild.id,
         );
@@ -38,6 +38,7 @@ class EventsSignupConversation extends Conversation {
         | 'osrs account cannot be found'
         | 'team name needs to be supplied'
         | 'teams are locked 10 minutes before a global event starts'
+        | 'teams have been locked by an administrator'
         | 'participant has no access to this event'
         | undefined = guildEvent.signupParticipant(
             this.opMessage.author.id,
@@ -81,7 +82,7 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id = Number.parseInt(qa.answer.content, 10);
-                const guildEvent: Event.Standard | null = await Db.fetchGuildEvent(
+                const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
                     id,
                     this.opMessage.guild.id,
                 );
@@ -102,6 +103,7 @@ class EventsSignupConversation extends Conversation {
                 | 'osrs account cannot be found'
                 | 'team name needs to be supplied'
                 | 'teams are locked 10 minutes before a global event starts'
+                | 'teams have been locked by an administrator'
                 | 'participant has no access to this event'
                 | undefined = this.event.signupParticipant(
                     this.opMessage.author.id,
@@ -111,15 +113,16 @@ class EventsSignupConversation extends Conversation {
 
                 switch (error) {
                     case 'teams are locked 10 minutes before a global event starts':
-                    case 'osrs hiscores cannot be reached': {
+                    case 'osrs hiscores cannot be reached':
+                    case 'teams have been locked by an administrator': {
                         this.returnMessage = `Failed to sign up because ${error}.`;
                         this.state = CONVERSATION_STATE.DONE;
                         break;
                     }
                     case 'this rsn is already signed up':
                     case 'osrs account cannot be found': {
-                        this.returnMessage = `The ${error}. Please try again.`;
-                        this.state = CONVERSATION_STATE.Q2E;
+                        this.returnMessage = `Failed to sign up because ${error}.`;
+                        this.state = CONVERSATION_STATE.DONE;
                         break;
                     }
                     case 'team name needs to be supplied': {
@@ -149,6 +152,7 @@ class EventsSignupConversation extends Conversation {
                 | 'osrs account cannot be found'
                 | 'team name needs to be supplied'
                 | 'teams are locked 10 minutes before a global event starts'
+                | 'teams have been locked by an administrator'
                 | 'participant has no access to this event'
                 | undefined = this.event.signupParticipant(
                     this.opMessage.author.id,

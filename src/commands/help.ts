@@ -2,6 +2,7 @@ import * as discord from 'discord.js';
 import { Command, } from '../command';
 import { isAdmin, } from '../main';
 import { MessageWrapper, } from '../messageWrapper';
+import { ConversationManager, } from '../conversation';
 
 const help = (
     msg: discord.Message
@@ -11,6 +12,7 @@ const help = (
         msg.author,
     );
     const helpStr: string = Command.generateHelpString(admin);
+    ConversationManager.stopConversation(msg);
     MessageWrapper.sendMessage({
         message: msg,
         content: helpStr,
