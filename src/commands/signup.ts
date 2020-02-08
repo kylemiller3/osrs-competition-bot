@@ -82,6 +82,10 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id = Number.parseInt(qa.answer.content, 10);
+                if (Number.isNaN(id)) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    break;
+                }
                 const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
                     id,
                     this.opMessage.guild.id,
