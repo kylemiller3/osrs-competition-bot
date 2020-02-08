@@ -142,16 +142,6 @@ export namespace Command {
     };
 
     /**
-     * Implementation of the list active command description
-     * @category Event Implementations
-     */
-    const eventsListActive: Description = {
-        description: 'Lists active events.',
-        accessControl: anyUser,
-        command: '.listactive',
-    };
-
-    /**
      * The resulting dictionary after parsing [[ALL.EVENTS_DELETE]]
      * @category Parsing Interfaces
      */
@@ -423,76 +413,6 @@ export namespace Command {
         },
     };
 
-    /**
-     * The resulting dictionary after parsing [[ALL.EVENTS_LIST_PARTICIPANTS]]
-     * @category Parsing Interfaces
-     */
-    export interface EventsListParticipants extends Record<string, string | number | boolean> {
-        id: number
-    }
-
-    /**
-     * Implementation of the list participants command description
-     * @category User Implementations
-     */
-    const eventsListParticipants: Description = {
-        description: 'Lists all users signed up for an event.',
-        accessControl: anyUser,
-        command: '.listparticipants',
-        params: {
-            id: {
-                description: 'The event\'s unique id.',
-                usage: 'event id',
-                expectedType: ParamType.NUMBER,
-                required: true,
-            },
-        },
-    };
-
-    /**
-     * The resulting dictionary after parsing [[ALL.EVENTS_AMISIGNEDUP]]
-     * @category Parsing Interfaces
-     */
-    export interface EventsAmISignedUp extends Record<string, string | number | boolean> {
-        id: number
-    }
-
-    /**
-     * Implementation of the amisignedup command description
-     * @category User Implementations
-     */
-    const eventsAmISignedUp: Description = {
-        description: 'Tells you if you are signed up for an event.',
-        accessControl: anyUser,
-        command: '.amisignedup',
-        params: {
-            id: {
-                description: 'The event\'s unique id.',
-                usage: 'event id',
-                expectedType: ParamType.NUMBER,
-                required: true,
-            },
-        },
-    };
-
-    /**
-     * Implementation of the user stats command description
-     * @category User Implementations
-     */
-    const usersStats: Description = {
-        description: 'Prints stats for a user or self if no mention.',
-        accessControl: anyUser,
-        command: '.stats',
-        params: {
-            id: {
-                description: 'The event\'s unique id.',
-                usage: 'event id',
-                expectedType: ParamType.NUMBER,
-                required: true,
-            },
-        },
-    };
-
 
     /**
      * The resulting dictionary after parsing [[ALL.FORCE_UPDATE]]
@@ -645,20 +565,14 @@ export namespace Command {
     export enum ALL {
         ADMIN_SET_CHANNEL,
         EVENTS_ADD,
-        // EVENTS_AMISIGNEDUP,
         EVENTS_DELETE,
-        // EVENTS_EDIT,
         EVENTS_END_EVENT,
         EVENTS_FORCE_SIGNUP,
         EVENTS_FORCE_UNSIGNUP,
-        // EVENTS_LIST_ACTIVE,
         EVENTS_LIST_ALL,
-        // EVENTS_LIST_PARTICIPANTS,
         EVENTS_SIGNUP,
         EVENTS_UNSIGNUP,
-        // EVENTS_ADD_SCORE,
         HELP,
-        // USERS_STATS,
         FORCE_UPDATE,
         JOIN_GLOBAL,
         UNJOIN_GLOBAL,
@@ -669,20 +583,14 @@ export namespace Command {
     const lookup: Record<Command.ALL, Description> = {
         [Command.ALL.ADMIN_SET_CHANNEL]: adminSetChannel,
         [Command.ALL.EVENTS_ADD]: eventsAdd,
-        // [Command.ALL.EVENTS_AMISIGNEDUP]: eventsAmISignedUp,
         [Command.ALL.EVENTS_DELETE]: eventsDelete,
-        // [Command.ALL.EVENTS_EDIT]: eventsEdit,
         [Command.ALL.EVENTS_END_EVENT]: eventsEndEvent,
         [Command.ALL.EVENTS_FORCE_SIGNUP]: eventsForceSignup,
         [Command.ALL.EVENTS_FORCE_UNSIGNUP]: eventsForceUnsignup,
-        // [Command.ALL.EVENTS_LIST_ACTIVE]: eventsListActive,
         [Command.ALL.EVENTS_LIST_ALL]: eventsListAll,
-        // [Command.ALL.EVENTS_LIST_PARTICIPANTS]: eventsListParticipants,
         [Command.ALL.EVENTS_SIGNUP]: eventsSignup,
         [Command.ALL.EVENTS_UNSIGNUP]: eventsUnsignup,
-        // [Command.ALL.EVENTS_ADD_SCORE]: eventsAddScore,
         [Command.ALL.HELP]: help,
-        // [Command.ALL.USERS_STATS]: usersStats,
         [Command.ALL.FORCE_UPDATE]: forceUpdate,
         [Command.ALL.JOIN_GLOBAL]: joinGlobal,
         [Command.ALL.UNJOIN_GLOBAL]: unjoinGlobal,

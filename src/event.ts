@@ -3,7 +3,7 @@ import * as discord from 'discord.js';
 import { Utils, } from './utils';
 import {
     gClient, getDisplayNameFromDiscordId, getTagFromDiscordId, getDiscordGuildName,
-} from './main';
+} from '..';
 import { Network, } from './network';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace

@@ -122,7 +122,7 @@ export namespace Network {
             const isInputError: (error: Error) => boolean = (
                 error: Error
             ): boolean => error.message === 'Player not found! Check RSN or game mode.'
-            || error.message === 'RSN must be less or equal to 12 characters'
+                || error.message === 'RSN must be less or equal to 12 characters'
                 || error.message === 'RSN must be of type string';
             const obs = genericNetworkFetch$<hiscores.Player | null>(
                 bound,

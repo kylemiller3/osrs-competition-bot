@@ -5,7 +5,7 @@ import {
 import {
     filter, timeout, map, tap, catchError, withLatestFrom, distinctUntilChanged, switchMap, concatMap, throttleTime, auditTime, debounceTime,
 } from 'rxjs/operators';
-import { messageReceived$, } from './main';
+import { messageReceived$, } from '..';
 import { MessageWrapper, } from './messageWrapper';
 import { Utils, } from './utils';
 import { Command, } from './command';

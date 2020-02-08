@@ -1,6 +1,6 @@
 import * as discord from 'discord.js';
 import { Command, } from '../command';
-import { isAdmin, } from '../main';
+import { isAdmin, } from '../..';
 import { MessageWrapper, } from '../messageWrapper';
 import { ConversationManager, } from '../conversation';
 

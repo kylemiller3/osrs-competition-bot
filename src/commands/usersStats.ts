@@ -1,7 +1,7 @@
 import * as discord from 'discord.js';
 import { hiscores, } from 'osrs-json-api';
 import { Command, } from '../command';
-import { spoofMessage, } from '../main';
+import { spoofMessage, } from '../..';
 import { Event, } from '../event';
 
 /**
