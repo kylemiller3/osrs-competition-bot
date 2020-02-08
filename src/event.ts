@@ -276,11 +276,6 @@ export namespace Event {
             this.adminLocked = locked;
         }
 
-        // eslint-disable-next-line class-methods-use-this
-        canDelete(): boolean {
-            return true;
-        }
-
         getEventTracking(): TrackingCategory {
             return this.tracking.category;
         }
@@ -929,10 +924,6 @@ export namespace Event {
             );
 
             this.invitations = invitations;
-        }
-
-        canDelete(): boolean {
-            return !Utils.isInPast(this.when.start);
         }
 
         validate(): ('the name is over 50 characters'

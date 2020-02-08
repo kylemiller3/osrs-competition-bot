@@ -29,7 +29,7 @@ class EventAddConversation extends Conversation {
                 twoDaysFromNow.setMilliseconds(0);
                 twoDaysFromNow.setSeconds(0);
                 twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
-                return `Start it when?\nExample: ${twoDaysFromNow.toISOString()} which is two days from now OR 'now' for right now.`;
+                return `Start it when?\nExample: ${twoDaysFromNow.toISOString()} which is two days from now OR 'asap' for one hour from now.`;
             }
             case CONVERSATION_STATE.Q2C:
                 return `Starting date is set for ${this.start.toString()}. Is this ok?`;
@@ -69,7 +69,7 @@ class EventAddConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q1E;
                     this.lastErrorMessage = 'The name is blank.';
                     break;
-                } else if (name.length > 100) {
+                } else if (name.length > 50) {
                     this.state = CONVERSATION_STATE.Q1E;
                     this.lastErrorMessage = 'The name is greater than 100 characters long.';
                     break;
@@ -83,12 +83,19 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q2:
             case CONVERSATION_STATE.Q2E: {
                 const dateStr: string = qa.answer.content;
-                const start: Date = dateStr.toLowerCase() !== 'now'
+                const now: Date = new Date();
+                const oneHourFromNow = new Date(now);
+                oneHourFromNow.setHours(oneHourFromNow.getHours() + 1);
+                const start: Date = dateStr.toLowerCase() !== 'asap'
                     ? new Date(dateStr)
-                    : new Date();
+                    : oneHourFromNow;
                 if (!Utils.isValidDate(start)) {
                     this.state = CONVERSATION_STATE.Q2E;
                     this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
+                    break;
+                } else if (start.getTime() - now.getTime() < 1000 * 60 * 60) {
+                    this.state = CONVERSATION_STATE.Q2E;
+                    this.lastErrorMessage = 'The start date must be at least an hour in advance';
                     break;
                 } else {
                     this.start = start;
@@ -115,18 +122,20 @@ class EventAddConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q3E;
                     this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
                     break;
-                } else if (this.start >= end) {
+                }
+                
+                if (this.start >= end) {
                     this.state = CONVERSATION_STATE.Q3E;
                     this.lastErrorMessage = 'The start date is after the event end date.';
                     break;
-                } else if (this.end.getTime() - this.start.getTime() < 1000 * 60 * 60) {
+                } else if (end.getTime() - this.start.getTime() < 1000 * 60 * 60) {
                     this.state = CONVERSATION_STATE.Q3E;
                     this.lastErrorMessage = 'The event must be at least an hour in duration.';
                     break;
-                } else if (this.end.getTime() - this.start.getTime() > 1000 * 60 * 60 * 24 * 7) {
+                } else if (end.getTime() - this.start.getTime() > 1000 * 60 * 60 * 24 * 3) {
                     // freemium
                     this.state = CONVERSATION_STATE.Q3E;
-                    this.lastErrorMessage = 'The free version limits events to one week duration maximum.';
+                    this.lastErrorMessage = 'The free version limits events to three days duration maximum.';
                     break;
                 } else {
                     this.end = end;

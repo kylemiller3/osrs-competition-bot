@@ -53,6 +53,8 @@ class EventsUnjoinGlobalConversation extends Conversation {
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
+                const thirtyMinutesBeforeStart: Date = new Date(this.event.when.start);
+                thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
                 if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Cancelled.';
                     this.state = CONVERSATION_STATE.DONE;
@@ -61,8 +63,8 @@ class EventsUnjoinGlobalConversation extends Conversation {
                     this.returnMessage = 'Your guild wasn\'t participating anyway.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
-                } else if (Utils.isInPast(this.event.when.start)) {
-                    this.returnMessage = 'Cannot leave an event now that it has started';
+                } else if (Utils.isInPast(thirtyMinutesBeforeStart)) {
+                    this.returnMessage = 'Cannot leave a global event within thirty minutes of the start date.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
                 }

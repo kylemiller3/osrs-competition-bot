@@ -4,7 +4,7 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
-import { dbPassword, } from './auth';
+import { dbPassword, } from '../auth';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {

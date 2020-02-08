@@ -41,15 +41,24 @@ class EventsJoinGlobalConversation extends Conversation {
                     id,
                     this.opMessage.guild.id,
                 );
+
                 if (event === null) {
                     this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
                     this.state = CONVERSATION_STATE.Q1E;
                     break;
-                } else if (event.guilds.others !== undefined
+                }
+
+                const thirtyMinutesBeforeStart: Date = new Date(event.when.start);
+                thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
+                if (event.guilds.others !== undefined
                     && event.guilds.others.findIndex(
                         (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id
                     ) !== -1) {
                     this.returnMessage = 'Your guild has already joined this event.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
+                } else if (Utils.isInPast(thirtyMinutesBeforeStart)) {
+                    this.lastErrorMessage = 'Cannot join a global event within thirty minutes of the start date.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
                 } else {

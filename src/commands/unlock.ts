@@ -17,18 +17,8 @@ class UnlockEventConversation extends Conversation {
 
     produceQ(): string | null {
         switch (this.state) {
-            case CONVERSATION_STATE.Q1E:
-                case CONVERSATION_STATE.Q2E:
-                case CONVERSATION_STATE.Q3E:
-                case CONVERSATION_STATE.Q4E:
-                case CONVERSATION_STATE.Q5E:
-                case CONVERSATION_STATE.Q6E: {
-                    return this.lastErrorMessage;
-                }
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to unlock? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Event not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
             default:
                 return null;
         }
@@ -48,12 +38,13 @@ class UnlockEventConversation extends Conversation {
                     this.opMessage.guild.id,
                 );
                 if (creatorEvent === null) {
+                    this.lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';
                     this.state = CONVERSATION_STATE.Q1E;
                     break;
                 }
 
                 if (creatorEvent.global === true) {
-                    this.returnMessage = 'Failed: Globally enabled events automatically lock.';
+                    this.returnMessage = 'Globally enabled events automatically lock and cannot be unlocked.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
                 }

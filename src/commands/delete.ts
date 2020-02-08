@@ -44,8 +44,8 @@ class EventDeleteConversation extends Conversation {
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                         break;
-                    } else if (!event.canDelete()) {
-                        this.returnMessage = 'This event cannot be deleted anymore.';
+                    } else if (event.global === true && Utils.isInPast(event.when.start)) {
+                        this.returnMessage = 'A global event cannot be deleted after it has started.';
                         this.state = CONVERSATION_STATE.DONE;
                         break;
                     } else {

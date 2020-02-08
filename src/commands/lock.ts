@@ -44,7 +44,7 @@ class LockEventConversation extends Conversation {
                 }
 
                 if (creatorEvent.global === true) {
-                    this.returnMessage = 'Failed: Globally enabled events automatically lock.';
+                    this.returnMessage = 'Globally enabled events automatically lock.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
