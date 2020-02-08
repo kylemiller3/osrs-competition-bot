@@ -277,9 +277,8 @@ export namespace Event {
         }
 
         // eslint-disable-next-line class-methods-use-this
-        canDelete(): 'the global event has started already'
-        | undefined {
-            return undefined;
+        canDelete(): boolean {
+            return true;
         }
 
         getEventTracking(): TrackingCategory {
@@ -351,17 +350,8 @@ export namespace Event {
             return false;
         }
 
-        end(): 'ending early is disabled for global events'
-        | 'the event has not started'
-        | 'the event has already ended'
-        | undefined {
-            if (Utils.isInFuture(this.when.start)) {
-                return 'the event has not started';
-            }
-            if (Utils.isInPast(this.when.end)) {
-                return 'the event has already ended';
-            }
-            return undefined;
+        end(): void {
+            this.when.end = new Date();
         }
 
         signupParticipant(
@@ -941,11 +931,8 @@ export namespace Event {
             this.invitations = invitations;
         }
 
-        canDelete(): 'the global event has started already'
-        | undefined {
-            return Utils.isInPast(this.when.start)
-                ? 'the global event has started already'
-                : undefined;
+        canDelete(): boolean {
+            return !Utils.isInPast(this.when.start);
         }
 
         validate(): ('the name is over 50 characters'
@@ -990,13 +977,6 @@ export namespace Event {
         /* eslint-disable class-methods-use-this */
         addScore(customScore: number): boolean {
             return false;
-        }
-
-        end(): 'ending early is disabled for global events'
-        | 'the event has not started'
-        | 'the event has already ended'
-        | undefined {
-            return 'ending early is disabled for global events';
         }
         /* eslint-enable class-methods-use-this */
         /* eslint-enable @typescript-eslint/no-unused-vars */

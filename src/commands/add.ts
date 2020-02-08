@@ -10,6 +10,7 @@ import { Event, } from '../event';
 
 class EventAddConversation extends Conversation {
     event: Event.Standard;
+    name: string;
     tracker: Event.Tracking;
     start: Date;
     end: Date;
@@ -23,17 +24,13 @@ class EventAddConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Event name? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Failed to name the event.\nExample: Runecrafting Event #1. Please try again.';
             case CONVERSATION_STATE.Q2: {
                 const twoDaysFromNow: Date = new Date();
                 twoDaysFromNow.setMilliseconds(0);
                 twoDaysFromNow.setSeconds(0);
                 twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
-                return `Start it when?\nExample: ${twoDaysFromNow.toISOString()} (2 days from now) OR 'now' for right now.`;
+                return `Start it when?\nExample: ${twoDaysFromNow.toISOString()} which is two days from now OR 'now' for right now.`;
             }
-            case CONVERSATION_STATE.Q2E:
-                return 'Failed to set date. Please try again.';
             case CONVERSATION_STATE.Q2C:
                 return `Starting date is set for ${this.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3: {
@@ -41,28 +38,20 @@ class EventAddConversation extends Conversation {
                 oneWeekFromNow.setMilliseconds(0);
                 oneWeekFromNow.setSeconds(0);
                 oneWeekFromNow.setHours(oneWeekFromNow.getHours() + 24 * 7);
-                return `End it when?\nExample: ${oneWeekFromNow.toISOString()} (a week from now) OR 'tbd' for long running event.`;
+                return `End it when?\nExample: ${oneWeekFromNow.toISOString()} which is one week from now.`;
             }
-            case CONVERSATION_STATE.Q3E:
-                return 'Failed to set date. Maybe your event ends before it starts? Please try again.';
             case CONVERSATION_STATE.Q3C:
                 return `Ending date is set for ${this.end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
-                return 'Which category of event?\nChoices are \'skills\' with skill name list, \'bh\' with bh mode (\'rogue\' and/or \'hunter\'), \'lms\', \'clues\' with clue difficulty list, \'custom\', or \'bosses\' with bosses list. NOTE: lists must be comma separated and are case sensitive';
-            case CONVERSATION_STATE.Q4E:
-                return 'Could not set event type. Please try again.';
+                return 'Which category of event?';
             case CONVERSATION_STATE.Q4C:
                 return `Event will be of type ${this.tracker.category} and track ${this.tracker.what === undefined ? 'nothing' : this.tracker.what}. Is this ok?`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
-            case CONVERSATION_STATE.Q5E:
-                return 'Could not set global flag. Try yes or no. Please try again.';
             case CONVERSATION_STATE.Q6:
                 return 'Would you like to invite specific guilds (yes) or leave the event open to everyone (no)?';
             case CONVERSATION_STATE.Q6O:
-                return 'Enter the Discord Guild ids separating each one with a comma.';
-            case CONVERSATION_STATE.Q6E:
-                return 'No Discord Guild ids specified.';
+                return 'Enter the Discord Guild IDs separating each one with a comma.';
             case CONVERSATION_STATE.CONFIRM:
                 return `The event looks like this:\n\`\`\`json\n${JSON.stringify(this.event, null, 2)}\n\`\`\`\nIs this ok?`;
             default:
@@ -72,67 +61,90 @@ class EventAddConversation extends Conversation {
 
     async consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
+            // Event name
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const name: string = qa.answer.content;
                 if (name.length === 0) {
                     this.state = CONVERSATION_STATE.Q1E;
+                    this.lastErrorMessage = 'The name is blank.';
+                    break;
+                } else if (name.length > 100) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    this.lastErrorMessage = 'The name is greater than 100 characters long.';
+                    break;
                 } else {
-                    this.params.name = name;
+                    this.name = name;
                     this.state = CONVERSATION_STATE.Q2;
+                    break;
                 }
-                break;
             }
+            // Start date
             case CONVERSATION_STATE.Q2:
             case CONVERSATION_STATE.Q2E: {
                 const dateStr: string = qa.answer.content;
                 const start: Date = dateStr.toLowerCase() !== 'now'
-                    ? new Date(
-                        dateStr
-                    )
+                    ? new Date(dateStr)
                     : new Date();
                 if (!Utils.isValidDate(start)) {
                     this.state = CONVERSATION_STATE.Q2E;
+                    this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
+                    break;
                 } else {
                     this.start = start;
                     this.state = CONVERSATION_STATE.Q2C;
+                    break;
                 }
-                break;
             }
             case CONVERSATION_STATE.Q2C: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.state = CONVERSATION_STATE.Q2;
+                    break;
                 } else {
                     this.state = CONVERSATION_STATE.Q3;
+                    break;
                 }
-                break;
             }
+            // End date
             case CONVERSATION_STATE.Q3:
             case CONVERSATION_STATE.Q3E: {
                 const dateStr: string = qa.answer.content;
-                const end: Date = dateStr.toLowerCase() !== 'tbd'
-                    ? new Date(
-                        dateStr
-                    )
-                    : Utils.distantFuture;
-                if (!Utils.isValidDate(end) || this.start >= end) {
+                const end: Date = new Date(dateStr);
+                if (!Utils.isValidDate(end)) {
                     this.state = CONVERSATION_STATE.Q3E;
+                    this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
+                    break;
+                } else if (this.start >= end) {
+                    this.state = CONVERSATION_STATE.Q3E;
+                    this.lastErrorMessage = 'The start date is after the event end date.';
+                    break;
+                } else if (this.end.getTime() - this.start.getTime() < 1000 * 60 * 60) {
+                    this.state = CONVERSATION_STATE.Q3E;
+                    this.lastErrorMessage = 'The event must be at least an hour in duration.';
+                    break;
+                } else if (this.end.getTime() - this.start.getTime() > 1000 * 60 * 60 * 24 * 7) {
+                    // freemium
+                    this.state = CONVERSATION_STATE.Q3E;
+                    this.lastErrorMessage = 'The free version limits events to one week duration maximum.';
+                    break;
                 } else {
                     this.end = end;
                     this.state = CONVERSATION_STATE.Q3C;
+                    break;
                 }
-                break;
             }
             case CONVERSATION_STATE.Q3C: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.state = CONVERSATION_STATE.Q3;
+                    break;
                 } else {
                     this.state = CONVERSATION_STATE.Q4;
+                    break;
                 }
-                break;
             }
+            // Category / Tracking
             case CONVERSATION_STATE.Q4:
             case CONVERSATION_STATE.Q4E: {
                 const type: string = qa.answer.content;
@@ -152,6 +164,7 @@ class EventAddConversation extends Conversation {
                         break;
                     default:
                         this.state = CONVERSATION_STATE.Q4E;
+                        this.lastErrorMessage = 'Unknown category. See user manual.';
                         return;
                 }
 
@@ -310,32 +323,27 @@ class EventAddConversation extends Conversation {
                 }
                 if (what !== undefined && what.length !== keyStrs.length) {
                     this.state = CONVERSATION_STATE.Q4E;
-                    return;
+                    this.lastErrorMessage = 'Some inputs were invalid. See user manual.';
+                    break;
                 }
                 this.tracker = {
                     category: tracking,
                     what,
                 };
-                this.state = CONVERSATION_STATE.Q5;
+                this.state = CONVERSATION_STATE.Q4C;
                 break;
             }
             case CONVERSATION_STATE.Q4C: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.state = CONVERSATION_STATE.Q4;
+                    break;
                 } else {
-                    this.state = CONVERSATION_STATE.Q5;
-                }
-                break;
-            }
-            case CONVERSATION_STATE.Q5:
-            case CONVERSATION_STATE.Q5E: {
-                const global: boolean = Utils.isYes(qa.answer.content);
-
-                if (!global) {
+                    // create event here
+                    // freemium
                     this.event = new Event.Standard(
                         undefined,
-                        this.params.name as string,
+                        this.name,
                         this.start,
                         this.end,
                         {
@@ -345,67 +353,96 @@ class EventAddConversation extends Conversation {
                         },
                         [],
                         this.tracker,
-                        global,
+                        false,
                         false,
                     );
+                    // freemium
                     this.state = CONVERSATION_STATE.CONFIRM;
-                } else {
-                    this.event = new Event.Global(
-                        undefined,
-                        this.params.name as string,
-                        this.start,
-                        this.end,
-                        {
-                            creator: {
-                                guildId: qa.answer.guild.id,
-                            },
-                        },
-                        [],
-                        this.tracker,
-                        global,
-                        false,
-                    );
-                    this.state = CONVERSATION_STATE.Q6;
+                    break;
                 }
-                break;
             }
-            case CONVERSATION_STATE.Q6: {
-                const answer = qa.answer.content;
-                if (!Utils.isYes(answer)) {
-                    this.state = CONVERSATION_STATE.CONFIRM;
-                } else {
-                    this.state = CONVERSATION_STATE.Q6O;
-                }
-                break;
-            }
-            case CONVERSATION_STATE.Q6O:
-            case CONVERSATION_STATE.Q6E: {
-                const ids: string[] = qa.answer.content.split(',').map(
-                    (str: string): string => str.trim()
-                );
-                if (ids.length === 0) {
-                    this.state = CONVERSATION_STATE.Q6E;
-                } else {
-                    if (this.event instanceof Event.Global) {
-                        this.event.invitations = ids;
-                    }
-                    this.state = CONVERSATION_STATE.CONFIRM;
-                }
-                break;
-            }
+            // // Global
+            // case CONVERSATION_STATE.Q5:
+            // case CONVERSATION_STATE.Q5E: {
+            //     const global: boolean = Utils.isYes(qa.answer.content);
+
+            //     if (!global) {
+            //         this.event = new Event.Standard(
+            //             undefined,
+            //             this.name,
+            //             this.start,
+            //             this.end,
+            //             {
+            //                 creator: {
+            //                     guildId: qa.answer.guild.id,
+            //                 },
+            //             },
+            //             [],
+            //             this.tracker,
+            //             global,
+            //             false,
+            //         );
+            //         this.state = CONVERSATION_STATE.CONFIRM;
+            //     } else {
+            //         this.event = new Event.Global(
+            //             undefined,
+            //             this.name as string,
+            //             this.start,
+            //             this.end,
+            //             {
+            //                 creator: {
+            //                     guildId: qa.answer.guild.id,
+            //                 },
+            //             },
+            //             [],
+            //             this.tracker,
+            //             global,
+            //             false,
+            //         );
+            //         this.state = CONVERSATION_STATE.Q6;
+            //     }
+            //     break;
+            // }
+            // case CONVERSATION_STATE.Q6: {
+            //     const answer = qa.answer.content;
+            //     if (!Utils.isYes(answer)) {
+            //         this.state = CONVERSATION_STATE.CONFIRM;
+            //     } else {
+            //         this.state = CONVERSATION_STATE.Q6O;
+            //     }
+            //     break;
+            // }
+            // case CONVERSATION_STATE.Q6O:
+            // case CONVERSATION_STATE.Q6E: {
+            //     const ids: string[] = qa.answer.content.split(',').map(
+            //         (str: string): string => str.trim()
+            //     );
+            //     if (ids.length === 0) {
+            //         this.state = CONVERSATION_STATE.Q6E;
+            //     } else {
+            //         if (this.event instanceof Event.Global) {
+            //             this.event.invitations = ids;
+            //         }
+            //         this.state = CONVERSATION_STATE.CONFIRM;
+            //     }
+            //     break;
+            // }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Cancelled.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 } else {
                     // save here
                     const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                     willAddEvent$.next(savedEvent);
                     Utils.logger.trace(`Saved event id ${savedEvent.id} to database.`);
+
                     this.returnMessage = 'Event successfully scheduled.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 }
-                this.state = CONVERSATION_STATE.DONE;
-                break;
             }
             default:
                 break;

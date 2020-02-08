@@ -1168,14 +1168,13 @@ const init = async (): Promise<void> => {
 init();
 
 // TODO:
-// Rewrite command code - like old code do more in command and add more event helper functions
 // Event concepts:
 // private isLocked(): admin for local or auto for global
 // return true/false instead of error strings
 // Change global join to specify team name immediately
 // Add freemium model:
-// tier 1: more global events/more events/more participants
-// tier 2: private server, simple ssh into a proxy server for hiscores lookup
+// tier 1: global events/more events/more participants and higher priority
+// tier 2: dedicated servers, simple ssh into a proxy server for hiscores lookup, highest priority
 // Maintain list of guilds with their dedicated server
 // Separate out posting scoreboard messages from updating event...
 // 1. make event updates parallel
@@ -1184,10 +1183,13 @@ init();
 // b. helper function in mw that returns an observable factory of prepared messages
 // c. concatMap prepared messages so updates are posted in order
 // Set and enforce limits of users/events per guild
-// 1. 40 users per guild total
-// a. tier 1: 40 limit
-// b. tier 2: unlimited
-// 2. 4 event limit
+// 1. 20 users per guild total
+// a. tier 1: 40 limit total
+// b. tier 2: 80 limit total
+// 2. week long event limit
 // a. no long running events - limit length
-// b. tier 2: upgrade to unlimited
+// b. tier 2: upgrade to one month
 // Move lock/unlock checks to class abstraction
+// bucket/queue methods
+// 1. Divide updates into 5 minute buckets
+// 2. Priority queue by tier

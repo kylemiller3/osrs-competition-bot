@@ -13,57 +13,63 @@ import { Utils, } from '../utils';
 class EventsSignupConversation extends Conversation {
     event: Event.Standard;
     rsn: string;
-    teamName: string
+    teamName: string | null;
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
         const id = this.params.id as number | undefined;
         const rsn = this.params.rsn as string | undefined;
-        const team = this.params.team as string | undefined;
+        const teamName = this.params.team as string | undefined;
 
         if (id === undefined || rsn === undefined) {
             return Promise.resolve(false);
         }
 
-        const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
-            id,
-            this.opMessage.guild.id,
-        );
-        if (guildEvent === null) {
+        await this.consumeQa({
+            questions: [],
+            answer: {
+                ...this.opMessage,
+                content: `${id}`,
+            } as discord.Message,
+        });
+        if (this.state === CONVERSATION_STATE.Q1E) {
             return Promise.resolve(false);
         }
 
-        const error: 'this rsn is already signed up'
-        | 'osrs hiscores cannot be reached'
-        | 'osrs account cannot be found'
-        | 'team name needs to be supplied'
-        | 'teams are locked 10 minutes before a global event starts'
-        | 'teams have been locked by an administrator'
-        | 'participant has no access to this event'
-        | undefined = guildEvent.signupParticipant(
-            this.opMessage.author.id,
-            this.opMessage.guild.id,
-            rsn,
-            team,
-        );
-
-        if (error !== undefined) {
-            this.returnMessage = `Signup failed because ${error}.`;
+        await this.consumeQa({
+            questions: [],
+            answer: {
+                ...this.opMessage,
+                content: `${rsn}`,
+            } as discord.Message,
+        });
+        if (this.state === CONVERSATION_STATE.Q2E) {
+            return Promise.resolve(false);
+        }
+        if (this.state === CONVERSATION_STATE.DONE) {
             return Promise.resolve(true);
         }
 
-        this.returnMessage = 'Successfully signed-up up for event';
-        const savedEvent: Event.Standard = await Db.upsertEvent(guildEvent);
-        willSignUpPlayer$.next(savedEvent);
-        return Promise.resolve(true);
+        await this.consumeQa({
+            questions: [],
+            answer: {
+                ...this.opMessage,
+                content: `${teamName}`,
+            } as discord.Message,
+        });
+        if (this.state === CONVERSATION_STATE.Q3E) {
+            return Promise.resolve(false);
+        }
+        if (this.state === CONVERSATION_STATE.DONE) {
+            return Promise.resolve(true);
+        }
+        return Promise.resolve(false);
     }
 
     produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to signup for? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Event not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q2E:
@@ -82,18 +88,31 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id = Number.parseInt(qa.answer.content, 10);
-                const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
-                    id,
-                    this.opMessage.guild.id,
-                );
-                if (guildEvent === null) {
+                if (Number.isNaN(id)) {
                     this.state = CONVERSATION_STATE.Q1E;
-                    return;
-                }
+                    break;
+                } else {
+                    const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
+                        id,
+                        this.opMessage.guild.id,
+                    );
+                    if (guildEvent === null) {
+                        this.lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';
+                        this.state = CONVERSATION_STATE.Q1E;
+                        break;
+                    }
 
-                this.event = guildEvent;
-                this.state = CONVERSATION_STATE.Q2;
-                break;
+                    if (guildEvent.adminLocked === true) {
+                        this.returnMessage = 'Teams have been locked by an administrator.';
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    }
+
+
+                    this.event = guildEvent;
+                    this.state = CONVERSATION_STATE.Q2;
+                    break;
+                }
             }
             case CONVERSATION_STATE.Q2:
             case CONVERSATION_STATE.Q2E: {

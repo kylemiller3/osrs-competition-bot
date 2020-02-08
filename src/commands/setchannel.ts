@@ -16,8 +16,6 @@ class AdminSetChannelConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Mention a channel to set text channel? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Could not find channel mention.\nExample: \'#general\' Please try again.';
             default:
                 return null;
         }
@@ -29,6 +27,7 @@ class AdminSetChannelConversation extends Conversation {
             case CONVERSATION_STATE.Q1E: {
                 const channelMentions = qa.answer.mentions.channels;
                 if (channelMentions.array().length === 0) {
+                    this.lastErrorMessage = 'Could not find channel mention.\nExample: \'#general\'';
                     this.state = CONVERSATION_STATE.Q1E;
                 } else {
                     await Db.upsertSettings({

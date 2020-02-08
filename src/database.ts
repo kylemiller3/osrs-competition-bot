@@ -4,7 +4,7 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
-import { dbPassword, } from '../auth';
+import { dbPassword, } from './auth';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -163,11 +163,11 @@ export namespace Db {
             //---------------
             task.none({
                 text: 'CREATE TABLE IF NOT EXISTS '
-                + `${TABLES.SETTINGS}`
-                + '('
+                    + `${TABLES.SETTINGS}`
+                    + '('
                     + `${SETTINGS_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
                     + `${SETTINGS_COL.CHANNEL_ID} TEXT NOT NULL`
-                + ')',
+                    + ')',
             });
 
             //------------
@@ -175,71 +175,71 @@ export namespace Db {
             //------------
             task.none({
                 text: 'CREATE OR REPLACE FUNCTION '
-                + 'f_cast_isots(text) '
-                + 'RETURNS timestamptz AS '
-                + '$$SELECT to_timestamp($1, \'YYYY-MM-DDTHH24:MI\')$$ '
-                + 'LANGUAGE sql IMMUTABLE',
+                    + 'f_cast_isots(text) '
+                    + 'RETURNS timestamptz AS '
+                    + '$$SELECT to_timestamp($1, \'YYYY-MM-DDTHH24:MI\')$$ '
+                    + 'LANGUAGE sql IMMUTABLE',
             });
             task.none({
                 text: 'CREATE TABLE IF NOT EXISTS '
-                        + `${TABLES.EVENTS}`
-                        + '('
-                            + `${EVENTS_COL.ID} SERIAL PRIMARY KEY, `
-                            + `${EVENTS_COL.EVENT} JSONB NOT NULL `
-                        + ')',
+                    + `${TABLES.EVENTS}`
+                    + '('
+                    + `${EVENTS_COL.ID} SERIAL PRIMARY KEY, `
+                    + `${EVENTS_COL.EVENT} JSONB NOT NULL `
+                    + ')',
             });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_name ON '
-                        + `${TABLES.EVENTS}`
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->>'name')`
-                        + ')',
+                    + `${TABLES.EVENTS}`
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->>'name')`
+                    + ')',
 
             });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_start ON '
-                        + `${TABLES.EVENTS}`
-                        + '('
-                            + 'f_cast_isots'
-                            + '('
-                                + `(${EVENTS_COL.EVENT}->'when'->>'start')`
-                            + ')'
-                        + ')',
+                    + `${TABLES.EVENTS}`
+                    + '('
+                    + 'f_cast_isots'
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->'when'->>'start')`
+                    + ')'
+                    + ')',
             });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_end ON '
-                        + `${TABLES.EVENTS}`
-                        + '('
-                            + 'f_cast_isots'
-                            + '('
-                                + `(${EVENTS_COL.EVENT}->'when'->>'end')`
-                            + ')'
-                        + ')',
+                    + `${TABLES.EVENTS}`
+                    + '('
+                    + 'f_cast_isots'
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->'when'->>'end')`
+                    + ')'
+                    + ')',
             });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_creator_guild_id ON '
-                        + `${TABLES.EVENTS}`
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId')`
-                        + ')',
+                    + `${TABLES.EVENTS}`
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId')`
+                    + ')',
             });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_other_guilds ON '
-                        + `${TABLES.EVENTS} `
-                        + 'USING gin '
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->'guilds'->'others')`
-                            + ' jsonb_path_ops'
-                        + ')',
+                    + `${TABLES.EVENTS} `
+                    + 'USING gin '
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->'guilds'->'others')`
+                    + ' jsonb_path_ops'
+                    + ')',
             });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_participants ON '
-                        + `${TABLES.EVENTS} `
-                        + 'USING gin '
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->'teams'->'participants')`
-                            + ' jsonb_path_ops'
-                        + ')',
+                    + `${TABLES.EVENTS} `
+                    + 'USING gin '
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->'teams'->'participants')`
+                    + ' jsonb_path_ops'
+                    + ')',
             });
             task.none({
                 text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS name_is_defined`,
@@ -249,7 +249,7 @@ export namespace Db {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT name_is_defined CHECK '
                     + '('
-                        + `(${EVENTS_COL.EVENT} ? 'name' AND NOT ${EVENTS_COL.EVENT}->>'name' IS NULL)`
+                    + `(${EVENTS_COL.EVENT} ? 'name' AND NOT ${EVENTS_COL.EVENT}->>'name' IS NULL)`
                     + ')',
             });
             task.none({
@@ -260,15 +260,15 @@ export namespace Db {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT valid_dates CHECK '
                     + '('
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
-                        + ')'
-                        + ' AND '
-                        + '('
-                            + `${EVENTS_COL.EVENT}->'when' ? 'start' AND NOT ${EVENTS_COL.EVENT}->'when'->>'start' IS NULL`
-                            + ' AND '
-                            + `${EVENTS_COL.EVENT}->'when' ? 'end' AND NOT ${EVENTS_COL.EVENT}->'when'->>'end' IS NULL`
-                        + ')'
+                    + '('
+                    + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
+                    + ')'
+                    + ' AND '
+                    + '('
+                    + `${EVENTS_COL.EVENT}->'when' ? 'start' AND NOT ${EVENTS_COL.EVENT}->'when'->>'start' IS NULL`
+                    + ' AND '
+                    + `${EVENTS_COL.EVENT}->'when' ? 'end' AND NOT ${EVENTS_COL.EVENT}->'when'->>'end' IS NULL`
+                    + ')'
                     + ')',
             });
             task.none({
@@ -279,7 +279,7 @@ export namespace Db {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
                     + '('
-                        + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'guildId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' IS NULL`
+                    + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'guildId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' IS NULL`
                     + ')',
             });
             task.none({
@@ -290,7 +290,7 @@ export namespace Db {
                     + `${TABLES.EVENTS} `
                     + 'ADD CONSTRAINT teams_have_participant CHECK '
                     + '('
-                        + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? ((@.teams.type() == "array" && @.teams.size() == 0) || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
+                    + `jsonb_path_exists(${EVENTS_COL.EVENT}, '$ ? ((@.teams.type() == "array" && @.teams.size() == 0) || (@.teams.participants.type() == "array" && @.teams.participants.size() > 0))')`
                     + ')',
             });
             // TODO: add constraint that checks for unique rsn?
@@ -300,19 +300,19 @@ export namespace Db {
     const insertNewEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'insert new event',
         text: `INSERT INTO ${TABLES.EVENTS} `
-        + `(${EVENTS_COL.EVENT}) `
-        + 'VALUES '
-        + '($1) '
-        + 'RETURNING *',
+            + `(${EVENTS_COL.EVENT}) `
+            + 'VALUES '
+            + '($1) '
+            + 'RETURNING *',
     });
     const updateEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'update event',
         text: `UPDATE ${TABLES.EVENTS} `
-        + 'SET '
-        + `${EVENTS_COL.EVENT} = $2 `
-        + 'WHERE '
-        + `${EVENTS_COL.ID} = $1::bigint `
-        + 'RETURNING *',
+            + 'SET '
+            + `${EVENTS_COL.EVENT} = $2 `
+            + 'WHERE '
+            + `${EVENTS_COL.ID} = $1::bigint `
+            + 'RETURNING *',
     });
     export const upsertEvent = async (
         event: Event.Standard,
@@ -320,13 +320,13 @@ export namespace Db {
     ): Promise<Event.Standard> => {
         if (event.id === undefined) {
             const json: string = JSON.stringify(event);
-            const ret: {id: number; event: Event.Standard} = await db.one(
+            const ret: { id: number; event: Event.Standard } = await db.one(
                 insertNewEventStmt,
                 json,
             );
             return rowToEvent(ret);
         }
-        const ret: {id: number; event: Event.Standard} = await db.one(
+        const ret: { id: number; event: Event.Standard } = await db.one(
             updateEventStmt,
             [
                 event.id,
@@ -478,9 +478,9 @@ export namespace Db {
             + `${EVENTS_COL.ID} = $1::bigint `
             + 'AND'
             + '('
-                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $2::text)) `
-                + 'OR '
-                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`
+            + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $2::text)) `
+            + 'OR '
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`
             + ')',
     });
     export const fetchAnyGuildEvent = async (
@@ -554,9 +554,9 @@ export namespace Db {
             + `(${EVENTS_COL.EVENT}->>'global')::boolean = TRUE `
             + 'AND '
             + '('
-                + `${EVENTS_COL.EVENT}->'invitations' @> to_jsonb($1::text) `
-                + 'OR NOT '
-                + `${EVENTS_COL.EVENT} ? 'invitations'`
+            + `${EVENTS_COL.EVENT}->'invitations' @> to_jsonb($1::text) `
+            + 'OR NOT '
+            + `${EVENTS_COL.EVENT} ? 'invitations'`
             + ')',
     });
     export const fetchAllInvitedEvents = async (
@@ -584,9 +584,9 @@ export namespace Db {
             + `(${EVENTS_COL.EVENT}->>'global')::boolean = TRUE `
             + 'AND '
             + '('
-                + `${EVENTS_COL.EVENT}->'invitations' @> to_jsonb($2::text) `
-                + 'OR NOT '
-                + `${EVENTS_COL.EVENT} ? 'invitations'`
+            + `${EVENTS_COL.EVENT}->'invitations' @> to_jsonb($2::text) `
+            + 'OR NOT '
+            + `${EVENTS_COL.EVENT} ? 'invitations'`
             + ')',
     });
     export const fetchInvitedEvent = async (
@@ -637,11 +637,11 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
+            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
             + ')'
-                + ' OVERLAPS '
+            + ' OVERLAPS '
             + '('
-                + '$1::timestamptz, $2::timestamptz'
+            + '$1::timestamptz, $2::timestamptz'
             + ')',
     });
     export const fetchAllEventsBetweenDates = async (
@@ -669,9 +669,9 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= current_timestamp `
-                + 'AND '
-                + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz > current_timestamp`
+            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz <= current_timestamp `
+            + 'AND '
+            + `(${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz > current_timestamp`
             + ')'
             + 'ORDER BY '
             + `${EVENTS_COL.ID} ASC`,
@@ -695,19 +695,19 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
-                + 'OR '
-                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text`
+            + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
+            + 'OR '
+            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text`
             + ') '
             + 'AND '
             + '('
-                + '('
-                    + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
-                + ')'
-                + ' OVERLAPS '
-                + '('
-                    + '$2::timestamptz, $3::timestamptz'
-                + ')'
+            + '('
+            + `(${EVENTS_COL.EVENT}->'when'->>'start')::timestamptz, (${EVENTS_COL.EVENT}->'when'->>'end')::timestamptz`
+            + ')'
+            + ' OVERLAPS '
+            + '('
+            + '$2::timestamptz, $3::timestamptz'
+            + ')'
             + ')',
     });
     export const fetchAllGuildEventsBetweenDates = async (
@@ -746,18 +746,18 @@ export namespace Db {
     const upsertSettingsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'insert new settings',
         text: `INSERT INTO ${TABLES.SETTINGS} `
-        + '('
+            + '('
             + `${SETTINGS_COL.GUILD_ID}, `
             + `${SETTINGS_COL.CHANNEL_ID} `
-        + ')'
-        + 'VALUES '
-        + '($1, $2) '
-        + 'ON CONFLICT '
-        + `(${SETTINGS_COL.GUILD_ID}) `
-        + 'DO UPDATE '
-        + 'SET '
-        + `${SETTINGS_COL.CHANNEL_ID} = $2 `
-        + 'RETURNING *',
+            + ')'
+            + 'VALUES '
+            + '($1, $2) '
+            + 'ON CONFLICT '
+            + `(${SETTINGS_COL.GUILD_ID}) `
+            + 'DO UPDATE '
+            + 'SET '
+            + `${SETTINGS_COL.CHANNEL_ID} = $2 `
+            + 'RETURNING *',
     });
     export const upsertSettings = async (
         settings: Settings.Obj,
@@ -782,9 +782,9 @@ export namespace Db {
     const fetchSettingsStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
         name: 'fetch settings',
         text: 'SELECT * FROM '
-        + `${TABLES.SETTINGS} `
-        + 'WHERE '
-        + `${SETTINGS_COL.GUILD_ID} = $1`,
+            + `${TABLES.SETTINGS} `
+            + 'WHERE '
+            + `${SETTINGS_COL.GUILD_ID} = $1`,
     });
     export const fetchSettings = async (
         guildId: string,

@@ -45,14 +45,14 @@ export interface Qa {
 }
 
 export abstract class Conversation {
-    qa: Qa[];
     opMessage: discord.Message;
     uuid: string;
-    qaSub: Subscription | undefined
-    nextQa$: Observable<Qa>;
-    errorInjector$: Subject<Qa>;
+    private qaSub: Subscription | undefined
+    private nextQa$: Observable<Qa>;
+    private errorInjector$: Subject<Qa>;
     state: CONVERSATION_STATE;
-    returnMessage: string;
+    lastErrorMessage: string | null;
+    returnMessage: string | null;
     returnOptions: discord.MessageOptions | undefined;
     params: Record<string, string | number | boolean | undefined>;
 
@@ -67,14 +67,14 @@ export abstract class Conversation {
         params: Record<string, string | number | boolean | undefined> = Object(),
     ) {
         this.params = params;
-        this.qa = [];
         this.opMessage = opMessage;
         this.uuid = `${Math.random()}`;
         this.errorInjector$ = new Subject<Qa>();
         this.returnOptions = {
             reply: opMessage.author,
         };
-        this.returnMessage = 'Conversation state error!';
+        this.returnMessage = null;
+        this.lastErrorMessage = null;
 
         const nextA$ = messageReceived$.pipe(
             // need op message state
@@ -165,7 +165,22 @@ export abstract class Conversation {
             ),
             concatMap(
                 (): Observable<void> => {
-                    const question: string | null = this.produceQ();
+                    let question: string | null;
+                    switch (this.state) {
+                        case CONVERSATION_STATE.Q1E:
+                        case CONVERSATION_STATE.Q2E:
+                        case CONVERSATION_STATE.Q3E:
+                        case CONVERSATION_STATE.Q4E:
+                        case CONVERSATION_STATE.Q5E:
+                        case CONVERSATION_STATE.Q6E: {
+                            question = this.lastErrorMessage;
+                            this.lastErrorMessage = null;
+                            break;
+                        }
+                        default:
+                            question = this.produceQ();
+                            break;
+                    }
                     if (question !== null) {
                         const sendInfo: MessageWrapper.SendInfo = {
                             message: this.opMessage,
@@ -209,9 +224,19 @@ export abstract class Conversation {
     }
 
     conversationDidEndSuccessfully(): void {
+        let content: string;
+        if (this.returnMessage === null) {
+            if (this.lastErrorMessage === null) {
+                content = 'Conversation state error! Report this.';
+            } else {
+                content = this.lastErrorMessage;
+            }
+        } else {
+            content = this.returnMessage;
+        }
         const sendInfo: MessageWrapper.SendInfo = {
             message: this.opMessage,
-            content: this.returnMessage,
+            content,
             options: this.returnOptions,
             tag: this.uuid,
         };
@@ -247,7 +272,7 @@ export namespace ConversationManager {
         stopConversation(msg);
 
         const shorthand: boolean = await newConversation.init();
-        if (!shorthand) {
+        if (shorthand === false) {
             const question = newConversation.produceQ();
             if (question === null) {
                 return;

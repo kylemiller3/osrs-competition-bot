@@ -19,8 +19,6 @@ class LockEventConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to lock? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Event not found. Hint: find the event id on the corresponding scoreboard. Please try again.';
             default:
                 return null;
         }
@@ -36,6 +34,7 @@ class LockEventConversation extends Conversation {
                     this.opMessage.guild.id,
                 );
                 if (creatorEvent === null) {
+                    this.lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';
                     this.state = CONVERSATION_STATE.Q1E;
                     break;
                 }
@@ -44,13 +43,13 @@ class LockEventConversation extends Conversation {
                     this.returnMessage = 'Failed: Globally enabled events automatically lock.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
+                } else {
+                    creatorEvent.adminLocked = true;
+                    await Db.upsertEvent(creatorEvent);
+                    this.returnMessage = 'Successfully locked event.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 }
-
-                creatorEvent.adminLocked = true;
-                await Db.upsertEvent(creatorEvent);
-                this.returnMessage = 'Successfully locked event.';
-                this.state = CONVERSATION_STATE.DONE;
-                break;
             }
             default:
                 break;

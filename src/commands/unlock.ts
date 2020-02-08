@@ -17,6 +17,14 @@ class UnlockEventConversation extends Conversation {
 
     produceQ(): string | null {
         switch (this.state) {
+            case CONVERSATION_STATE.Q1E:
+                case CONVERSATION_STATE.Q2E:
+                case CONVERSATION_STATE.Q3E:
+                case CONVERSATION_STATE.Q4E:
+                case CONVERSATION_STATE.Q5E:
+                case CONVERSATION_STATE.Q6E: {
+                    return this.lastErrorMessage;
+                }
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to unlock? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1E:

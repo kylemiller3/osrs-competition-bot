@@ -20,8 +20,6 @@ class EventDeleteConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Delete which event id? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
                 return `Are you sure you want to delete event "${this.event.name}"? This cannot be undone.`;
             default:
@@ -35,7 +33,9 @@ class EventDeleteConversation extends Conversation {
             case CONVERSATION_STATE.Q1E: {
                 const idToDelete: number = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(idToDelete)) {
+                    this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
                     this.state = CONVERSATION_STATE.Q1E;
+                    break;
                 } else {
                     const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         idToDelete,
@@ -44,31 +44,32 @@ class EventDeleteConversation extends Conversation {
                     if (event === null) {
                         this.state = CONVERSATION_STATE.Q1E;
                         break;
-                    }
-                    if (event.canDelete() !== undefined) {
+                    } else if (!event.canDelete()) {
                         this.returnMessage = 'This event cannot be deleted anymore.';
                         this.state = CONVERSATION_STATE.DONE;
                         break;
+                    } else {
+                        this.event = event;
+                        this.state = CONVERSATION_STATE.CONFIRM;
+                        break;
                     }
-
-                    this.event = event;
-                    this.state = CONVERSATION_STATE.CONFIRM;
                 }
-                break;
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Cancelled.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 } else {
                     if (this.event.id !== undefined) {
                         await Db.deleteEvent(this.event.id);
                         willDeleteEvent$.next(this.event);
                     }
                     this.returnMessage = 'Event deleted.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 }
-                this.state = CONVERSATION_STATE.DONE;
-                break;
             }
             default:
                 break;

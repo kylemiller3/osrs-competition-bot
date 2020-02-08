@@ -31,7 +31,7 @@ rateThrottle.pipe(
                     Utils.logger.debug('force update request');
                 }
             ),
-            throttleTime(1000 * 60 * 5),
+            throttleTime(1000 * 60 * 15),
             tap(
                 (eventAndMessage: [Event.Standard, discord.Message]):
                 void => {
@@ -63,8 +63,6 @@ class ForceUpdateConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to force update? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.Q1C:
                 return 'Are you SURE you want to update an event that has already ended? This cannot be undone and should only be used if the scoreboard failed to update when the event ended.';
             default:
@@ -79,6 +77,7 @@ class ForceUpdateConversation extends Conversation {
                 const eventId: number = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(eventId)) {
                     this.state = CONVERSATION_STATE.Q1E;
+                    break;
                 } else {
                     const creatorEvent: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         eventId,
@@ -91,44 +90,50 @@ class ForceUpdateConversation extends Conversation {
                     const event: Event.Standard | null = creatorEvent !== null
                         ? creatorEvent
                         : invitedEvent;
+
                     if (event === null) {
+                        this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
                         this.state = CONVERSATION_STATE.Q1E;
                         break;
-                    }
-                    if (event.global
-                        && Utils.isInPast(event.when.end)) {
-                        this.returnMessage = 'Sorry, this command is disabled for global events after they end.';
+                    } else if (Utils.isInPast(event.when.end)) {
+                        if (event.global === true) {
+                            // can't for globals
+                            this.returnMessage = 'This command is disabled for global events after they end.';
+                            this.state = CONVERSATION_STATE.DONE;
+                            break;
+                        } else {
+                            // confirm if event already ended
+                            this.event = event;
+                            this.state = CONVERSATION_STATE.Q1C;
+                            break;
+                        }
+                    } else {
+                        // do it
+                        rateThrottle.next([
+                            this.event,
+                            this.opMessage,
+                        ]);
+                        this.returnMessage = 'This command is rate limited to once every fifteen minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
                         this.state = CONVERSATION_STATE.DONE;
                         break;
                     }
-                    this.event = event;
-                    if (Utils.isInPast(this.event.when.end)) {
-                        // confirm if event already ended
-                        this.state = CONVERSATION_STATE.Q1C;
-                        return;
-                    }
-                    rateThrottle.next([
-                        this.event,
-                        this.opMessage,
-                    ]);
-                    this.returnMessage = 'This command is rate limited to once every five minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
-                    this.state = CONVERSATION_STATE.DONE;
                 }
-                break;
             }
             case CONVERSATION_STATE.Q1C: {
                 const answer = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Will not force update.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 } else {
                     rateThrottle.next([
                         this.event,
                         this.opMessage,
                     ]);
                     this.returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 }
-                this.state = CONVERSATION_STATE.DONE;
-                break;
             }
             default:
                 break;

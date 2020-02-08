@@ -19,8 +19,6 @@ class EventEndConversation extends Conversation {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'End which event id? (type .exit to stop command)';
-            case CONVERSATION_STATE.Q1E:
-                return 'Could not find event. Hint: find the event id on the corresponding scoreboard. Please try again.';
             case CONVERSATION_STATE.CONFIRM:
                 return `Are you sure you want to end ${this.event.name} now? This cannot be undone.`;
             default:
@@ -35,41 +33,50 @@ class EventEndConversation extends Conversation {
                 const idToEdit: number = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(idToEdit)) {
                     this.state = CONVERSATION_STATE.Q1E;
+                    break;
                 } else {
                     const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         idToEdit,
                         this.opMessage.guild.id,
                     );
                     if (event === null) {
+                        this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
                         this.state = CONVERSATION_STATE.Q1E;
                         break;
+                    } else if (Utils.isInFuture(event.when.start)) {
+                        this.returnMessage = 'The event has not started. Delete it instead.';
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    } else if (Utils.isInPast(event.when.end)) {
+                        this.returnMessage = 'The event has already ended.';
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    } else if (event.global === true) {
+                        this.returnMessage = 'Ending early is disabled for global events.';
+                        this.state = CONVERSATION_STATE.DONE;
+                        break;
+                    } else {
+                        this.event = event;
+                        this.state = CONVERSATION_STATE.CONFIRM;
+                        break;
                     }
-                    this.event = event;
-                    this.state = CONVERSATION_STATE.CONFIRM;
                 }
-                break;
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
                     this.returnMessage = 'Cancelled.';
+                    this.state = CONVERSATION_STATE.DONE;
+                    break;
                 } else {
-                    const error: 'ending early is disabled for global events'
-                    | 'the event has not started'
-                    | 'the event has already ended'
-                    | undefined = this.event.end();
-                    if (error !== undefined) {
-                        this.returnMessage = error;
-                        this.state = CONVERSATION_STATE.DONE;
-                    }
-
-                    this.event.when.end = new Date();
+                    this.event.end();
                     const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                     willEndEvent$.next(savedEvent);
+
                     this.returnMessage = 'Event successfully ended.';
                     this.state = CONVERSATION_STATE.DONE;
+                    break;
                 }
-                break;
             }
             default:
                 break;
