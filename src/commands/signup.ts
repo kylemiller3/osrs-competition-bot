@@ -91,6 +91,14 @@ class EventsSignupConversation extends Conversation {
                 if (Number.isNaN(id)) {
                     this.state = CONVERSATION_STATE.Q1E;
                     break;
+                }
+                const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
+                    id,
+                    this.opMessage.guild.id,
+                );
+                if (guildEvent === null) {
+                    this.state = CONVERSATION_STATE.Q1E;
+                    break;
                 } else {
                     const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
                         id,

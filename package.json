@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",
     "test": "mocha --project ./tsconfig.json --colors --require esm --require ts-node/register ./**/*.spec.ts",
-    "start": "nohup ts-node -T --project ./tsconfig.json ./src/index.ts > /dev/null&"
+    "start": "nohup ts-node -T --project ./tsconfig.json ./index.ts > /dev/null&"
   },
   "author": "https://github.com/kylemiller3",
   "license": "GPL-3.0",
