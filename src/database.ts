@@ -12,6 +12,7 @@ export namespace Db {
     enum TABLES {
         EVENTS = 'events',
         SETTINGS = 'settings',
+        PREMIUM = 'premium'
     }
 
     enum EVENTS_COL {
@@ -69,6 +70,7 @@ export namespace Db {
     enum SETTINGS_COL {
         GUILD_ID = 'guild_id',
         CHANNEL_ID = 'channel_id',
+        PAY_TIER = 'pay_tier',
     }
 
     export const initOptions: pgp.IInitOptions = {
@@ -166,7 +168,16 @@ export namespace Db {
                     + `${TABLES.SETTINGS}`
                     + '('
                     + `${SETTINGS_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
-                    + `${SETTINGS_COL.CHANNEL_ID} TEXT NOT NULL`
+                    + `${SETTINGS_COL.CHANNEL_ID} TEXT NOT NULL, `
+                    + `${SETTINGS_COL.PAY_TIER} SMALLINT NOT NULL`
+                    + ')',
+            });
+
+            task.none({
+                text: 'CREATE INDEX IF NOT EXISTS idx_tier ON '
+                    + `${TABLES.SETTINGS}`
+                    + '('
+                    + `${SETTINGS_COL.PAY_TIER}`
                     + ')',
             });
 
@@ -748,34 +759,34 @@ export namespace Db {
         text: `INSERT INTO ${TABLES.SETTINGS} `
             + '('
             + `${SETTINGS_COL.GUILD_ID}, `
-            + `${SETTINGS_COL.CHANNEL_ID} `
+            + `${SETTINGS_COL.CHANNEL_ID}, `
+            + `${SETTINGS_COL.PAY_TIER}, `
             + ')'
             + 'VALUES '
-            + '($1, $2) '
-            + 'ON CONFLICT '
-            + `(${SETTINGS_COL.GUILD_ID}) `
-            + 'DO UPDATE '
-            + 'SET '
-            + `${SETTINGS_COL.CHANNEL_ID} = $2 `
+            + '($1, $2, $3) '
+            + 'ON CONFLICT DO NOTHING '
             + 'RETURNING *',
     });
     export const upsertSettings = async (
-        settings: Settings.Obj,
+        settings: Settings.GuildSettings,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Settings.Obj> => {
+    ): Promise<Settings.GuildSettings> => {
         const ret: {
             [SETTINGS_COL.GUILD_ID]: string
             [SETTINGS_COL.CHANNEL_ID]: string
+            [SETTINGS_COL.PAY_TIER]: Settings.PAY_TIER
         } = await db.one(
             upsertSettingsStmt,
             [
                 settings.guildId,
                 settings.channelId,
+                settings.payTier,
             ],
         );
         return {
             guildId: ret[SETTINGS_COL.GUILD_ID],
             channelId: ret[SETTINGS_COL.CHANNEL_ID],
+            payTier: ret[SETTINGS_COL.PAY_TIER],
         };
     };
 
@@ -789,10 +800,11 @@ export namespace Db {
     export const fetchSettings = async (
         guildId: string,
         db: pgp.IDatabase<unknown> = Db.mainDb,
-    ): Promise<Settings.Obj | null> => {
+    ): Promise<Settings.GuildSettings | null> => {
         const ret: {
             [SETTINGS_COL.GUILD_ID]: string
             [SETTINGS_COL.CHANNEL_ID]: string
+            [SETTINGS_COL.PAY_TIER]: Settings.PAY_TIER
         } | null = await db.oneOrNone(
             fetchSettingsStmt,
             [
@@ -803,6 +815,7 @@ export namespace Db {
         return {
             guildId: ret[SETTINGS_COL.GUILD_ID],
             channelId: ret[SETTINGS_COL.CHANNEL_ID],
+            payTier: ret[SETTINGS_COL.PAY_TIER],
         };
     };
 }

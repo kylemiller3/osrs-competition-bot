@@ -14,9 +14,11 @@ class EventAddConversation extends Conversation {
     tracker: Event.Tracking;
     start: Date;
     end: Date;
+    now: Date
 
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
+        this.now = new Date()
         return Promise.resolve(false);
     }
 
@@ -25,7 +27,7 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Event name? (type .exit to stop command)';
             case CONVERSATION_STATE.Q2: {
-                const twoDaysFromNow: Date = new Date();
+                const twoDaysFromNow: Date = new Date(this.now);
                 twoDaysFromNow.setMilliseconds(0);
                 twoDaysFromNow.setSeconds(0);
                 twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
@@ -34,7 +36,7 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q2C:
                 return `Starting date is set for ${this.start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3: {
-                const oneWeekFromNow: Date = new Date();
+                const oneWeekFromNow: Date = new Date(this.now);
                 oneWeekFromNow.setMilliseconds(0);
                 oneWeekFromNow.setSeconds(0);
                 oneWeekFromNow.setHours(oneWeekFromNow.getHours() + 24 * 7);
@@ -132,10 +134,10 @@ class EventAddConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q3E;
                     this.lastErrorMessage = 'The event must be at least an hour in duration.';
                     break;
-                } else if (end.getTime() - this.start.getTime() > 1000 * 60 * 60 * 24 * 3) {
+                } else if (end.getTime() - this.start.getTime() > 1000 * 60 * 60 * 24 * 5) {
                     // freemium
                     this.state = CONVERSATION_STATE.Q3E;
-                    this.lastErrorMessage = 'The free version limits events to three days duration maximum.';
+                    this.lastErrorMessage = 'The free version limits events to five days duration maximum.';
                     break;
                 } else {
                     this.end = end;

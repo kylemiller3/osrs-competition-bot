@@ -512,7 +512,7 @@ const refreshMessage = async (
     options?: discord.MessageOptions,
 ): Promise<Event.ChannelMessage | null> => {
     // sanity checks
-    const settings: Settings.Obj | null = await Db.fetchSettings(
+    const settings: Settings.GuildSettings | null = await Db.fetchSettings(
         guild.id,
     );
     if (settings === null) {
