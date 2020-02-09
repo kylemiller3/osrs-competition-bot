@@ -12,7 +12,7 @@ export namespace Db {
     enum TABLES {
         EVENTS = 'events',
         SETTINGS = 'settings',
-        PREMIUM = 'premium'
+        ACCOUNT = 'account',
     }
 
     enum EVENTS_COL {
