@@ -3,10 +3,142 @@ import { describe, it, } from 'mocha';
 import { assert, expect, } from 'chai';
 import pgp from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
-import { Event, } from '../event';
 import { Db, } from '../database';
 import { Utils, } from '../utils';
-import { Settings, } from '../settings';
+import { TABLES, } from '../databaseMisc';
+import { async } from 'rxjs/internal/scheduler/async';
+
+describe('Postgres Database', (): void => {
+    Utils.logger.level = 'fatal';
+    let connection: pgp.IConnected<unknown, pg.IClient>;
+    describe('Connect', (): void => {
+        it('should not throw an error.', async (): Promise<void> => {
+            connection = await Db.testDb.connect();
+        });
+    });
+    describe('Disconnect', (): void => {
+        it('should not throw an error.', (): void => {
+            connection.done();
+        });
+    });
+    describe('Create tables', async (): Promise<void> => {
+        it('should not throw an error.', async (): Promise<void> => {
+            await Db.testDb.none({
+                text: `DROP TABLE IF EXISTS ${TABLES.MESSAGE}, ${TABLES.GUILD}, ${TABLES.ACCOUNT}, ${TABLES.PARTICIPANT}, ${TABLES.TEAM}, ${TABLES.EVENT}, ${TABLES.SETTING}`,
+            });
+            await Db.createTables(Db.testDb);
+        });
+    });
+    const fiveMinsFromNow: Date = new Date();
+    fiveMinsFromNow.setMinutes(fiveMinsFromNow.getMinutes() + 5);
+    const testEvent = {
+        id: undefined,
+        name: 'test',
+        when: {
+            start: new Date(),
+            end: fiveMinsFromNow,
+        },
+        guilds: {
+            creator: {
+                guildId: 'asdf',
+                scoreboardMessages: [
+                    {
+                        channelId: 'some channel id',
+                        messageId: 'message 1a',
+                    },
+                    {
+                        channelId: 'some channel id',
+                        messageId: 'message 1b',
+                    },
+                ],
+            },
+            others: [
+                {
+                    guildId: 'ghjk',
+                    scoreboardMessages: [
+                        {
+                            channelId: 'another channel id',
+                            messageId: 'message 2a',
+                        },
+                        {
+                            channelId: 'another channel id',
+                            messageId: 'message 2b',
+                        },
+                        {
+                            channelId: 'some other channel id',
+                            messageId: 'message 2c',
+                        },
+                    ],
+                },
+                {
+                    guildId: 'uiop',
+                    scoreboardMessages: [
+                        {
+                            channelId: 'yet another channel id',
+                            messageId: 'message 3a',
+                        },
+                    ],
+                },
+                {
+                    guildId: 'no messages',
+                },
+            ],
+        },
+        teams: [
+            {
+                name: 'Test team',
+                guildId: 'asdf',
+                participants: [
+                    {
+                        userId: 'qwerty',
+                        customScore: 0,
+                        runescapeAccounts: [
+                            {
+                                rsn: 'b0aty',
+                            },
+                        ],
+                    },
+                    {
+                        userId: 'qwop',
+                        customScore: 0,
+                        runescapeAccounts: [
+                            {
+                                rsn: 'not b0aty',
+                            },
+                            {
+                                rsn: 'a b0aty',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        tracking: {
+            category: 'bosses',
+            what: [
+                'Chambers of Xeric',
+            ],
+        },
+        global: false,
+        adminLocked: false,
+    };
+    describe('Save event', async (): Promise<void> => {
+        it('should not throw an error.', async (): Promise<void> => {
+            await Db.saveEvent(
+                testEvent,
+                Db.testDb,
+            );
+        });
+    });
+    describe('Fetch event', async (): Promise<void> => {
+        it('should not throw an error.', async (): Promise<void> => {
+            await Db.fetchEvent(
+                1,
+                Db.testDb,
+            );
+        });
+    });
+});
 
 // const accountA: Event.Account = {
 //     rsn: 'rsn1',

@@ -169,7 +169,7 @@ export namespace Event {
      */
     export interface ChannelMessage {
         channelId: string
-        messageId: string[]
+        messageId: string
     }
 
     /**
@@ -178,7 +178,7 @@ export namespace Event {
      */
     export interface Guild {
         guildId: string
-        scoreboardMessage?: ChannelMessage
+        scoreboardMessages?: ChannelMessage[]
     }
 
     /**

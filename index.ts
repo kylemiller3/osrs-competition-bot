@@ -466,7 +466,7 @@ const deleteMessages = async (
 
     // get message objects
     const discordMessagesPromises:
-    Promise<discord.Message | null>[] = eventMessage.messageId.map(
+    Promise<discord.Message | null>[] = eventMessage.messagesId.map(
         (messageId: string):
         Promise<discord.Message | null> => channel.fetchMessage(
             messageId,
@@ -570,7 +570,7 @@ const refreshMessage = async (
 
     const messagePart: Event.ChannelMessage = {
         channelId: settings.channelId,
-        messageId: response.messages
+        messagesId: response.messages
             .filter(Utils.isDefinedFilter)
             .map((msg: discord.Message): string => msg.id),
     };
@@ -618,7 +618,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
                             const msg2 = refreshMessage(
                                 gClient,
                                 guild,
-                                eventGuild.scoreboardMessage,
+                                eventGuild.sentMessages,
                                 `${scoreboardStr}${footer}`,
                                 {
                                     code: true,
@@ -673,7 +673,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
                             //     : undefined;
                             newEvent.guilds
                                 .creator
-                                .scoreboardMessage = channelMessage !== null
+                                .sentMessages = channelMessage !== null
                                     ? channelMessage
                                     : undefined;
                         } else if (newEvent.guilds.others !== undefined) {
@@ -681,7 +681,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
                             //     ? msg1
                             //     : undefined;
                             newEvent.guilds.others[idx - 1]
-                                .scoreboardMessage = channelMessage !== null
+                                .sentMessages = channelMessage !== null
                                     ? channelMessage
                                     : undefined;
                         }
@@ -1098,7 +1098,7 @@ willDeleteEvent$.subscribe(
                 await refreshMessage(
                     gClient,
                     discordGuild,
-                    guild.scoreboardMessage,
+                    guild.sentMessages,
                     content,
                     {
                         code: true,

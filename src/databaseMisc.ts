@@ -1,14 +1,13 @@
-import { Event } from "./event";
-import pgPromise, { PreparedStatement } from "pg-promise";
+import pgPromise, { PreparedStatement, TableName, } from 'pg-promise';
 
 export enum TABLES {
-    SETTINGS = 'settings',
-    EVENTS = 'events',
-    TEAMS = 'teams',
-    PARTICIPANTS = 'participants',
+    SETTING = 'setting',
+    EVENT = 'event',
+    TEAM = 'team',
+    PARTICIPANT = 'participant',
     ACCOUNT = 'account',
-    GUILDS = 'guilds',
-    MESSAGES = 'messages',
+    GUILD = 'guild',
+    MESSAGE = 'message',
 }
 
 export enum EVENT_COLUMNS {
@@ -22,15 +21,15 @@ export enum EVENT_COLUMNS {
     ADMIN_LOCKED = 'admin_locked',
 }
 
-const createTableEventsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.EVENTS}(`
+const createTableEventsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.EVENT}(`
     + `${EVENT_COLUMNS.ID}                   SERIAL PRIMARY KEY, `
     + `${EVENT_COLUMNS.NAME}                 VARCHAR(50) NOT NULL, `
-    + `${EVENT_COLUMNS.WHEN_START}           TIMESTAMPZ NOT NULL, `
-    + `${EVENT_COLUMNS.WHEN_END}             TIMESTAMPZ NOT NULL, `
+    + `${EVENT_COLUMNS.WHEN_START}           TIMESTAMP NOT NULL, `
+    + `${EVENT_COLUMNS.WHEN_END}             TIMESTAMP NOT NULL, `
     + `${EVENT_COLUMNS.GLOBAL}               BOOLEAN NOT NULL, `
-    + `${EVENT_COLUMNS.TRACKING_CATEGORY}    VARCHAR(30) NOT NULL, `
-    + `${EVENT_COLUMNS.TRACKING_WHAT}        TEXT NOT NULL, `
-    + `${EVENT_COLUMNS.ADMIN_LOCKED}          BOOLEAN NOT NULL `
+    + `${EVENT_COLUMNS.TRACKING_CATEGORY}    VARCHAR(50) NOT NULL, `
+    + `${EVENT_COLUMNS.TRACKING_WHAT}        TEXT, `
+    + `${EVENT_COLUMNS.ADMIN_LOCKED}         BOOLEAN NOT NULL `
     + ')';
 
 export const createTableEventsStmt: pgPromise.PreparedStatement = new PreparedStatement({
@@ -38,7 +37,7 @@ export const createTableEventsStmt: pgPromise.PreparedStatement = new PreparedSt
     text: createTableEventsStr,
 });
 
-const upsertEventStr: string = `INSERT INTO ${TABLES.EVENTS}(`
+const upsertEventStr: string = `INSERT INTO ${TABLES.EVENT}(`
     + `${EVENT_COLUMNS.NAME}, `
     + `${EVENT_COLUMNS.WHEN_START}, `
     + `${EVENT_COLUMNS.WHEN_END}, `
@@ -48,7 +47,8 @@ const upsertEventStr: string = `INSERT INTO ${TABLES.EVENTS}(`
     + `${EVENT_COLUMNS.ADMIN_LOCKED}`
     + ') VALUES ('
     + '$1, $2, $3, $4, $5, $6, $7'
-    + ') ON CONFLICT DO NOTHING';
+    + ') ON CONFLICT DO NOTHING '
+    + `RETURNING ${EVENT_COLUMNS.ID}`;
 
 export const upsertEventStmt: pgPromise.PreparedStatement = new PreparedStatement({
     name: 'Upsert Event',
@@ -59,12 +59,14 @@ export enum TEAM_COLUMNS {
     ID = 'id',
     FK_EVENT_ID = 'fk_event_id',
     NAME = 'name',
+    GUILD_ID = 'guild_id',
 }
 
-const createTableTeamsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.TEAMS}(`
-    + `${TEAM_COLUMNS.ID}                          SERIAL PRIMARY KEY, `
-    + `FOREIGN KEY(${TEAM_COLUMNS.FK_EVENT_ID})    REFERENCES ${TABLES.EVENTS}(${EVENT_COLUMNS.ID}), `
-    + `${TEAM_COLUMNS.NAME}                        VARCHAR(50) NOT NULL`
+const createTableTeamsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.TEAM}(`
+    + `${TEAM_COLUMNS.ID}             SERIAL PRIMARY KEY, `
+    + `${TEAM_COLUMNS.FK_EVENT_ID}    INTEGER REFERENCES ${TABLES.EVENT}(${EVENT_COLUMNS.ID}), `
+    + `${TEAM_COLUMNS.NAME}           VARCHAR(50) NOT NULL, `
+    + `${TEAM_COLUMNS.GUILD_ID}       VARCHAR(50) NOT NULL`
     + ')';
 
 export const createTableTeamsStmt: pgPromise.PreparedStatement = new PreparedStatement({
@@ -72,12 +74,14 @@ export const createTableTeamsStmt: pgPromise.PreparedStatement = new PreparedSta
     text: createTableTeamsStr,
 });
 
-const upsertTeamStr: string = `INSERT INTO ${TABLES.TEAMS}(`
-    + `${TEAM_COLUMNS.FK_EVENT_ID}`
-    + `${TEAM_COLUMNS.NAME}`
+const upsertTeamStr: string = `INSERT INTO ${TABLES.TEAM}(`
+    + `${TEAM_COLUMNS.FK_EVENT_ID}, `
+    + `${TEAM_COLUMNS.NAME}, `
+    + `${TEAM_COLUMNS.GUILD_ID}`
     + ') VALUES ('
-    + '$1, $2'
-    + ') ON CONFLICT DO NOTHING';
+    + '$1, $2, $3'
+    + ') ON CONFLICT DO NOTHING '
+    + `RETURNING ${TEAM_COLUMNS.ID}`;
 
 export const upsertTeamStmt: pgPromise.PreparedStatement = new PreparedStatement({
     name: 'Upsert Event Team',
@@ -91,11 +95,11 @@ export enum PARTICIPANT_COLUMNS {
     CUSTOM_SCORE = 'custom_score',
 }
 
-const createTableParticipantsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.PARTICIPANTS}(`
-    + `${PARTICIPANT_COLUMNS.ID}                         SERIAL PRIMARY KEY, `
-    + `FOREIGN KEY(${PARTICIPANT_COLUMNS.FK_TEAM_ID})    REFERENCES ${TABLES.TEAMS}(${TEAM_COLUMNS.ID}), `
-    + `${PARTICIPANT_COLUMNS.USER_ID}                    VARCHAR(50) NOT NULL, `
-    + `${PARTICIPANT_COLUMNS.CUSTOM_SCORE}               BIGINT NOT NULL`
+const createTableParticipantsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.PARTICIPANT}(`
+    + `${PARTICIPANT_COLUMNS.ID}              SERIAL PRIMARY KEY, `
+    + `${PARTICIPANT_COLUMNS.FK_TEAM_ID}      INTEGER REFERENCES ${TABLES.TEAM}(${TEAM_COLUMNS.ID}), `
+    + `${PARTICIPANT_COLUMNS.USER_ID}         VARCHAR(50) NOT NULL, `
+    + `${PARTICIPANT_COLUMNS.CUSTOM_SCORE}    BIGINT NOT NULL`
     + ')';
 
 export const createTableParticipantsStmt: pgPromise.PreparedStatement = new PreparedStatement({
@@ -103,13 +107,14 @@ export const createTableParticipantsStmt: pgPromise.PreparedStatement = new Prep
     text: createTableParticipantsStr,
 });
 
-const upsertParticipantStr: string = `INSERT INTO ${TABLES.PARTICIPANTS}(`
-    + `${PARTICIPANT_COLUMNS.FK_TEAM_ID}`
-    + `${PARTICIPANT_COLUMNS.USER_ID}`
+const upsertParticipantStr: string = `INSERT INTO ${TABLES.PARTICIPANT}(`
+    + `${PARTICIPANT_COLUMNS.FK_TEAM_ID}, `
+    + `${PARTICIPANT_COLUMNS.USER_ID}, `
     + `${PARTICIPANT_COLUMNS.CUSTOM_SCORE}`
     + ') VALUES ('
     + '$1, $2, $3'
-    + ') ON CONFLICT DO NOTHING';
+    + ') ON CONFLICT DO NOTHING '
+    + `RETURNING ${PARTICIPANT_COLUMNS.ID}`;
 
 export const upsertParticipantStmt: pgPromise.PreparedStatement = new PreparedStatement({
     name: 'Upsert Team Participant',
@@ -479,365 +484,365 @@ export enum ACCOUNT_COLUMNS {
 }
 
 const createTableAccountStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.ACCOUNT}(`
-    + `${ACCOUNT_COLUMNS.ID}                                                         SERIAL PRIMARY KEY `
-    + `FOREIGN KEY (${ACCOUNT_COLUMNS.FK_PARTICIPANT_ID})                            REFERENCES ${TABLES.PARTICIPANTS}(${PARTICIPANT_COLUMNS.ID}) `
+    + `${ACCOUNT_COLUMNS.ID}                                                         SERIAL PRIMARY KEY, `
+    + `${ACCOUNT_COLUMNS.FK_PARTICIPANT_ID}                                          INTEGER REFERENCES ${TABLES.PARTICIPANT}(${PARTICIPANT_COLUMNS.ID}), `
     + `${ACCOUNT_COLUMNS.RSN}                                                        VARCHAR(15) NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BH_ROGUE_RANK}                                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BH_ROGUE_SCORE}                                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BH_HUNTER_RANK}                                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BH_HUNTER_SCORE}                                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_LMS_RANK}                                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_LMS_SCORE}                                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ALL_RANK}                                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ALL_SCORE}                                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_EASY_RANK}                                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_EASY_SCORE}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_HARD_RANK}                                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_HARD_SCORE}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ELITE_RANK}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ELITE_SCORE}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MASTER_RANK}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MASTER_SCORE}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MEDIUM_RANK}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MEDIUM_SCORE}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_BEGINNER_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_CLUES_BEGINNER_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_OBOR_RANK}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_OBOR_SCORE}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_MIMIC_RANK}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_MIMIC_SCORE}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRAKEN_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRAKEN_SCORE}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZULRAH_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZULRAH_SCORE}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_HESPORI_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_HESPORI_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SCORPIA_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SCORPIA_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SKOTIZO_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SKOTIZO_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VETION_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VETION_SCORE}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VORKATH_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VORKATH_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZALCANO_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZALCANO_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CALLISTO_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CALLISTO_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CERBERUS_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CERBERUS_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BRYOPHYTA_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BRYOPHYTA_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KREEARRA_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KREEARRA_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SARACHNIS_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SARACHNIS_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZKALZUK_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZKALZUK_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZTOKJAD_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZTOKJAD_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VENENATIS_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VENENATIS_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GIANT_MOLE_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GIANT_MOLE_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_WINTERTODT_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_WINTERTODT_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ABYSSAL_SIRE_RANK}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ABYSSAL_SIRE_SCORE}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_GAUNTLET_RANK}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_GAUNTLET_SCORE}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_FANATIC_RANK}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_FANATIC_SCORE}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_REX_RANK}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_REX_SCORE}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BARROWS_CHESTS_RANK}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BARROWS_CHESTS_SCORE}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KALPHITE_QUEEN_RANK}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KALPHITE_QUEEN_SCORE}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_ELEMENTAL_RANK}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_ELEMENTAL_SCORE}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CORPOREAL_BEAST_RANK}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CORPOREAL_BEAST_SCORE}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_PRIME_RANK}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_PRIME_SCORE}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ALCHEMICAL_HYDRA_RANK}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ALCHEMICAL_HYDRA_SCORE}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GENERAL_GRAARDOR_RANK}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GENERAL_GRAARDOR_SCORE}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRIL_TSUTSAROTH_RANK}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRIL_TSUTSAROTH_SCORE}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THEATRE_OF_BLOOD_RANK}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THEATRE_OF_BLOOD_SCORE}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_COMMANDER_ZILYANA_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_COMMANDER_ZILYANA_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_SUPREME_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_SUPREME_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KING_BLACK_DRAGON_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KING_BLACK_DRAGON_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CRAZY_ARCHAEOLOGIST_RANK}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CRAZY_ARCHAEOLOGIST_SCORE}                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GROTESQUE_GUARDIANS_RANK}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GROTESQUE_GUARDIANS_SCORE}                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DERANGED_ARCHAEOLOGIST_RANK}                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DERANGED_ARCHAEOLOGIST_SCORE}                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_CORRUPTED_GAUNTLET_RANK}                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_CORRUPTED_GAUNTLET_SCORE}                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_RANK}               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_SCORE}              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_RANK}        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_SCORE}       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_XP}                                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_RANK}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_LEVEL}                                  SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_XP}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_LEVEL}                                 SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_XP}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_LEVEL}                                 SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_XP}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_LEVEL}                                 SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_XP}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_LEVEL}                                 SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_XP}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_LEVEL}                                 SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_XP}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_LEVEL}                                 SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_XP}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_LEVEL}                             SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_XP}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_LEVEL}                            SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_XP}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_RANK}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_LEVEL}                           SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BH_ROGUE_RANK}                                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BH_ROGUE_SCORE}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BH_HUNTER_RANK}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BH_HUNTER_SCORE}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_LMS_RANK}                                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_LMS_SCORE}                                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ALL_RANK}                                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ALL_SCORE}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_EASY_RANK}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_EASY_SCORE}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_HARD_RANK}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_HARD_SCORE}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ELITE_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ELITE_SCORE}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MASTER_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MASTER_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MEDIUM_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MEDIUM_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_BEGINNER_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_CLUES_BEGINNER_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_OBOR_RANK}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_OBOR_SCORE}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_MIMIC_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_MIMIC_SCORE}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRAKEN_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRAKEN_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZULRAH_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZULRAH_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_HESPORI_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_HESPORI_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SCORPIA_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SCORPIA_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SKOTIZO_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SKOTIZO_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VETION_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VETION_SCORE}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VORKATH_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VORKATH_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZALCANO_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZALCANO_SCORE}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CALLISTO_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CALLISTO_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CERBERUS_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CERBERUS_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BRYOPHYTA_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BRYOPHYTA_SCORE}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KREEARRA_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KREEARRA_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SARACHNIS_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SARACHNIS_SCORE}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZKALZUK_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZKALZUK_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZTOKJAD_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZTOKJAD_SCORE}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VENENATIS_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VENENATIS_SCORE}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GIANT_MOLE_RANK}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GIANT_MOLE_SCORE}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_WINTERTODT_RANK}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_WINTERTODT_SCORE}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ABYSSAL_SIRE_RANK}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ABYSSAL_SIRE_SCORE}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_GAUNTLET_RANK}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_GAUNTLET_SCORE}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_FANATIC_RANK}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_FANATIC_SCORE}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_REX_RANK}                         BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_REX_SCORE}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BARROWS_CHESTS_RANK}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BARROWS_CHESTS_SCORE}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KALPHITE_QUEEN_RANK}                        BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KALPHITE_QUEEN_SCORE}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_ELEMENTAL_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_ELEMENTAL_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CORPOREAL_BEAST_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CORPOREAL_BEAST_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_PRIME_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_PRIME_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ALCHEMICAL_HYDRA_RANK}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ALCHEMICAL_HYDRA_SCORE}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GENERAL_GRAARDOR_RANK}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GENERAL_GRAARDOR_SCORE}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRIL_TSUTSAROTH_RANK}                       BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRIL_TSUTSAROTH_SCORE}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THEATRE_OF_BLOOD_RANK}                      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THEATRE_OF_BLOOD_SCORE}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_RANK}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_SCORE}                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_COMMANDER_ZILYANA_RANK}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_COMMANDER_ZILYANA_SCORE}                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_SUPREME_RANK}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_SUPREME_SCORE}                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KING_BLACK_DRAGON_RANK}                     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KING_BLACK_DRAGON_SCORE}                    BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CRAZY_ARCHAEOLOGIST_RANK}                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CRAZY_ARCHAEOLOGIST_SCORE}                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GROTESQUE_GUARDIANS_RANK}                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GROTESQUE_GUARDIANS_SCORE}                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DERANGED_ARCHAEOLOGIST_RANK}                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DERANGED_ARCHAEOLOGIST_SCORE}               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_CORRUPTED_GAUNTLET_RANK}                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_CORRUPTED_GAUNTLET_SCORE}               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_RANK}             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_SCORE}            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_RANK}      BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_SCORE}     BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_XP}                                   BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_RANK}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_LEVEL}                                SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_XP}                                  BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_RANK}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_LEVEL}                               SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_XP}                                 BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_RANK}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_LEVEL}                              SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_XP}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_LEVEL}                             SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_XP}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_LEVEL}                             SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_XP}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_LEVEL}                             SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_XP}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_LEVEL}                             SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_XP}                                BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_RANK}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_LEVEL}                             SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_XP}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_LEVEL}                            SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_XP}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_LEVEL}                            SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_XP}                               BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_RANK}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_LEVEL}                            SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_XP}                              BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_RANK}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_LEVEL}                           SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_XP}                             BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_RANK}                           BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_LEVEL}                          SMALLINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_XP}                            BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_RANK}                          BIGINT  NOT NULL, `
-    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_LEVEL}                         SMALLINT  NOT NULL`
+    + `${ACCOUNT_COLUMNS.ENDING_BH_ROGUE_RANK}                                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BH_ROGUE_SCORE}                                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BH_HUNTER_RANK}                                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BH_HUNTER_SCORE}                                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_LMS_RANK}                                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_LMS_SCORE}                                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ALL_RANK}                                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ALL_SCORE}                                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_EASY_RANK}                                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_EASY_SCORE}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_HARD_RANK}                                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_HARD_SCORE}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ELITE_RANK}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_ELITE_SCORE}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MASTER_RANK}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MASTER_SCORE}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MEDIUM_RANK}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_MEDIUM_SCORE}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_BEGINNER_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_CLUES_BEGINNER_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_OBOR_RANK}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_OBOR_SCORE}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_MIMIC_RANK}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_MIMIC_SCORE}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRAKEN_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRAKEN_SCORE}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZULRAH_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZULRAH_SCORE}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_HESPORI_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_HESPORI_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SCORPIA_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SCORPIA_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SKOTIZO_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SKOTIZO_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VETION_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VETION_SCORE}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VORKATH_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VORKATH_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZALCANO_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ZALCANO_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CALLISTO_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CALLISTO_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CERBERUS_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CERBERUS_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BRYOPHYTA_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BRYOPHYTA_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KREEARRA_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KREEARRA_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SARACHNIS_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_SARACHNIS_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZKALZUK_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZKALZUK_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZTOKJAD_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_TZTOKJAD_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VENENATIS_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_VENENATIS_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GIANT_MOLE_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GIANT_MOLE_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_WINTERTODT_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_WINTERTODT_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ABYSSAL_SIRE_RANK}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ABYSSAL_SIRE_SCORE}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_GAUNTLET_RANK}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_GAUNTLET_SCORE}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_FANATIC_RANK}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_FANATIC_SCORE}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_REX_RANK}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_REX_SCORE}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BARROWS_CHESTS_RANK}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_BARROWS_CHESTS_SCORE}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KALPHITE_QUEEN_RANK}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KALPHITE_QUEEN_SCORE}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_ELEMENTAL_RANK}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_ELEMENTAL_SCORE}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CORPOREAL_BEAST_RANK}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CORPOREAL_BEAST_SCORE}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_PRIME_RANK}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_PRIME_SCORE}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ALCHEMICAL_HYDRA_RANK}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_ALCHEMICAL_HYDRA_SCORE}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GENERAL_GRAARDOR_RANK}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GENERAL_GRAARDOR_SCORE}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRIL_TSUTSAROTH_RANK}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KRIL_TSUTSAROTH_SCORE}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THEATRE_OF_BLOOD_RANK}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THEATRE_OF_BLOOD_SCORE}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_COMMANDER_ZILYANA_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_COMMANDER_ZILYANA_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_SUPREME_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_SUPREME_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KING_BLACK_DRAGON_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_KING_BLACK_DRAGON_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CRAZY_ARCHAEOLOGIST_RANK}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CRAZY_ARCHAEOLOGIST_SCORE}                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GROTESQUE_GUARDIANS_RANK}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_GROTESQUE_GUARDIANS_SCORE}                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DERANGED_ARCHAEOLOGIST_RANK}                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_DERANGED_ARCHAEOLOGIST_SCORE}                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_CORRUPTED_GAUNTLET_RANK}                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_CORRUPTED_GAUNTLET_SCORE}                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_RANK}               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_SCORE}              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_RANK}        BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_SCORE}       BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_XP}                                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_RANK}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_LEVEL}                                  SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_XP}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_LEVEL}                                 SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_XP}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_LEVEL}                                 SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_XP}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_LEVEL}                                 SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_XP}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_LEVEL}                                 SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_XP}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_LEVEL}                                 SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_XP}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_LEVEL}                                 SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_XP}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_LEVEL}                             SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_XP}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_LEVEL}                            SMALLINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_XP}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_RANK}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_LEVEL}                           SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BH_ROGUE_RANK}                                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BH_ROGUE_SCORE}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BH_HUNTER_RANK}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BH_HUNTER_SCORE}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_LMS_RANK}                                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_LMS_SCORE}                                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ALL_RANK}                                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ALL_SCORE}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_EASY_RANK}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_EASY_SCORE}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_HARD_RANK}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_HARD_SCORE}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ELITE_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_ELITE_SCORE}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MASTER_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MASTER_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MEDIUM_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_MEDIUM_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_BEGINNER_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_CLUES_BEGINNER_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_OBOR_RANK}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_OBOR_SCORE}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_MIMIC_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_MIMIC_SCORE}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRAKEN_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRAKEN_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZULRAH_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZULRAH_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_HESPORI_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_HESPORI_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SCORPIA_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SCORPIA_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SKOTIZO_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SKOTIZO_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VETION_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VETION_SCORE}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VORKATH_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VORKATH_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZALCANO_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ZALCANO_SCORE}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CALLISTO_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CALLISTO_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CERBERUS_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CERBERUS_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BRYOPHYTA_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BRYOPHYTA_SCORE}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KREEARRA_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KREEARRA_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SARACHNIS_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_SARACHNIS_SCORE}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZKALZUK_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZKALZUK_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZTOKJAD_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_TZTOKJAD_SCORE}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VENENATIS_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_VENENATIS_SCORE}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GIANT_MOLE_RANK}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GIANT_MOLE_SCORE}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_WINTERTODT_RANK}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_WINTERTODT_SCORE}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ABYSSAL_SIRE_RANK}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ABYSSAL_SIRE_SCORE}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_GAUNTLET_RANK}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_GAUNTLET_SCORE}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_FANATIC_RANK}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_FANATIC_SCORE}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_REX_RANK}                         BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_REX_SCORE}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BARROWS_CHESTS_RANK}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_BARROWS_CHESTS_SCORE}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KALPHITE_QUEEN_RANK}                        BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KALPHITE_QUEEN_SCORE}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_ELEMENTAL_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_ELEMENTAL_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CORPOREAL_BEAST_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CORPOREAL_BEAST_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_PRIME_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_PRIME_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ALCHEMICAL_HYDRA_RANK}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_ALCHEMICAL_HYDRA_SCORE}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GENERAL_GRAARDOR_RANK}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GENERAL_GRAARDOR_SCORE}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRIL_TSUTSAROTH_RANK}                       BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KRIL_TSUTSAROTH_SCORE}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THEATRE_OF_BLOOD_RANK}                      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THEATRE_OF_BLOOD_SCORE}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_RANK}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_SCORE}                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_COMMANDER_ZILYANA_RANK}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_COMMANDER_ZILYANA_SCORE}                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_SUPREME_RANK}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_SUPREME_SCORE}                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KING_BLACK_DRAGON_RANK}                     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_KING_BLACK_DRAGON_SCORE}                    BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CRAZY_ARCHAEOLOGIST_RANK}                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CRAZY_ARCHAEOLOGIST_SCORE}                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GROTESQUE_GUARDIANS_RANK}                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_GROTESQUE_GUARDIANS_SCORE}                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DERANGED_ARCHAEOLOGIST_RANK}                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_DERANGED_ARCHAEOLOGIST_SCORE}               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_CORRUPTED_GAUNTLET_RANK}                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_CORRUPTED_GAUNTLET_SCORE}               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_RANK}             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_SCORE}            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_RANK}      BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_SCORE}     BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_XP}                                   BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_RANK}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_LEVEL}                                SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_XP}                                  BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_RANK}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_LEVEL}                               SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_XP}                                 BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_RANK}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_LEVEL}                              SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_XP}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_LEVEL}                             SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_XP}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_LEVEL}                             SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_XP}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_LEVEL}                             SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_XP}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_LEVEL}                             SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_XP}                                BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_RANK}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_LEVEL}                             SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_XP}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_LEVEL}                            SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_XP}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_LEVEL}                            SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_XP}                               BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_RANK}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_LEVEL}                            SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_XP}                              BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_RANK}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_LEVEL}                           SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_XP}                             BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_RANK}                           BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_LEVEL}                          SMALLINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_XP}                            BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_RANK}                          BIGINT, `
+    + `${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_LEVEL}                         SMALLINT`
     + ')';
 
 export const createTableAccountStmt: pgPromise.PreparedStatement = new PreparedStatement({
@@ -1561,8 +1566,10 @@ const upsertAccountStr: string = `INSERT INTO ${TABLES.ACCOUNT}(`
     + '$354, '
     + '$355, '
     + '$356, '
-    + '$357'
-    + ') ON CONFLICT DO NOTHING';
+    + '$357, '
+    + '$358'
+    + ') ON CONFLICT DO NOTHING '
+    + `RETURNING ${ACCOUNT_COLUMNS.ID}`;
 
 export const upsertAccountStmt: pgPromise.PreparedStatement = new PreparedStatement({
     name: 'Upsert Participant Account',
@@ -1576,11 +1583,11 @@ export enum GUILD_COLUMNS {
     IS_CREATOR = 'is_creator'
 }
 
-const createTableGuildsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.GUILDS}(`
-    + `${GUILD_COLUMNS.ID}                          SERIAL PRIMARY KEY, `
-    + `FOREIGN KEY(${GUILD_COLUMNS.FK_EVENT_ID})    REFERENCES ${TABLES.EVENTS}(${EVENT_COLUMNS.ID}), `
-    + `${GUILD_COLUMNS.GUILD_ID}                    VARCHAR(50) NOT NULL, `
-    + `${GUILD_COLUMNS.IS_CREATOR}                  BOOLEAN DEFAULT FALSE`
+const createTableGuildsStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.GUILD}(`
+    + `${GUILD_COLUMNS.ID}             SERIAL PRIMARY KEY, `
+    + `${GUILD_COLUMNS.FK_EVENT_ID}    INTEGER REFERENCES ${TABLES.EVENT}(${EVENT_COLUMNS.ID}), `
+    + `${GUILD_COLUMNS.GUILD_ID}       VARCHAR(50) NOT NULL, `
+    + `${GUILD_COLUMNS.IS_CREATOR}     BOOLEAN DEFAULT FALSE`
     + ')';
 
 export const createTableGuildStmt: pgPromise.PreparedStatement = new PreparedStatement({
@@ -1588,13 +1595,14 @@ export const createTableGuildStmt: pgPromise.PreparedStatement = new PreparedSta
     text: createTableGuildsStr,
 });
 
-const upsertGuildStr: string = `INSERT INTO ${TABLES.GUILDS}(`
+const upsertGuildStr: string = `INSERT INTO ${TABLES.GUILD}(`
     + `${GUILD_COLUMNS.FK_EVENT_ID}, `
     + `${GUILD_COLUMNS.GUILD_ID}, `
     + `${GUILD_COLUMNS.IS_CREATOR}`
     + ') VALUES ('
     + '$1, $2, $3'
-    + ') ON CONFLICT DO NOTHING';
+    + ') ON CONFLICT DO NOTHING '
+    + `RETURNING ${GUILD_COLUMNS.ID}`;
 
 export const upsertGuildStmt: pgPromise.PreparedStatement = new PreparedStatement({
     name: 'Upsert Event Guild',
@@ -1608,11 +1616,11 @@ export enum MESSAGE_COLUMNS {
     MESSAGE_ID = 'message_id',
 }
 
-const createTableMessagesStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.MESSAGES}(`
-    + `${MESSAGE_COLUMNS.ID}                          SERIAL PRIMARY KEY, `
-    + `FOREIGN KEY(${MESSAGE_COLUMNS.FK_GUILD_ID})    REFERENCES ${TABLES.GUILDS}(${GUILD_COLUMNS.ID}), `
-    + `${MESSAGE_COLUMNS.CHANNEL_ID}                  VARCHAR(50) NOT NULL, `
-    + `${MESSAGE_COLUMNS.MESSAGE_ID}                  VARCHAR(50) NOT NULL`
+const createTableMessagesStr: string = `CREATE TABLE IF NOT EXISTS ${TABLES.MESSAGE}(`
+    + `${MESSAGE_COLUMNS.ID}              SERIAL PRIMARY KEY, `
+    + `${MESSAGE_COLUMNS.FK_GUILD_ID}     INTEGER REFERENCES ${TABLES.GUILD}(${GUILD_COLUMNS.ID}), `
+    + `${MESSAGE_COLUMNS.CHANNEL_ID}      VARCHAR(50) NOT NULL, `
+    + `${MESSAGE_COLUMNS.MESSAGE_ID}      VARCHAR(50) NOT NULL`
     + ')';
 
 export const createTableMessageStmt: pgPromise.PreparedStatement = new PreparedStatement({
@@ -1620,15 +1628,805 @@ export const createTableMessageStmt: pgPromise.PreparedStatement = new PreparedS
     text: createTableMessagesStr,
 });
 
-const upsertMessageStr: string = `INSERT INTO ${TABLES.MESSAGES}(`
+const upsertMessageStr: string = `INSERT INTO ${TABLES.MESSAGE}(`
     + `${MESSAGE_COLUMNS.FK_GUILD_ID}, `
     + `${MESSAGE_COLUMNS.CHANNEL_ID}, `
     + `${MESSAGE_COLUMNS.MESSAGE_ID}`
     + ') VALUES ('
     + '$1, $2, $3'
-    + ') ON CONFLICT DO NOTHING';
+    + ') ON CONFLICT DO NOTHING '
+    + `RETURNING ${MESSAGE_COLUMNS.ID}`;
 
 export const upsertMessagesStmt: pgPromise.PreparedStatement = new PreparedStatement({
     name: 'Upsert Guild Message',
     text: upsertMessageStr,
+});
+
+const fetchEventStr = 'SELECT jsonb_build_object('
+    + `'id', e.${EVENT_COLUMNS.ID}, `
+    + `'name', e.${EVENT_COLUMNS.NAME}, `
+    + '\'when\', jsonb_build_object('
+    + `'start', e.${EVENT_COLUMNS.WHEN_START}, `
+    + `'end', e.${EVENT_COLUMNS.WHEN_END} `
+    + '), '
+    + `'global', e.${EVENT_COLUMNS.GLOBAL}, `
+    + '\'tracking\', json_build_object( '
+    + `'category', e.${EVENT_COLUMNS.TRACKING_CATEGORY},`
+    + `'what', e.${EVENT_COLUMNS.TRACKING_WHAT}), `
+    + `'adminLocked', e.${EVENT_COLUMNS.ADMIN_LOCKED}, `
+    + '\'guilds\', jsonb_build_object( '
+    + '\'creator\', creator_guild, '
+    + '\'others\', other_guilds '
+    + '), '
+    + '\'teams\', teams '
+    + ') '
+    + 'FROM event e '
+    // left join creator guild
+    + 'LEFT JOIN ('
+    + 'SELECT fk_event_id, jsonb_object_agg('
+    + `'guildId', g_creator.${GUILD_COLUMNS.GUILD_ID} `
+    + ') || jsonb_object_agg( '
+    + '\'scoreboardMessages\', scoreboard_creator '
+    + ') creator_guild '
+    + 'FROM guild g_creator '
+    // creator guild's messages
+    + 'LEFT JOIN ( '
+    + 'SELECT fk_guild_id, jsonb_agg( '
+    + 'jsonb_build_object( '
+    + `'channelId', m_creator.${MESSAGE_COLUMNS.CHANNEL_ID}, `
+    + `'messageId', m_creator.${MESSAGE_COLUMNS.MESSAGE_ID} `
+    + ')'
+    + ') scoreboard_creator '
+    + 'FROM message m_creator '
+    + 'GROUP BY fk_guild_id '
+    + `) m_creator ON g_creator.${GUILD_COLUMNS.ID} = m_creator.${MESSAGE_COLUMNS.FK_GUILD_ID} `
+    + `WHERE g_creator.${GUILD_COLUMNS.IS_CREATOR} = TRUE `
+    + 'GROUP BY fk_event_id '
+    + `) g_creator ON e.${EVENT_COLUMNS.ID} = g_creator.${GUILD_COLUMNS.FK_EVENT_ID} `
+    // left join other guilds
+    + 'LEFT JOIN ( '
+    + 'SELECT fk_event_id, jsonb_agg( '
+    + 'jsonb_build_object( '
+    + `'guildId', g_others.${GUILD_COLUMNS.GUILD_ID}, `
+    + '\'scoreboardMessages\', scoreboard_others '
+    + ') '
+    + ') other_guilds '
+    + '    FROM guild g_others '
+    // others' messages
+    + 'LEFT JOIN ( '
+    + 'SELECT fk_guild_id, jsonb_agg( '
+    + 'jsonb_build_object( '
+    + `'channelId', m_others.${MESSAGE_COLUMNS.CHANNEL_ID}, `
+    + `'messageId', m_others.${MESSAGE_COLUMNS.MESSAGE_ID} `
+    + ') '
+    + ') scoreboard_others '
+    + 'FROM message m_others '
+    + 'GROUP BY fk_guild_id '
+    + `) m_others ON g_others.${GUILD_COLUMNS.ID} = m_others.${MESSAGE_COLUMNS.FK_GUILD_ID} `
+    + `WHERE g_others.${GUILD_COLUMNS.IS_CREATOR} = FALSE `
+    + 'GROUP BY fk_event_id '
+    + `) g_others ON e.${EVENT_COLUMNS.ID} = g_others.${GUILD_COLUMNS.FK_EVENT_ID} `
+    // left join teams
+    + 'LEFT JOIN ( '
+    + 'SELECT fk_event_id, jsonb_agg( '
+    + 'json_build_object( '
+    + `'name', t.${TEAM_COLUMNS.NAME}, `
+    + `'guildId', t.${TEAM_COLUMNS.GUILD_ID}, `
+    + '\'participants\', participants '
+    + ') '
+    + ') teams '
+    + 'FROM team t '
+    // teams' participants
+    + 'LEFT JOIN ( '
+    + 'SELECT fk_team_id, jsonb_agg( '
+    + 'json_build_object( '
+    + `'userId', p.${PARTICIPANT_COLUMNS.USER_ID}, `
+    + `'customScore', p.${PARTICIPANT_COLUMNS.USER_ID}, `
+    + '\'runescapeAccounts\', runescape_accounts '
+    + ') '
+    + ') participants '
+    + 'FROM participant p '
+    // participants' accounts
+    + 'LEFT JOIN ( '
+    + 'SELECT fk_participant_id, jsonb_agg( '
+    + 'jsonb_build_object( '
+    + `'rsn', a.${ACCOUNT_COLUMNS.RSN}, `
+    + '\'ending\', jsonb_build_object( '
+    + '\'bh\', jsonb_build_object( '
+    + '\'rogue\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BH_ROGUE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BH_ROGUE_SCORE} `
+    + '), '
+    + '\'hunter\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BH_HUNTER_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BH_HUNTER_SCORE} `
+    + ') '
+    + '), '
+    + '\'lms\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_LMS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_LMS_SCORE} `
+    + '), '
+    + '\'clues\', jsonb_build_object( '
+    + '\'all\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_ALL_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_ALL_SCORE} `
+    + '), '
+    + '\'easy\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_EASY_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_EASY_SCORE} `
+    + '), '
+    + '\'hard\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_HARD_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_HARD_SCORE} `
+    + '), '
+    + '\'elite\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_ELITE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_ELITE_SCORE} `
+    + '), '
+    + '\'master\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_MASTER_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_MASTER_SCORE} `
+    + '), '
+    + '\'medium\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_MEDIUM_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_MEDIUM_SCORE} `
+    + '), '
+    + '\'beginner\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_CLUES_BEGINNER_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_CLUES_BEGINNER_SCORE} `
+    + ') '
+    + '), '
+    + '\'bosses\', jsonb_build_object( '
+    + '\'Obor\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_OBOR_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_OBOR_SCORE} `
+    + '), '
+    + '\'Mimic\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_MIMIC_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_MIMIC_SCORE} `
+    + '), '
+    + '\'Kraken\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KRAKEN_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KRAKEN_SCORE} `
+    + '), '
+    + '\'Zulrah\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ZULRAH_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ZULRAH_SCORE} `
+    + '), '
+    + '\'Hespori\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_HESPORI_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_HESPORI_SCORE} `
+    + '), '
+    + '\'Scorpia\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_SCORPIA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_SCORPIA_SCORE} `
+    + '), '
+    + '\'Skotizo\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_SKOTIZO_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_SKOTIZO_SCORE} `
+    + '), '
+    + '\'Vet\'\'ion\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_VETION_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_VETION_SCORE} `
+    + '), '
+    + '\'Vorkath\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_VORKATH_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_VORKATH_SCORE} `
+    + '), '
+    + '\'Zalcano\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ZALCANO_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ZALCANO_SCORE} `
+    + '), '
+    + '\'Callisto\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CALLISTO_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CALLISTO_SCORE} `
+    + '), '
+    + '\'Cerberus\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CERBERUS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CERBERUS_SCORE} `
+    + '), '
+    + '\'Bryophyta\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_BRYOPHYTA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_BRYOPHYTA_SCORE} `
+    + '), '
+    + '\'Kree\'\'Arra\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KREEARRA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KREEARRA_SCORE} `
+    + '), '
+    + '\'Sarachnis\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_SARACHNIS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_SARACHNIS_SCORE} `
+    + '), '
+    + '\'TzKal-Zuk\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_TZKALZUK_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_TZKALZUK_SCORE} `
+    + '), '
+    + '\'TzTok-Jad\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_TZTOKJAD_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_TZTOKJAD_SCORE} `
+    + '), '
+    + '\'Venenatis\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_VENENATIS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_VENENATIS_SCORE} `
+    + '), '
+    + '\'Giant Mole\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_GIANT_MOLE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_GIANT_MOLE_SCORE} `
+    + '), '
+    + '\'Wintertodt\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_WINTERTODT_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_WINTERTODT_SCORE} `
+    + '), '
+    + '\'Abyssal Sire\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ABYSSAL_SIRE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ABYSSAL_SIRE_SCORE} `
+    + '), '
+    + '\'The Gauntlet\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_GAUNTLET_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_GAUNTLET_SCORE} `
+    + '), '
+    + '\'Chaos Fanatic\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_FANATIC_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_FANATIC_SCORE} `
+    + '), '
+    + '\'Dagannoth Rex\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_REX_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_REX_SCORE} `
+    + '), '
+    + '\'Barrows Chests\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_BARROWS_CHESTS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_BARROWS_CHESTS_SCORE} `
+    + '), '
+    + '\'Kalphite Queen\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KALPHITE_QUEEN_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KALPHITE_QUEEN_SCORE} `
+    + '), '
+    + '\'Chaos Elemental\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_ELEMENTAL_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAOS_ELEMENTAL_SCORE} `
+    + '), '
+    + '\'Corporeal Beast\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CORPOREAL_BEAST_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CORPOREAL_BEAST_SCORE} `
+    + '), '
+    + '\'Dagannoth Prime\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_PRIME_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_PRIME_SCORE} `
+    + '), '
+    + '\'Alchemical Hydra\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ALCHEMICAL_HYDRA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_ALCHEMICAL_HYDRA_SCORE} `
+    + '), '
+    + '\'General Graardor\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_GENERAL_GRAARDOR_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_GENERAL_GRAARDOR_SCORE} `
+    + '), '
+    + '\'K\'\'ril Tsutsaroth\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KRIL_TSUTSAROTH_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KRIL_TSUTSAROTH_SCORE} `
+    + '), '
+    + '\'Theatre of Blood\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THEATRE_OF_BLOOD_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THEATRE_OF_BLOOD_SCORE} `
+    + '), '
+    + '\'Chambers of Xeric\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_SCORE} `
+    + '), '
+    + '\'Commander Zilyana\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_COMMANDER_ZILYANA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_COMMANDER_ZILYANA_SCORE} `
+    + '), '
+    + '\'Dagannoth Supreme\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_SUPREME_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DAGANNOTH_SUPREME_SCORE} `
+    + '), '
+    + '\'King Black Dragon\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KING_BLACK_DRAGON_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_KING_BLACK_DRAGON_SCORE} `
+    + '), '
+    + '\'Crazy Archaeologist\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CRAZY_ARCHAEOLOGIST_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CRAZY_ARCHAEOLOGIST_SCORE} `
+    + '), '
+    + '\'Grotesque Guardians\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_GROTESQUE_GUARDIANS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_GROTESQUE_GUARDIANS_SCORE} `
+    + '), '
+    + '\'Deranged Archaeologist\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DERANGED_ARCHAEOLOGIST_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_DERANGED_ARCHAEOLOGIST_SCORE} `
+    + '), '
+    + '\'The Corrupted Gauntlet\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_CORRUPTED_GAUNTLET_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THE_CORRUPTED_GAUNTLET_SCORE} `
+    + '), '
+    + '\'Thermonuclear Smoke Devil\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_SCORE} `
+    + '), '
+    + '\'Chambers of Xeric: Challenge Mode\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.ENDING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_SCORE} `
+    + ') '
+    + '), '
+    + '\'skills\', jsonb_build_object( '
+    + '\'magic\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_MAGIC_LEVEL} `
+    + '), '
+    + '\'attack\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_ATTACK_LEVEL} `
+    + '), '
+    + '\'hunter\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HUNTER_LEVEL} `
+    + '), '
+    + '\'mining\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_MINING_LEVEL} `
+    + '), '
+    + '\'prayer\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_PRAYER_LEVEL} `
+    + '), '
+    + '\'ranged\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_RANGED_LEVEL} `
+    + '), '
+    + '\'slayer\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_SLAYER_LEVEL} `
+    + '), '
+    + '\'agility\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_AGILITY_LEVEL} `
+    + '), '
+    + '\'cooking\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_COOKING_LEVEL} `
+    + '), '
+    + '\'defence\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_DEFENCE_LEVEL} `
+    + '), '
+    + '\'farming\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FARMING_LEVEL} `
+    + '), '
+    + '\'fishing\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FISHING_LEVEL} `
+    + '), '
+    + '\'overall\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_OVERALL_LEVEL} `
+    + '), '
+    + '\'crafting\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_CRAFTING_LEVEL} `
+    + '), '
+    + '\'herblore\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HERBLORE_LEVEL} `
+    + '), '
+    + '\'smithing\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_SMITHING_LEVEL} `
+    + '), '
+    + '\'strength\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_STRENGTH_LEVEL} `
+    + '), '
+    + '\'thieving\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_THIEVING_LEVEL} `
+    + '), '
+    + '\'fletching\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FLETCHING_LEVEL} `
+    + '), '
+    + '\'hitpoints\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_HITPOINTS_LEVEL} `
+    + '), '
+    + '\'runecraft\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_RUNECRAFT_LEVEL} `
+    + '), '
+    + '\'firemaking\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_FIREMAKING_LEVEL} `
+    + '), '
+    + '\'woodcutting\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_WOODCUTTING_LEVEL} `
+    + '), '
+    + '\'construction\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.ENDING_SKILLS_CONSTRUCTION_LEVEL} `
+    + ') '
+    + ') '
+    + '), '
+    + '\'starting\', jsonb_build_object( '
+    + '\'bh\', jsonb_build_object( '
+    + '\'rogue\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BH_ROGUE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BH_ROGUE_SCORE} `
+    + '), '
+    + '\'hunter\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BH_HUNTER_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BH_HUNTER_SCORE} `
+    + ') '
+    + '), '
+    + '\'lms\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_LMS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_LMS_SCORE} `
+    + '), '
+    + '\'clues\', jsonb_build_object( '
+    + '\'all\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_ALL_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_ALL_SCORE} `
+    + '), '
+    + '\'easy\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_EASY_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_EASY_SCORE} `
+    + '), '
+    + '\'hard\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_HARD_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_HARD_SCORE} `
+    + '), '
+    + '\'elite\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_ELITE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_ELITE_SCORE} `
+    + '), '
+    + '\'master\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_MASTER_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_MASTER_SCORE} `
+    + '), '
+    + '\'medium\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_MEDIUM_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_MEDIUM_SCORE} `
+    + '), '
+    + '\'beginner\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_CLUES_BEGINNER_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_CLUES_BEGINNER_SCORE} `
+    + ') '
+    + '), '
+    + '\'bosses\', jsonb_build_object( '
+    + '\'Obor\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_OBOR_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_OBOR_SCORE} `
+    + '), '
+    + '\'Mimic\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_MIMIC_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_MIMIC_SCORE} `
+    + '), '
+    + '\'Kraken\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KRAKEN_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KRAKEN_SCORE} `
+    + '), '
+    + '\'Zulrah\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ZULRAH_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ZULRAH_SCORE} `
+    + '), '
+    + '\'Hespori\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_HESPORI_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_HESPORI_SCORE} `
+    + '), '
+    + '\'Scorpia\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_SCORPIA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_SCORPIA_SCORE} `
+    + '), '
+    + '\'Skotizo\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_SKOTIZO_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_SKOTIZO_SCORE} `
+    + '), '
+    + '\'Vet\'\'ion\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_VETION_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_VETION_SCORE} `
+    + '), '
+    + '\'Vorkath\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_VORKATH_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_VORKATH_SCORE} `
+    + '), '
+    + '\'Zalcano\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ZALCANO_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ZALCANO_SCORE} `
+    + '), '
+    + '\'Callisto\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CALLISTO_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CALLISTO_SCORE} `
+    + '), '
+    + '\'Cerberus\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CERBERUS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CERBERUS_SCORE} `
+    + '), '
+    + '\'Bryophyta\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_BRYOPHYTA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_BRYOPHYTA_SCORE} `
+    + '), '
+    + '\'Kree\'\'Arra\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KREEARRA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KREEARRA_SCORE} `
+    + '), '
+    + '\'Sarachnis\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_SARACHNIS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_SARACHNIS_SCORE} `
+    + '), '
+    + '\'TzKal-Zuk\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_TZKALZUK_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_TZKALZUK_SCORE} `
+    + '), '
+    + '\'TzTok-Jad\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_TZTOKJAD_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_TZTOKJAD_SCORE} `
+    + '), '
+    + '\'Venenatis\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_VENENATIS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_VENENATIS_SCORE} `
+    + '), '
+    + '\'Giant Mole\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_GIANT_MOLE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_GIANT_MOLE_SCORE} `
+    + '), '
+    + '\'Wintertodt\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_WINTERTODT_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_WINTERTODT_SCORE} `
+    + '), '
+    + '\'Abyssal Sire\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ABYSSAL_SIRE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ABYSSAL_SIRE_SCORE} `
+    + '), '
+    + '\'The Gauntlet\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_GAUNTLET_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_GAUNTLET_SCORE} `
+    + '), '
+    + '\'Chaos Fanatic\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_FANATIC_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_FANATIC_SCORE} `
+    + '), '
+    + '\'Dagannoth Rex\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_REX_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_REX_SCORE} `
+    + '), '
+    + '\'Barrows Chests\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_BARROWS_CHESTS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_BARROWS_CHESTS_SCORE} `
+    + '), '
+    + '\'Kalphite Queen\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KALPHITE_QUEEN_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KALPHITE_QUEEN_SCORE} `
+    + '), '
+    + '\'Chaos Elemental\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_ELEMENTAL_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAOS_ELEMENTAL_SCORE} `
+    + '), '
+    + '\'Corporeal Beast\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CORPOREAL_BEAST_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CORPOREAL_BEAST_SCORE} `
+    + '), '
+    + '\'Dagannoth Prime\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_PRIME_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_PRIME_SCORE} `
+    + '), '
+    + '\'Alchemical Hydra\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ALCHEMICAL_HYDRA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_ALCHEMICAL_HYDRA_SCORE} `
+    + '), '
+    + '\'General Graardor\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_GENERAL_GRAARDOR_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_GENERAL_GRAARDOR_SCORE} `
+    + '), '
+    + '\'K\'\'ril Tsutsaroth\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KRIL_TSUTSAROTH_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KRIL_TSUTSAROTH_SCORE} `
+    + '), '
+    + '\'Theatre of Blood\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THEATRE_OF_BLOOD_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THEATRE_OF_BLOOD_SCORE} `
+    + '), '
+    + '\'Chambers of Xeric\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_SCORE} `
+    + '), '
+    + '\'Commander Zilyana\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_COMMANDER_ZILYANA_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_COMMANDER_ZILYANA_SCORE} `
+    + '), '
+    + '\'Dagannoth Supreme\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_SUPREME_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DAGANNOTH_SUPREME_SCORE} `
+    + '), '
+    + '\'King Black Dragon\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KING_BLACK_DRAGON_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_KING_BLACK_DRAGON_SCORE} `
+    + '), '
+    + '\'Crazy Archaeologist\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CRAZY_ARCHAEOLOGIST_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CRAZY_ARCHAEOLOGIST_SCORE} `
+    + '), '
+    + '\'Grotesque Guardians\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_GROTESQUE_GUARDIANS_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_GROTESQUE_GUARDIANS_SCORE} `
+    + '), '
+    + '\'Deranged Archaeologist\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DERANGED_ARCHAEOLOGIST_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_DERANGED_ARCHAEOLOGIST_SCORE} `
+    + '), '
+    + '\'The Corrupted Gauntlet\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_CORRUPTED_GAUNTLET_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THE_CORRUPTED_GAUNTLET_SCORE} `
+    + '), '
+    + '\'Thermonuclear Smoke Devil\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_THERMONUCLEAR_SMOKE_DEVIL_SCORE} `
+    + '), '
+    + '\'Chambers of Xeric: Challenge Mode\', jsonb_build_object( '
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_RANK}, `
+    + `'score', a.${ACCOUNT_COLUMNS.STARTING_BOSSES_CHAMBERS_OF_XERIC_CHALLENGE_MODE_SCORE} `
+    + ') '
+    + '), '
+    + '\'skills\', jsonb_build_object( '
+    + '\'magic\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_MAGIC_LEVEL} `
+    + '), '
+    + '\'attack\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_ATTACK_LEVEL} `
+    + '), '
+    + '\'hunter\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HUNTER_LEVEL} `
+    + '), '
+    + '\'mining\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_MINING_LEVEL} `
+    + '), '
+    + '\'prayer\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_PRAYER_LEVEL} `
+    + '), '
+    + '\'ranged\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_RANGED_LEVEL} `
+    + '), '
+    + '\'slayer\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_SLAYER_LEVEL} `
+    + '), '
+    + '\'agility\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_AGILITY_LEVEL} `
+    + '), '
+    + '\'cooking\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_COOKING_LEVEL} `
+    + '), '
+    + '\'defence\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_DEFENCE_LEVEL} `
+    + '), '
+    + '\'farming\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FARMING_LEVEL} `
+    + '), '
+    + '\'fishing\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FISHING_LEVEL} `
+    + '), '
+    + '\'overall\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_OVERALL_LEVEL} `
+    + '), '
+    + '\'crafting\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_CRAFTING_LEVEL} `
+    + '), '
+    + '\'herblore\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HERBLORE_LEVEL} `
+    + '), '
+    + '\'smithing\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_SMITHING_LEVEL} `
+    + '), '
+    + '\'strength\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_STRENGTH_LEVEL} `
+    + '), '
+    + '\'thieving\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_THIEVING_LEVEL} `
+    + '), '
+    + '\'fletching\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FLETCHING_LEVEL} `
+    + '), '
+    + '\'hitpoints\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_HITPOINTS_LEVEL} `
+    + '), '
+    + '\'runecraft\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_RUNECRAFT_LEVEL} `
+    + '), '
+    + '\'firemaking\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_FIREMAKING_LEVEL} `
+    + '), '
+    + '\'woodcutting\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_WOODCUTTING_LEVEL} `
+    + '), '
+    + '\'construction\', jsonb_build_object( '
+    + `'xp', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_XP}, `
+    + `'rank', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_RANK}, `
+    + `'level', a.${ACCOUNT_COLUMNS.STARTING_SKILLS_CONSTRUCTION_LEVEL} `
+    + ') '
+    + ') '
+    + ') '
+    + ') '
+    + ') runescape_accounts '
+    + 'FROM account a '
+    + 'GROUP BY fk_participant_id '
+    + `) a ON p.${PARTICIPANT_COLUMNS.ID} = a.${ACCOUNT_COLUMNS.FK_PARTICIPANT_ID} `
+    + 'GROUP BY fk_team_id '
+    + `) p ON t.${TEAM_COLUMNS.ID} = p.${PARTICIPANT_COLUMNS.FK_TEAM_ID} `
+    + 'GROUP BY fk_event_id '
+    + `) t ON e.${EVENT_COLUMNS.ID} = t.${TEAM_COLUMNS.FK_EVENT_ID} `
+    + `WHERE e.${EVENT_COLUMNS.ID} = $1`;
+
+export const fetchEventStmt: pgPromise.PreparedStatement = new PreparedStatement({
+    name: 'Fetch Event',
+    text: fetchEventStr,
 });
