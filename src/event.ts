@@ -631,18 +631,20 @@ export namespace Event {
                                                                     || account.starting[categoryKey][whatKey] === undefined)
                                                     ) {
                                                         if (categoryKey === 'skills') {
-                                                            const ending = account
+                                                            const ending = Math.max(account
                                                                 .ending
                                                                 .skills[whatKey]
-                                                                .xp;
+                                                                .xp,
+                                                            0);
                                                             return {
                                                                 lhs: whatKey,
                                                                 whatScore: ending,
                                                             };
                                                         }
-                                                        const ending = account
+                                                        const ending = Math.max(account
                                                             .ending[categoryKey][whatKey]
-                                                            .score;
+                                                            .score,
+                                                        0);
                                                         return {
                                                             lhs: whatKey,
                                                             whatScore: ending,
