@@ -39,6 +39,7 @@ export namespace Event {
     | 'Kree\'Arra'
     | 'K\'ril Tsutsaroth'
     | 'Mimic'
+    | 'Nightmare'
     | 'Obor'
     | 'Sarachnis'
     | 'Scorpia'
@@ -615,43 +616,49 @@ export namespace Event {
                                                                     || account.starting[categoryKey][whatKey] === undefined)
                                                     ) {
                                                         if (categoryKey === 'skills') {
-                                                            const ending = account
+                                                            const ending = Math.max(account
                                                                 .ending
                                                                 .skills[whatKey]
-                                                                .xp;
+                                                                .xp,
+                                                            0);
                                                             return {
                                                                 lhs: whatKey,
                                                                 whatScore: ending,
                                                             };
                                                         }
-                                                        const ending = account
+                                                        const ending = Math.max(account
                                                             .ending[categoryKey][whatKey]
-                                                            .score;
+                                                            .score,
+                                                        0);
                                                         return {
                                                             lhs: whatKey,
                                                             whatScore: ending,
                                                         };
                                                     }
                                                     if (categoryKey === 'skills') {
-                                                        const ending = account
+                                                        const ending = Math.max(account
                                                             .ending
                                                             .skills[whatKey]
-                                                            .xp;
-                                                        const starting = account
+                                                            .xp,
+                                                        0);
+                                                        const starting = Math.max(account
                                                             .starting
                                                             .skills[whatKey]
-                                                            .xp;
+                                                            .xp,
+                                                        0);
                                                         return {
                                                             lhs: whatKey,
                                                             whatScore: ending - starting,
                                                         };
                                                     }
-                                                    const ending = account
+                                                    const ending = Math.max(account
                                                         .ending[categoryKey][whatKey]
-                                                        .score;
-                                                    const starting = account
+                                                        .score,
+                                                    0);
+                                                    const starting = Math.max(account
                                                         .starting[categoryKey][whatKey]
-                                                        .score;
+                                                        .score,
+                                                    0);
                                                     return {
                                                         lhs: whatKey,
                                                         whatScore: ending - starting,
