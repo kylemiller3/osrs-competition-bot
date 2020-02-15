@@ -2,11 +2,11 @@ import * as discord from 'discord.js';
 import {
     Conversation, Qa, CONVERSATION_STATE, ConversationManager,
 } from '../conversation';
-import { Event, } from '../event';
-import { Command, } from '../command';
-import { Utils, } from '../utils';
-import { Db, } from '../database';
-import { willUpdateScores$, } from '../..';
+import { Event } from '../event';
+import { Command } from '../command';
+import { Utils } from '../utils';
+import { Db } from '../database';
+import { willUpdateScores$ } from '../..';
 
 class EventsJoinGlobalConversation extends Conversation {
     event: Event.Standard;
@@ -21,7 +21,7 @@ class EventsJoinGlobalConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Join which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to join "${this.event.name}" now? Global events have special rules.`;
+                return `Are you sure you want to join "${this.event._name}" now? Global events have special rules.`;
             default:
                 return null;
         }
@@ -52,7 +52,7 @@ class EventsJoinGlobalConversation extends Conversation {
                 thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
                 if (event.guilds.others !== undefined
                     && event.guilds.others.findIndex(
-                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id
+                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id,
                     ) !== -1) {
                     this.returnMessage = 'Your guild has already joined this event.';
                     this.state = CONVERSATION_STATE.DONE;
@@ -120,7 +120,7 @@ const joinGlobal = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsJoinGlobalConversation
+        eventsJoinGlobalConversation,
     );
 };
 

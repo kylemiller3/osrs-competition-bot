@@ -1,18 +1,20 @@
 import * as discord from 'discord.js';
-import { hiscores, } from 'osrs-json-api';
+import { hiscores } from 'osrs-json-api';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
-import { Network, } from '../network';
-import { Command, } from '../command';
-import { Event, } from '../event';
-import { Db, } from '../database';
-import { willSignUpPlayer$, getTagFromDiscordId, gClient, } from '../..';
-import { Utils, } from '../utils';
+import { Network } from '../network';
+import { Command } from '../command';
+import { Event } from '../event';
+import { Db } from '../database';
+import { willSignUpPlayer$, getTagFromDiscordId, gClient } from '../..';
+import { Utils } from '../utils';
 
 class EventsSignupConversation extends Conversation {
     event: Event.Standard;
+
     rsn: string;
+
     teamName: string | null = null;
 
     // eslint-disable-next-line class-methods-use-this
@@ -111,7 +113,7 @@ class EventsSignupConversation extends Conversation {
 
                 if (guildEvent.global === true) {
                     const teamIdx: number = guildEvent.teams.findIndex(
-                        (team: Event.Team): boolean => team.guildId === qa.answer.guild.id
+                        (team: Event.Team): boolean => team.guildId === qa.answer.guild.id,
                     );
                     if (teamIdx !== -1) {
                         this.teamName = guildEvent.teams[teamIdx].name;
@@ -162,26 +164,26 @@ class EventsSignupConversation extends Conversation {
                 const findRsn = (participant: Event.Participant):
                 boolean => participant.runescapeAccounts.some(
                     (account: Event.Account):
-                    boolean => account.rsn.toLowerCase() === this.rsn.toLowerCase()
+                    boolean => account.rsn.toLowerCase() === this.rsn.toLowerCase(),
                 );
 
                 const rsnIdx: number = this.event.teams.findIndex(
                     (team: Event.Team):
                     boolean => team.participants.some(
-                        findRsn
-                    )
+                        findRsn,
+                    ),
                 );
 
                 const rsnJdx: number = rsnIdx !== -1
                     ? this.event.teams[rsnIdx].participants.findIndex(
-                        findRsn
+                        findRsn,
                     ) : -1;
 
                 if (rsnIdx !== -1 && rsnJdx !== -1) {
                     // we found the rsn in use already
                     const tag: string = await getTagFromDiscordId(
                         gClient,
-                        this.event.teams[rsnIdx].participants[rsnJdx].userId
+                        this.event.teams[rsnIdx].participants[rsnJdx].userId,
                     );
                     this.lastErrorMessage = `This rsn is already signed up by ${tag}.`;
                     this.state = CONVERSATION_STATE.DONE;
@@ -193,14 +195,14 @@ class EventsSignupConversation extends Conversation {
                     (team: Event.Team):
                     boolean => team.participants.some(
                         (participant: Event.Participant):
-                        boolean => participant.userId === qa.answer.author.id
-                    )
+                        boolean => participant.userId === qa.answer.author.id,
+                    ),
                 );
 
                 const participantJdx: number = participantIdx !== -1
                     ? this.event.teams[participantIdx].participants.findIndex(
                         (participant: Event.Participant):
-                        boolean => participant.userId === qa.answer.author.id
+                        boolean => participant.userId === qa.answer.author.id,
                     ) : -1;
 
                 if (participantIdx !== -1 && participantJdx !== -1) {
@@ -249,7 +251,7 @@ class EventsSignupConversation extends Conversation {
                 // we either add a new team or we add to the found team
                 const teamIdx: number = this.event.teams.findIndex(
                     (team: Event.Team):
-                    boolean => team.name.toLowerCase() === teamName.toLowerCase()
+                    boolean => team.name.toLowerCase() === teamName.toLowerCase(),
                 );
 
                 const participant: Event.Participant = {
@@ -297,7 +299,7 @@ class EventsSignupConversation extends Conversation {
 }
 
 const eventsSignup = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsSignup = Command.parseParameters(
         Command.ALL.EVENTS_SIGNUP,
@@ -310,7 +312,7 @@ const eventsSignup = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsSignupConversation
+        eventsSignupConversation,
     );
 };
 

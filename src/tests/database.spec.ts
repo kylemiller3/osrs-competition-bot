@@ -1,12 +1,14 @@
 /* eslint-disable no-unused-expressions */
-import { describe, it, } from 'mocha';
-import { assert, expect, } from 'chai';
+import { describe, it } from 'mocha';
+import { assert, expect } from 'chai';
 import pgp from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
-import { Db, } from '../database';
-import { Utils, } from '../utils';
-import { TABLES, } from '../databaseMisc';
 import { async } from 'rxjs/internal/scheduler/async';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
+import { Db } from '../database';
+import { Utils } from '../utils';
+import { TABLES, EventRow } from '../databaseMisc';
 
 describe('Postgres Database', (): void => {
     Utils.logger.level = 'fatal';
@@ -29,6 +31,7 @@ describe('Postgres Database', (): void => {
             await Db.createTables(Db.testDb);
         });
     });
+
     const fiveMinsFromNow: Date = new Date();
     fiveMinsFromNow.setMinutes(fiveMinsFromNow.getMinutes() + 5);
     const testEvent = {
@@ -122,7 +125,7 @@ describe('Postgres Database', (): void => {
         global: false,
         adminLocked: false,
     };
-    describe('Save event', async (): Promise<void> => {
+    describe('Save event JSON', async (): Promise<void> => {
         it('should not throw an error.', async (): Promise<void> => {
             await Db.saveEvent(
                 testEvent,
@@ -130,10 +133,25 @@ describe('Postgres Database', (): void => {
             );
         });
     });
-    describe('Fetch event', async (): Promise<void> => {
+    describe('Fetch event JSON', async (): Promise<void> => {
         it('should not throw an error.', async (): Promise<void> => {
-            await Db.fetchEvent(
+            await Db.fetchEventJson(
                 1,
+                Db.testDb,
+            );
+        });
+    });
+    describe('Fetch event cursor', async (): Promise<void> => {
+        it('should do something.', async (): Promise<void> => {
+            await Db.select(
+                pgp.as.format(`SELECT * FROM ${TABLES.EVENT} where id = 1`),
+                (obs: Observable<EventRow>): Observable<EventRow> => obs.pipe(
+                    tap(
+                        (event: EventRow): void => {
+                            console.log(event);
+                        },
+                    ),
+                ),
                 Db.testDb,
             );
         });
@@ -1083,14 +1101,14 @@ describe('Postgres Database', (): void => {
 //     describe('Fetch event', async (): Promise<void> => {
 //         let fetchedEvent: Event.Standard | null;
 //         it('should not return an event.', async (): Promise<void> => {
-//             fetchedEvent = await Db.fetchEvent(
+//             fetchedEvent = await Db.fetchEventJson(
 //                 3,
 //                 Db.testDb,
 //             );
 //             expect(fetchedEvent).to.be.null;
 //         });
 //         it('should return an event.', async (): Promise<void> => {
-//             fetchedEvent = await Db.fetchEvent(
+//             fetchedEvent = await Db.fetchEventJson(
 //                 2,
 //                 Db.testDb,
 //             );

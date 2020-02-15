@@ -2,9 +2,9 @@ import * as discord from 'discord.js';
 import {
     Conversation, Qa, ConversationManager, CONVERSATION_STATE,
 } from '../conversation';
-import { Db, } from '../database';
-import { Utils, } from '../utils';
-import { Command, } from '../command';
+import { Db } from '../database';
+import { Utils } from '../utils';
+import { Command } from '../command';
 
 class AdminSetChannelConversation extends Conversation {
     // eslint-disable-next-line class-methods-use-this
@@ -61,7 +61,7 @@ const adminSetChannel = (
     const adminSetChannelConversation = new AdminSetChannelConversation(msg, params);
     ConversationManager.startNewConversation(
         msg,
-        adminSetChannelConversation
+        adminSetChannelConversation,
     );
 };
 

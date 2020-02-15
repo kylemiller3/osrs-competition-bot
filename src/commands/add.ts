@@ -2,27 +2,32 @@ import * as discord from 'discord.js';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
-import { Utils, } from '../utils';
-import { Db, } from '../database';
-import { Command, } from '../command';
-import { willAddEvent$, } from '../..';
-import { Event, } from '../event';
+import { Utils } from '../utils';
+import { Db } from '../database';
+import { Command } from '../command';
+import { willAddEvent$ } from '../..';
+import { Event } from '../event';
 
 class EventAddConversation extends Conversation {
-    event: Event.Standard;
-    name: string;
-    tracker: Event.Tracking;
-    start: Date;
-    end: Date;
-    now: Date
+    private event: Event.Standard;
+
+    private name: string;
+
+    private tracker: Event.Tracking;
+
+    private start: Date;
+
+    private end: Date;
+
+    private now: Date
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
-        this.now = new Date()
+    protected async init(): Promise<boolean> {
+        this.now = new Date();
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
+    protected produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Event name? (type .exit to stop command)';
@@ -61,7 +66,7 @@ class EventAddConversation extends Conversation {
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
+    protected async consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
             // Event name
             case CONVERSATION_STATE.Q1:
@@ -125,7 +130,7 @@ class EventAddConversation extends Conversation {
                     this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
                     break;
                 }
-                
+
                 if (this.start >= end) {
                     this.state = CONVERSATION_STATE.Q3E;
                     this.lastErrorMessage = 'The start date is after the event end date.';
@@ -159,6 +164,100 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.Q4:
             case CONVERSATION_STATE.Q4E: {
                 const type: string = qa.answer.content;
+
+                const types: Event.Tracking[] = type.toLowerCase()
+                    .split(',')
+                    .map(
+                        (str: string): string => str.trim(),
+                    ) as Event.Tracking[];
+                const wrongTypes: (string | null)[] = types.map(
+                    (typeStr: Event.Tracking): string | null => {
+                        switch (typeStr) {
+                            case 'Abyssal Sire':
+                            case 'Alchemical Hydra':
+                            case 'Barrows Chests':
+                            case 'Bryophyta':
+                            case 'Callisto':
+                            case 'Cerberus':
+                            case 'Chambers of Xeric':
+                            case 'Chambers of Xeric: Challenge Mode':
+                            case 'Chaos Elemental':
+                            case 'Chaos Fanatic':
+                            case 'Commander Zilyana':
+                            case 'Corporeal Beast':
+                            case 'Crazy Archaeologist':
+                            case 'Dagannoth Prime':
+                            case 'Dagannoth Rex':
+                            case 'Dagannoth Supreme':
+                            case 'Deranged Archaeologist':
+                            case 'General Graardor':
+                            case 'Giant Mole':
+                            case 'Grotesque Guardians':
+                            case 'Hespori':
+                            case 'Kalphite Queen':
+                            case 'King Black Dragon':
+                            case 'Kraken':
+                            case 'Kree\'Arra':
+                            case 'K\'ril Tsutsaroth':
+                            case 'Mimic':
+                            case 'Nightmare':
+                            case 'Obor':
+                            case 'Sarachnis':
+                            case 'Scorpia':
+                            case 'Skotizo':
+                            case 'The Gauntlet':
+                            case 'The Corrupted Gauntlet':
+                            case 'Theatre of Blood':
+                            case 'Thermonuclear Smoke Devil':
+                            case 'TzKal-Zuk':
+                            case 'TzTok-Jad':
+                            case 'Venenatis':
+                            case 'Vet\'ion':
+                            case 'Vorkath':
+                            case 'Wintertodt':
+                            case 'Zalcano':
+                            case 'Zulrah':
+                            case 'attack':
+                            case 'strength':
+                            case 'defense':
+                            case 'ranged':
+                            case 'prayer':
+                            case 'magic':
+                            case 'runecraft':
+                            case 'construction':
+                            case 'hitpoints':
+                            case 'agility':
+                            case 'herblore':
+                            case 'thieving':
+                            case 'crafting':
+                            case 'fletching':
+                            case 'slayer':
+                            case 'hunter':
+                            case 'mining':
+                            case 'smithing':
+                            case 'fishing':
+                            case 'cooking':
+                            case 'firemaking':
+                            case 'woodcutting':
+                            case 'farming':
+                            case 'rogue':
+                            case 'hunter':
+                            case 'all':
+                            case 'beginner':
+                            case 'easy':
+                            case 'medium':
+                            case 'hard':
+                            case 'elite':
+                            case 'master':
+                            case 'lms': {
+                                return null;
+                            }
+                            default:
+                                return typeStr;
+                        }
+                    },
+                );
+
                 const trackingStr: string = type
                     .toLowerCase()
                     .trim()
@@ -192,7 +291,7 @@ class EventAddConversation extends Conversation {
                     .join(' ')
                     .split(',')
                     .map(
-                        (str: string): string => str.trim()
+                        (str: string): string => str.trim(),
                     );
                 switch (tracking) {
                     case 'custom':
@@ -211,7 +310,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -231,7 +330,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -267,7 +366,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -323,7 +422,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -448,7 +547,7 @@ class EventAddConversation extends Conversation {
                     // save here
                     const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
                     willAddEvent$.next(savedEvent);
-                    Utils.logger.trace(`Saved event id ${savedEvent.id} to database.`);
+                    Utils.logger.trace(`Saved event id ${savedEvent._id} to database.`);
 
                     this.returnMessage = 'Event successfully scheduled.';
                     this.state = CONVERSATION_STATE.DONE;
@@ -466,7 +565,7 @@ class EventAddConversation extends Conversation {
  * @info msg the input Discord message
  */
 const eventsAdd = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsAdd = Command.parseParameters(
         Command.ALL.EVENTS_ADD,
@@ -479,7 +578,7 @@ const eventsAdd = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventAddConversation
+        eventAddConversation,
     );
 };
 

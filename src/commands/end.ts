@@ -1,15 +1,16 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { Event, } from '../event';
+import { Command } from '../command';
+import { Event } from '../event';
 import {
     Conversation, Qa, CONVERSATION_STATE, ConversationManager,
 } from '../conversation';
-import { Db, } from '../database';
-import { Utils, } from '../utils';
-import { willEndEvent$, } from '../..';
+import { Db } from '../database';
+import { Utils } from '../utils';
+import { willEndEvent$ } from '../..';
 
 class EventEndConversation extends Conversation {
     event: Event.Standard;
+
     // eslint-disable-next-line class-methods-use-this
     async init(): Promise<boolean> {
         return Promise.resolve(false);
@@ -20,7 +21,7 @@ class EventEndConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'End which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to end ${this.event.name} now? This cannot be undone.`;
+                return `Are you sure you want to end ${this.event._name} now? This cannot be undone.`;
             default:
                 return null;
         }
@@ -85,7 +86,7 @@ class EventEndConversation extends Conversation {
 }
 
 const eventsEndEvent = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsEnd = Command.parseParameters(
         Command.ALL.EVENTS_END_EVENT,
@@ -98,7 +99,7 @@ const eventsEndEvent = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventEndConversation
+        eventEndConversation,
     );
 };
 

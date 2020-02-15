@@ -2,11 +2,11 @@ import * as discord from 'discord.js';
 import {
     Conversation, Qa, CONVERSATION_STATE, ConversationManager,
 } from '../conversation';
-import { Event, } from '../event';
-import { Command, } from '../command';
-import { Utils, } from '../utils';
-import { Db, } from '../database';
-import { willUpdateScores$, } from '../..';
+import { Event } from '../event';
+import { Command } from '../command';
+import { Utils } from '../utils';
+import { Db } from '../database';
+import { willUpdateScores$ } from '../..';
 
 class EventsUnjoinGlobalConversation extends Conversation {
     event: Event.Standard;
@@ -21,7 +21,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
             case CONVERSATION_STATE.Q1:
                 return 'Leave which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to be removed from ${this.event.name}? If you change your mind everyone will have to signup again.`;
+                return `Are you sure you want to be removed from ${this.event._name}? If you change your mind everyone will have to signup again.`;
             default:
                 return null;
         }
@@ -71,7 +71,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
 
                 // filter out on the others list
                 const newOthers: Event.Guild[] = this.event.guilds.others.filter(
-                    (other: Event.Guild): boolean => other.guildId !== this.opMessage.guild.id
+                    (other: Event.Guild): boolean => other.guildId !== this.opMessage.guild.id,
                 );
                 if (this.event.guilds.others.length === newOthers.length) {
                     this.state = CONVERSATION_STATE.DONE;
@@ -82,7 +82,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
 
                     // update - removing all teams signed-up by this guild
                     const newTeams: Event.Team[] = this.event.teams.filter(
-                        (team: Event.Team): boolean => team.guildId !== this.opMessage.guild.id
+                        (team: Event.Team): boolean => team.guildId !== this.opMessage.guild.id,
                     );
                     this.event.teams = newTeams;
                     const savedEvent: Event.Standard = await Db.upsertEvent(
@@ -122,7 +122,7 @@ const unjoinGlobal = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsUnjoinGlobalConversation
+        eventsUnjoinGlobalConversation,
     );
 };
 

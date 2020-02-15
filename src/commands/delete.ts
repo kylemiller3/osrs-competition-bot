@@ -1,33 +1,33 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { Event, } from '../event';
+import { Command } from '../command';
+import { Event } from '../event';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
-import { Db, } from '../database';
-import { Utils, } from '../utils';
-import { willDeleteEvent$, } from '../..';
+import { Db } from '../database';
+import { Utils } from '../utils';
+import { willDeleteEvent$ } from '../..';
 
 class EventDeleteConversation extends Conversation {
     event: Event.Standard;
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
+    protected async init(): Promise<boolean> {
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
+    protected produceQ(): string | null {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
                 return 'Delete which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to delete event "${this.event.name}"? This cannot be undone.`;
+                return `Are you sure you want to delete event "${this.event._name}"? This cannot be undone.`;
             default:
                 return null;
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
+    protected async consumeQa(qa: Qa): Promise<void> {
         switch (this.state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
@@ -78,7 +78,7 @@ class EventDeleteConversation extends Conversation {
 }
 
 const eventsDelete = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsDelete = Command.parseParameters(
         Command.ALL.EVENTS_DELETE,
@@ -91,7 +91,7 @@ const eventsDelete = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventDeleteConversation
+        eventDeleteConversation,
     );
 };
 

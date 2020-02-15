@@ -2,9 +2,9 @@ import * as discord from 'discord.js';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
-import { Event, } from '../event';
-import { Db, } from '../database';
-import { Command, } from '../command';
+import { Event } from '../event';
+import { Db } from '../database';
+import { Command } from '../command';
 
 
 class UnlockEventConversation extends Conversation {
@@ -62,7 +62,7 @@ class UnlockEventConversation extends Conversation {
 }
 
 const unlockEvent = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsSignup = Command.parseParameters(
         Command.ALL.EVENTS_UNLOCK,
@@ -75,7 +75,7 @@ const unlockEvent = (
     );
     ConversationManager.startNewConversation(
         msg,
-        unlockEventCoversation
+        unlockEventCoversation,
     );
 };
 

@@ -1,15 +1,16 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
+import { Command } from '../command';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
-import { Event, } from '../event';
-import { Utils, } from '../utils';
-import { Db, } from '../database';
-import { willUpdateScores$, gClient, } from '../..';
+import { Event } from '../event';
+import { Utils } from '../utils';
+import { Db } from '../database';
+import { willUpdateScores$, gClient } from '../..';
 
 class EventUnsignupConversation extends Conversation {
     event: Event.Standard;
+
     async init(): Promise<boolean> {
         const id = this.params.id as number | undefined;
         if (id === undefined) {
@@ -115,12 +116,12 @@ class EventUnsignupConversation extends Conversation {
                     const userIdx: number = this.event.teams.findIndex(
                         (team: Event.Team):
                         boolean => team.participants.some(
-                            findUser
-                        )
+                            findUser,
+                        ),
                     );
                     const userJdx: number = userIdx !== -1
                         ? this.event.teams[userIdx].participants.findIndex(
-                            findUser
+                            findUser,
                         ) : -1;
                     if (userJdx === -1) {
                         // participant not found
@@ -130,12 +131,12 @@ class EventUnsignupConversation extends Conversation {
                     } else {
                         // remove the user
                         this.event.teams[userIdx].participants.splice(
-                            userJdx, 1
+                            userJdx, 1,
                         );
                         // if no participants remove the team
                         if (this.event.teams[userIdx].participants.length === 0) {
                             this.event.teams.splice(
-                                userIdx, 1
+                                userIdx, 1,
                             );
                         }
                         const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
@@ -169,7 +170,7 @@ void => {
     );
     ConversationManager.startNewConversation(
         msg,
-        eventDeleteConversation
+        eventDeleteConversation,
     );
 };
 

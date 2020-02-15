@@ -1,14 +1,14 @@
 import * as discord from 'discord.js';
 import {
-    Subscription, Observable, merge, Subject, concat, of, from,
+    Subscription, Observable, merge, Subject, of, from,
 } from 'rxjs';
 import {
-    filter, timeout, map, tap, catchError, withLatestFrom, distinctUntilChanged, switchMap, concatMap, throttleTime, auditTime, debounceTime,
+    filter, timeout, map, tap, catchError, withLatestFrom, switchMap, concatMap, debounceTime,
 } from 'rxjs/operators';
-import { messageReceived$, } from '..';
-import { MessageWrapper, } from './messageWrapper';
-import { Utils, } from './utils';
-import { Command, } from './command';
+import { messageReceived$ } from '..';
+import { MessageWrapper } from './messageWrapper';
+import { Utils } from './utils';
+import { Command } from './command';
 
 export enum CONVERSATION_STATE {
     Q1,
@@ -40,29 +40,38 @@ export enum CONVERSATION_STATE {
 }
 
 export interface Qa {
-    questions: (discord.Message | null)[] // keep track of all questions
-    answer: discord.Message // and answers
+    questions: (discord.Message | null)[]; // keep track of all questions
+    answer: discord.Message; // and answers
 }
 
 export abstract class Conversation {
-    opMessage: discord.Message;
-    uuid: string;
-    private qaSub: Subscription | undefined
-    private nextQa$: Observable<Qa>;
-    private errorInjector$: Subject<Qa>;
-    state: CONVERSATION_STATE;
-    lastErrorMessage: string | null;
-    returnMessage: string | null;
-    returnOptions: discord.MessageOptions | undefined;
-    params: Record<string, string | number | boolean | undefined>;
+    protected opMessage: discord.Message;
 
-    static parser = <U>(command: Command.ALL, paramName: string, answer: string):
+    private uuid: string;
+
+    private qaSub: Subscription | undefined
+
+    private nextQa$: Observable<Qa>;
+
+    private errorInjector$: Subject<Qa>;
+
+    protected state: CONVERSATION_STATE;
+
+    protected lastErrorMessage: string | null;
+
+    protected returnMessage: string | null;
+
+    protected returnOptions: discord.MessageOptions | undefined;
+
+    protected params: Record<string, string | number | boolean | undefined>;
+
+    private static parser = <U>(command: Command.ALL, paramName: string, answer: string):
     Record<string, U> => Command.parseParameters<Record<string, U>>(
         command,
-        `${paramName}=${answer}`
+        `${paramName}=${answer}`,
     );
 
-    constructor(
+    public constructor(
         opMessage: discord.Message,
         params: Record<string, string | number | boolean | undefined> = Object(),
     ) {
@@ -81,7 +90,7 @@ export abstract class Conversation {
             filter(
                 (msg: discord.Message):
                 boolean => msg.author.id === this.opMessage.author.id
-                && msg.channel.id === this.opMessage.channel.id
+                && msg.channel.id === this.opMessage.channel.id,
             ),
             debounceTime(500),
             timeout(60000),
@@ -89,21 +98,21 @@ export abstract class Conversation {
                 (msg: discord.Message):
                 void => {
                     Utils.logger.debug(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
-                }
+                },
             ),
             catchError(
                 (error: Error):
                 Observable<discord.Message> => {
                     Utils.logger.debug(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
                     throw (error);
-                }
+                },
             ),
         );
 
         const nextQ$ = MessageWrapper.sentMessages$.pipe(
             filter(
                 (response: MessageWrapper.Response):
-                boolean => response.tag === this.uuid
+                boolean => response.tag === this.uuid,
             ),
             tap(
                 (response: MessageWrapper.Response):
@@ -114,17 +123,17 @@ export abstract class Conversation {
                                 return msg.content;
                             }
                             return '(NULL)';
-                        }
+                        },
                     ).join('\n');
                     Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with question '${content}'`);
-                }
+                },
             ),
             catchError(
                 (error: Error):
                 Observable<MessageWrapper.Response> => {
                     Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because the question did not send '${error}'`);
                     throw (error);
-                }
+                },
             ),
         );
 
@@ -135,7 +144,7 @@ export abstract class Conversation {
                 Qa => ({
                     answer: value[0],
                     questions: value[1].messages,
-                })
+                }),
             ),
             catchError(
                 (error: Error):
@@ -148,7 +157,7 @@ export abstract class Conversation {
                     };
                     MessageWrapper.sendMessages$.next(sendInfo);
                     throw (error);
-                }
+                },
             ),
         );
 
@@ -160,8 +169,8 @@ export abstract class Conversation {
         this.qaSub = this.nextQa$.pipe(
             switchMap(
                 (qa: Qa): Observable<void> => from(
-                    this.consumeQa(qa)
-                )
+                    this.consumeQa(qa),
+                ),
             ),
             concatMap(
                 (): Observable<void> => {
@@ -193,7 +202,7 @@ export abstract class Conversation {
                         this.conversationDidEndSuccessfully();
                     }
                     return of();
-                }
+                },
             ),
         ).subscribe(
             (): void => {},
@@ -211,11 +220,13 @@ export abstract class Conversation {
         this.state = CONVERSATION_STATE.Q1;
     }
 
-    abstract async init(): Promise<boolean>;
-    abstract async consumeQa(qa: Qa): Promise<void>;
-    abstract produceQ(): string | null;
+    protected abstract async init(): Promise<boolean>;
 
-    stopConversation(): void {
+    protected abstract async consumeQa(qa: Qa): Promise<void>;
+
+    protected abstract produceQ(): string | null;
+
+    public stopConversation(): void {
         if (this.qaSub !== undefined) {
             this.errorInjector$.error(
                 new Error('Stop Conversation was called'),
@@ -223,7 +234,7 @@ export abstract class Conversation {
         }
     }
 
-    conversationDidEndSuccessfully(): void {
+    public conversationDidEndSuccessfully(): void {
         let content: string;
         if (this.returnMessage === null) {
             if (this.lastErrorMessage === null) {
@@ -267,7 +278,7 @@ export namespace ConversationManager {
 
     export const startNewConversation = async (
         msg: discord.Message,
-        newConversation: Conversation
+        newConversation: Conversation,
     ): Promise<void> => {
         stopConversation(msg);
 
@@ -288,7 +299,7 @@ export namespace ConversationManager {
                 tag: newConversation.uuid,
             };
             MessageWrapper.sendMessages$.next(
-                sendInfo
+                sendInfo,
             );
         } else {
             newConversation.conversationDidEndSuccessfully();

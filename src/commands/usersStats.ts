@@ -1,8 +1,8 @@
 import * as discord from 'discord.js';
-import { hiscores, } from 'osrs-json-api';
-import { Command, } from '../command';
-import { spoofMessage, } from '../..';
-import { Event, } from '../event';
+import { hiscores } from 'osrs-json-api';
+import { Command } from '../command';
+import { spoofMessage } from '../..';
+import { Event } from '../event';
 
 /**
  * See [[Event.Tracking]] structure
@@ -297,7 +297,7 @@ const getStatsStr = (
 */
 
 const usersStats = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     // if (msg.mentions.members.array().length > 0) {
     //     spoofMessage(

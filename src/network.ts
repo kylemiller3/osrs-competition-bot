@@ -2,12 +2,12 @@ import {
     Observable, defer, of, from, merge,
 } from 'rxjs';
 
-import { retryBackoff, } from 'backoff-rxjs';
+import { retryBackoff } from 'backoff-rxjs';
 import {
     timeout, catchError, publishReplay, refCount, tap, map, delay, retry, mergeMap,
 } from 'rxjs/operators';
-import { hiscores, } from 'osrs-json-api';
-import { Utils, } from './utils';
+import { hiscores } from 'osrs-json-api';
+import { Utils } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Network {
@@ -39,13 +39,13 @@ export namespace Network {
 
     export const genericNetworkFetch$ = <T>(
         bound: () => Promise<T>,
-        shouldRetry: (error: Error) => boolean = (): boolean => true
+        shouldRetry: (error: Error) => boolean = (): boolean => true,
     ): Observable<T> => {
         // factory function because promises do not have retry functionality
         const networkRequestFactory: Observable<T> = defer(
             (): Observable<T> => of(null).pipe(
-                mergeMap((): Observable<T> => from(bound()))
-            )
+                mergeMap((): Observable<T> => from(bound())),
+            ),
         );
 
         const ret: Observable<T> = networkRequestFactory.pipe(
@@ -75,8 +75,8 @@ export namespace Network {
      * @ignore
     */
     interface HiscoreCache {
-        observable: Observable<hiscores.Player | null>
-        date: Date
+        observable: Observable<hiscores.Player | null>;
+        date: Date;
     }
 
     /**
@@ -96,7 +96,7 @@ export namespace Network {
     */
     export const hiscoresFetch$ = (
         rsn: string,
-        pullNew: boolean
+        pullNew: boolean,
     ): Observable<hiscores.Player | null> => {
         Utils.logger.debug(`Looking up user ${rsn}`);
         // eslint-disable-next-line no-control-regex
@@ -105,7 +105,7 @@ export namespace Network {
         if (cachedRsn !== undefined) {
             const date: Date = new Date(cachedRsn.date);
             date.setMinutes(
-                date.getMinutes() + 9
+                date.getMinutes() + 9,
             );
             if (Utils.isInPast(date) || pullNew) {
                 hiscoreCache[asciiRsn] = undefined;
@@ -120,7 +120,7 @@ export namespace Network {
             );
 
             const isInputError: (error: Error) => boolean = (
-                error: Error
+                error: Error,
             ): boolean => error.message === 'Player not found! Check RSN or game mode.'
                 || error.message === 'RSN must be less or equal to 12 characters'
                 || error.message === 'RSN must be of type string';
@@ -143,7 +143,7 @@ export namespace Network {
                         }
                         hiscoreCache[asciiRsn] = undefined;
                         throw error;
-                    }
+                    },
                 ),
                 publishReplay(1),
                 refCount(),
@@ -157,7 +157,7 @@ export namespace Network {
             const keys = Object.keys(hiscoreCache);
             if (keys.length >= CACHE_SIZE) {
                 const idxToRemove: number = Math.floor(
-                    (Math.random() * CACHE_SIZE)
+                    (Math.random() * CACHE_SIZE),
                 );
                 const keyToRemove: string = keys[idxToRemove];
                 hiscoreCache[keyToRemove] = undefined;

@@ -1,11 +1,11 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { isAdmin, } from '../..';
-import { MessageWrapper, } from '../messageWrapper';
-import { ConversationManager, } from '../conversation';
+import { Command } from '../command';
+import { isAdmin } from '../..';
+import { MessageWrapper } from '../messageWrapper';
+import { ConversationManager } from '../conversation';
 
 const help = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const admin: boolean = isAdmin(
         msg.guild,

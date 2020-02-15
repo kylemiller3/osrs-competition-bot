@@ -1,27 +1,27 @@
 import * as discord from 'discord.js';
-import { Subject, GroupedObservable, Observable, } from 'rxjs';
+import { Subject, GroupedObservable, Observable } from 'rxjs';
 import {
     groupBy, mergeMap, tap, throttleTime,
 } from 'rxjs/operators';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
-import { Command, } from '../command';
-import { Db, } from '../database';
-import { Event, } from '../event';
-import { Utils, } from '../utils';
-import { willUpdateScores$, } from '../..';
-import { MessageWrapper, } from '../messageWrapper';
+import { Command } from '../command';
+import { Db } from '../database';
+import { Event } from '../event';
+import { Utils } from '../utils';
+import { willUpdateScores$ } from '../..';
+import { MessageWrapper } from '../messageWrapper';
 
 const rateThrottle: Subject<[Event.Standard, discord.Message]> = new Subject();
 rateThrottle.pipe(
     groupBy(
         (eventAndMessage: [Event.Standard, discord.Message]): number => {
-            if (eventAndMessage[0].id !== undefined) {
-                return eventAndMessage[0].id;
+            if (eventAndMessage[0]._id !== undefined) {
+                return eventAndMessage[0]._id;
             }
             return -1;
-        }
+        },
     ),
     mergeMap(
         (group: GroupedObservable<number, [Event.Standard, discord.Message]>):
@@ -29,7 +29,7 @@ rateThrottle.pipe(
             tap(
                 (): void => {
                     Utils.logger.debug('force update request');
-                }
+                },
             ),
             throttleTime(1000 * 60 * 15),
             tap(
@@ -45,9 +45,9 @@ rateThrottle.pipe(
                         eventAndMessage[0],
                         true,
                     ]);
-                }
+                },
             ),
-        )
+        ),
     ),
 ).subscribe();
 
@@ -155,7 +155,7 @@ const forceUpdate = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsForceUpdateConversation
+        eventsForceUpdateConversation,
     );
 };
 

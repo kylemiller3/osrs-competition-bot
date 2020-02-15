@@ -1,9 +1,9 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { spoofMessage, } from '../..';
+import { Command } from '../command';
+import { spoofMessage } from '../..';
 
 const eventsForceUnsignup = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     if (msg.mentions.members.array().length === 0) {
         return;

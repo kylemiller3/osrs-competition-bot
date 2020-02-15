@@ -6,10 +6,10 @@ export namespace Command {
      * @category Interfaces
      */
     interface Description {
-        description: string
-        accessControl: AccessControl
-        command: string
-        params?: Record<string, ParamDescription>
+        description: string;
+        accessControl: AccessControl;
+        command: string;
+        params?: Record<string, ParamDescription>;
     }
 
     /**
@@ -22,11 +22,11 @@ export namespace Command {
      * @category Interfaces
      */
     interface ParamDescription {
-        description: string
-        usage: string
-        expectedType: ParamType
-        required: boolean
-        default?: string | number | boolean
+        description: string;
+        usage: string;
+        expectedType: ParamType;
+        required: boolean;
+        default?: string | number | boolean;
     }
 
     /**
@@ -46,8 +46,8 @@ export namespace Command {
     interface AccessControl {
         controlFunction: (
             admin: boolean
-        ) => boolean
-        description: string
+        ) => boolean;
+        description: string;
     }
 
     /**
@@ -57,7 +57,7 @@ export namespace Command {
      */
     const onlyAdmin: AccessControl = {
         controlFunction: (
-            admin: boolean
+            admin: boolean,
         ): boolean => admin,
         description: 'Only admins or \'osrs event manager\' role.',
     };
@@ -77,12 +77,12 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsAdd extends Record<string, string | number | boolean> {
-        name: string
-        starting: string
-        ending: string
-        type: string
-        teams: boolean
-        global: boolean
+        name: string;
+        starting: string;
+        ending: string;
+        type: string;
+        teams: boolean;
+        global: boolean;
     }
 
     /**
@@ -146,7 +146,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsDelete extends Record<string, string | number | boolean> {
-        id: number
+        id: number;
     }
 
     /**
@@ -172,10 +172,10 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsEdit extends Record<string, string | number | boolean> {
-        id: number
-        name: string
-        starting: string
-        ending: string
+        id: number;
+        name: string;
+        starting: string;
+        ending: string;
     }
 
     /**
@@ -222,7 +222,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsEnd extends Record<string, string | number | boolean> {
-        id: number
+        id: number;
     }
 
     /**
@@ -311,9 +311,9 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsAddScore extends Record<string, string | number | boolean> {
-        id: number
-        score: number
-        note: string
+        id: number;
+        score: number;
+        note: string;
     }
 
     /**
@@ -351,9 +351,9 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsSignup extends Record<string, string | number | boolean> {
-        id: number
-        rsn: string
-        team: string
+        id: number;
+        rsn: string;
+        team: string;
     }
 
     /**
@@ -392,7 +392,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface EventsUnsignup extends Record<string, string | number | boolean> {
-        id: number
+        id: number;
     }
 
     /**
@@ -419,7 +419,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface ForceUpdate extends Record<string, string | number | boolean> {
-        id: number
+        id: number;
     }
     /**
      * Implementation of the force update command description
@@ -444,7 +444,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface JoinGlobal extends Record<string, string | number | boolean> {
-        id: number
+        id: number;
     }
     /**
      * Implementation of the force update command description
@@ -469,7 +469,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface UnjoinGlobal extends Record<string, string | number | boolean> {
-        id: number
+        id: number;
     }
     /**
      * Implementation of the force update command description
@@ -494,7 +494,7 @@ export namespace Command {
      * @category Parsing Interfaces
      */
     export interface AdminSetChannel extends Record<string, string | number | boolean> {
-        channel: string
+        channel: string;
     }
 
     /**
@@ -622,7 +622,7 @@ export namespace Command {
     ): boolean => {
         const cDescription: Description = lookup[command];
         const access = cDescription.accessControl.controlFunction(
-            admin
+            admin,
         );
         return access;
     };
@@ -641,7 +641,7 @@ export namespace Command {
         const valid: boolean = str
             .toLowerCase()
             .startsWith(
-                lookup[command].command
+                lookup[command].command,
             );
         return valid;
     };
@@ -653,7 +653,7 @@ export namespace Command {
      * @category API
      */
     export const generateCommandUsageString = (
-        command: Command.ALL
+        command: Command.ALL,
     ): string => {
         const cDescription: Description = lookup[command];
         const usage = 'Usage: ';
@@ -664,14 +664,14 @@ export namespace Command {
             const commandParamStr: string = commandStr.concat(
                 Object.keys(cDescription.params).map(
                     (paramName: string):
-                    string => ''
+                    string => '',
                     // if (cDescription.params) {
                     //     // if (cDescription.params[paramName].required) {
                     //         return `${paramName}=(${cDescription.params[paramName].usage})`;
                     //     // }
                     //     // return `${paramName}?=(${cDescription.params[paramName].usage})`;
                     // }
-                ).join(' ')
+                ).join(' '),
             );
             return commandParamStr;
         }
@@ -693,11 +693,11 @@ export namespace Command {
             boolean => {
                 if (admin) return true;
                 return lookup[key].accessControl === anyUser;
-            }
+            },
         );
 
         const generateSubString = (
-            key: string
+            key: string,
         ): string => {
             const cDescription: Description = lookup[key];
             const paramNames: string[] | undefined = cDescription.params !== undefined
@@ -715,14 +715,14 @@ export namespace Command {
                         return `\t\t${name}: ${cDescription.params[name].description}`;
                     }
                     return '';
-                }
+                },
             ).join('\n');
             return `${cDescription.command}\n\t${cDescription.description}\n${paramStr}\n\t${generateCommandUsageString(key as unknown as ALL)}\n`;
         };
 
         const helpStr: string = filteredKeys.map(
             (key: string):
-            string => generateSubString(key)
+            string => generateSubString(key),
         ).join('\n');
         return helpStr;
     };
@@ -746,7 +746,7 @@ export namespace Command {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             acc: Record<string, any>,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            x: Record<string, any>
+            x: Record<string, any>,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ): Record<string, any> => {
             acc[Object.keys(x)[0]] = Object.values(x)[0];
@@ -759,13 +759,13 @@ export namespace Command {
             Record<string, RegExp> => {
                 const filteredEndingAnchors: string[] = allKeys.filter(
                     (endingAnchor: string):
-                    boolean => endingAnchor !== anchor
+                    boolean => endingAnchor !== anchor,
                 );
                 const endingAnchorRegex: string = filteredEndingAnchors.join('=|');
                 return {
                     [anchor]: RegExp(`(?<=${anchor}=)(.*?)(?:${endingAnchorRegex}=|$)`, 'i'),
                 };
-            }
+            },
         ).reduce(reduceRecord);
 
         const results: Record<string, string | undefined> = allKeys.map(
@@ -786,7 +786,7 @@ export namespace Command {
                 return {
                     [key]: exec[1].trim(),
                 };
-            }
+            },
         ).reduce(reduceRecord);
 
         const parsed: Record<string, string | number | boolean> = allKeys.map(
@@ -821,7 +821,7 @@ export namespace Command {
                     }
                 }
                 return {};
-            }
+            },
         ).reduce(reduceRecord);
 
         return parsed as unknown as T;
