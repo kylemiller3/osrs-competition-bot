@@ -799,7 +799,6 @@ export namespace Event {
             let idx = 0;
             const maxTeamsLen: number[] = currentScoreboard.map(
                 (team: TeamScoreboard, idi: number): number => {
-                    const teamLen: number = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length;
                     const participantsLen: number[] = team.participantsScores.flatMap(
                         (participant: ParticipantScoreboard): number => {
                             const participantLen: number = `${tab}${tags[idx]}${participant.participantScore.toLocaleString('en-us')}`.length;
@@ -828,6 +827,9 @@ export namespace Event {
                             );
                         }
                     );
+                    const teamLen: number = team.participantsScores.length > 1
+                        ? `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length
+                        : `${getTeamPrefix(idi, currentScoreboard.length - 1)}`.length;
                     return Math.max(
                         Math.max(...participantsLen),
                         teamLen,
@@ -844,23 +846,20 @@ export namespace Event {
                 : new Array(1).join('-');
             const str: string = `${dashesTeamSeparator}\n`.concat(currentScoreboard.map(
                 (team: TeamScoreboard, idi: number): string => {
-                    const teamStrLen: number = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length;
+                    const teamStrLen: number = team.participantsScores.length > 1
+                        ? `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${team.teamScore.toLocaleString('en-us')}`.length
+                        : `${getTeamPrefix(idi, currentScoreboard.length - 1)}`.length;
                     const spacesToInsertTeam: number = maxTeamStrLen - teamStrLen;
                     const spacesTeam: string = new Array(spacesToInsertTeam + 1).join(' ');
-                    // const teamStr: string = team.teamScore > 0
-                    //     ? `${prefix}${team.lhs}${spacesTeam}${team.teamScore}`
-                    //     : `${prefix}${team.lhs}`;
-                    const teamStr = `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${spacesTeam}${team.teamScore.toLocaleString('en-us')}`;
-
+                    const teamStr = team.participantsScores.length > 1
+                        ? `${getTeamPrefix(idi, currentScoreboard.length - 1)}${team.lhs}${spacesTeam}${team.teamScore.toLocaleString('en-us')}`
+                        : `${getTeamPrefix(idi, currentScoreboard.length - 1)}`;
 
                     const participantsStr = team.participantsScores.map(
                         (participant: ParticipantScoreboard): string => {
                             const participantStrLen: number = `${tab}${tags[idx]}${participant.participantScore.toLocaleString('en-us')}`.length;
                             const spacesToInsertParticipant: number = maxTeamStrLen - participantStrLen;
                             const spacesParticipant: string = new Array(spacesToInsertParticipant + 1).join(' ');
-                            // const participantStr: string = participant.participantScore > 0
-                            //     ? `${tab}${tags[idx]}${spacesParticipant}${participant.participantScore.toLocaleString('en-us')}`
-                            //     : `${tab}${tags[idx]}`;
                             const participantStr = `${tab}${tags[idx]}${spacesParticipant}${participant.participantScore.toLocaleString('en-us')}`;
                             idx += 1;
 
@@ -869,9 +868,6 @@ export namespace Event {
                                     const accountStrLen: number = `${tab}${tab}${account.lhs}${account.accountScore.toLocaleString('en-us')}`.length;
                                     const spacesToInsertAccount: number = maxTeamStrLen - accountStrLen;
                                     const spacesAccount: string = new Array(spacesToInsertAccount + 1).join(' ');
-                                    // const accountStr: string = account.accountScore > 0
-                                    //     ? `${tab}${tab}${account.lhs}${spacesAccount}${account.accountScore.toLocaleString('en-us')}`
-                                    //     : `${tab}${tab}${account.lhs}`;
                                     const accountStr = `${tab}${tab}${account.lhs}${spacesAccount}${account.accountScore.toLocaleString('en-us')}`;
 
                                     if (account.whatsScores !== undefined) {
