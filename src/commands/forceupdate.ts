@@ -1,17 +1,17 @@
 import * as discord from 'discord.js';
-import { Subject, GroupedObservable, Observable, } from 'rxjs';
+import { Subject, GroupedObservable, Observable } from 'rxjs';
 import {
     groupBy, mergeMap, tap, throttleTime,
 } from 'rxjs/operators';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
-import { Command, } from '../command';
-import { Db, } from '../database';
-import { Event, } from '../event';
-import { Utils, } from '../utils';
-import { willUpdateScores$, } from '../..';
-import { MessageWrapper, } from '../messageWrapper';
+import { Command } from '../command';
+import { Db } from '../database';
+import { Event } from '../event';
+import { Utils } from '../utils';
+import { willUpdateScores$ } from '../..';
+import { MessageWrapper } from '../messageWrapper';
 
 const rateThrottle: Subject<[Event.Standard, discord.Message]> = new Subject();
 rateThrottle.pipe(
@@ -21,7 +21,7 @@ rateThrottle.pipe(
                 return eventAndMessage[0].id;
             }
             return -1;
-        }
+        },
     ),
     mergeMap(
         (group: GroupedObservable<number, [Event.Standard, discord.Message]>):
@@ -29,7 +29,7 @@ rateThrottle.pipe(
             tap(
                 (): void => {
                     Utils.logger.debug('force update request');
-                }
+                },
             ),
             throttleTime(1000 * 60 * 15),
             tap(
@@ -45,22 +45,22 @@ rateThrottle.pipe(
                         eventAndMessage[0],
                         true,
                     ]);
-                }
+                },
             ),
-        )
+        ),
     ),
 ).subscribe();
 
 class ForceUpdateConversation extends Conversation {
-    event: Event.Standard;
+    private event: Event.Standard;
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
+    public async init(): Promise<boolean> {
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
-        switch (this.state) {
+    public produceQ(): string | null {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to force update? (type .exit to stop command)';
             case CONVERSATION_STATE.Q1C:
@@ -70,13 +70,13 @@ class ForceUpdateConversation extends Conversation {
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
-        switch (this.state) {
+    protected async consumeQa(qa: Qa): Promise<void> {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const eventId: number = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(eventId)) {
-                    this.state = CONVERSATION_STATE.Q1E;
+                    this._state = CONVERSATION_STATE.Q1E;
                     break;
                 } else {
                     const creatorEvent: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
@@ -92,19 +92,19 @@ class ForceUpdateConversation extends Conversation {
                         : invitedEvent;
 
                     if (event === null) {
-                        this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
-                        this.state = CONVERSATION_STATE.Q1E;
+                        this._lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
+                        this._state = CONVERSATION_STATE.Q1E;
                         break;
                     } else if (Utils.isInPast(event.when.end)) {
-                        if (event.global === true) {
+                        if (event.isGlobal === true) {
                             // can't for globals
-                            this.returnMessage = 'This command is disabled for global events after they end.';
-                            this.state = CONVERSATION_STATE.DONE;
+                            this._returnMessage = 'This command is disabled for global events after they end.';
+                            this._state = CONVERSATION_STATE.DONE;
                             break;
                         } else {
                             // confirm if event already ended
                             this.event = event;
-                            this.state = CONVERSATION_STATE.Q1C;
+                            this._state = CONVERSATION_STATE.Q1C;
                             break;
                         }
                     } else {
@@ -113,8 +113,8 @@ class ForceUpdateConversation extends Conversation {
                             this.event,
                             this.opMessage,
                         ]);
-                        this.returnMessage = 'This command is rate limited to once every fifteen minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
-                        this.state = CONVERSATION_STATE.DONE;
+                        this._returnMessage = 'This command is rate limited to once every fifteen minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
+                        this._state = CONVERSATION_STATE.DONE;
                         break;
                     }
                 }
@@ -122,16 +122,16 @@ class ForceUpdateConversation extends Conversation {
             case CONVERSATION_STATE.Q1C: {
                 const answer = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.returnMessage = 'Will not force update.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Will not force update.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
                     rateThrottle.next([
                         this.event,
                         this.opMessage,
                     ]);
-                    this.returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 }
             }
@@ -155,7 +155,7 @@ const forceUpdate = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsForceUpdateConversation
+        eventsForceUpdateConversation,
     );
 };
 

@@ -1,8 +1,8 @@
-import * as discord from 'discord.js';
-import { hiscores, } from 'osrs-json-api';
-import { Command, } from '../command';
-import { spoofMessage, } from '../..';
-import { Event, } from '../event';
+// import * as discord from 'discord.js';
+// import { hiscores, } from 'osrs-json-api';
+// import { Command, } from '../command';
+// import { spoofMessage, } from '../..';
+// import { Event, } from '../event';
 
 /**
  * See [[Event.Tracking]] structure
@@ -23,7 +23,8 @@ import { Event, } from '../event';
 //             if (Event.getEventTracking(event) !== Event.Tracking.SKILLS) return 0;
 //             const xps: number[] = participant.runescapeAccounts.map(
 //                 (account: Event.CompetitiveAccount): number => {
-//                     if (account.starting === undefined || account.ending === undefined) return NaN;
+//                     if (account.starting === undefined
+//                        || account.ending === undefined) return NaN;
 //                     const skillsComponents:
 //                     hiscores.RankLevelXpObject[][] = keys.map(
 //                         (key: string):
@@ -297,7 +298,7 @@ const getStatsStr = (
 */
 
 const usersStats = (
-    msg: discord.Message
+    // msg: discord.Message,
 ): void => {
     // if (msg.mentions.members.array().length > 0) {
     //     spoofMessage(

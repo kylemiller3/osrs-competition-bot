@@ -7,8 +7,8 @@ export namespace Settings {
     }
 
     export interface GuildSettings {
-        guildId: string
-        channelId: string
-        payTier: PAY_TIER
+        guildId: string;
+        channelId: string;
+        payTier: PAY_TIER;
     }
 }

@@ -2,38 +2,38 @@ import * as discord from 'discord.js';
 import {
     Conversation, Qa, CONVERSATION_STATE, ConversationManager,
 } from '../conversation';
-import { Event, } from '../event';
-import { Command, } from '../command';
-import { Utils, } from '../utils';
-import { Db, } from '../database';
-import { willUpdateScores$, } from '../..';
+import { Event } from '../event';
+import { Command } from '../command';
+import { Utils } from '../utils';
+import { Db } from '../database';
+import { willUpdateScores$ } from '../..';
 
 class EventsJoinGlobalConversation extends Conversation {
-    event: Event.Standard;
+    private _event: Event.Standard;
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
+    public async init(): Promise<boolean> {
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
-        switch (this.state) {
+    public produceQ(): string | null {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
                 return 'Join which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to join "${this.event.name}" now? Global events have special rules.`;
+                return `Are you sure you want to join "${this._event.name}" now? Global events have special rules.`;
             default:
                 return null;
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
-        switch (this.state) {
+    protected async consumeQa(qa: Qa): Promise<void> {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(id)) {
-                    this.state = CONVERSATION_STATE.Q1E;
+                    this._state = CONVERSATION_STATE.Q1E;
                     break;
                 }
 
@@ -43,8 +43,8 @@ class EventsJoinGlobalConversation extends Conversation {
                 );
 
                 if (event === null) {
-                    this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
-                    this.state = CONVERSATION_STATE.Q1E;
+                    this._lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
+                    this._state = CONVERSATION_STATE.Q1E;
                     break;
                 }
 
@@ -52,51 +52,51 @@ class EventsJoinGlobalConversation extends Conversation {
                 thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
                 if (event.guilds.others !== undefined
                     && event.guilds.others.findIndex(
-                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id
+                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id,
                     ) !== -1) {
-                    this.returnMessage = 'Your guild has already joined this event.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Your guild has already joined this event.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else if (Utils.isInPast(thirtyMinutesBeforeStart)) {
-                    this.lastErrorMessage = 'Cannot join a global event within thirty minutes of the start date.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._lastErrorMessage = 'Cannot join a global event within thirty minutes of the start date.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
-                    this.state = CONVERSATION_STATE.CONFIRM;
-                    this.event = event;
+                    this._state = CONVERSATION_STATE.CONFIRM;
+                    this._event = event;
                     break;
                 }
             }
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.returnMessage = 'Cancelled.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Cancelled.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
-                    if (this.event.guilds.others !== undefined) {
-                        this.event.guilds.others = [
-                            ...this.event.guilds.others,
+                    if (this._event.guilds.others !== undefined) {
+                        this._event.guilds.others = [
+                            ...this._event.guilds.others,
                             {
                                 guildId: this.opMessage.guild.id,
                             },
                         ];
                     } else {
-                        this.event.guilds.others = [
+                        this._event.guilds.others = [
                             {
                                 guildId: this.opMessage.guild.id,
                             },
                         ];
                     }
                     const savedEvent: Event.Standard = await Db.upsertEvent(
-                        this.event,
+                        this._event,
                     );
                     willUpdateScores$.next([
                         savedEvent,
                         false,
                     ]);
-                    this.returnMessage = 'Joined global event.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Joined global event.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 }
             }
@@ -120,7 +120,7 @@ const joinGlobal = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsJoinGlobalConversation
+        eventsJoinGlobalConversation,
     );
 };
 

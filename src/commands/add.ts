@@ -2,82 +2,88 @@ import * as discord from 'discord.js';
 import {
     Conversation, ConversationManager, CONVERSATION_STATE, Qa,
 } from '../conversation';
-import { Utils, } from '../utils';
-import { Db, } from '../database';
-import { Command, } from '../command';
-import { willAddEvent$, } from '../..';
-import { Event, } from '../event';
+import { Utils } from '../utils';
+import { Db } from '../database';
+import { Command } from '../command';
+import { willAddEvent$ } from '../..';
+import { Event } from '../event';
 
 class EventAddConversation extends Conversation {
-    event: Event.Standard;
-    name: string;
-    tracker: Event.Tracking;
-    start: Date;
-    end: Date;
-    now: Date
+    private _event: Event.Standard;
+
+    private _name: string;
+
+    private _tracker: Event.Tracking;
+
+    private _start: Date;
+
+    private _end: Date;
+
+    private _now: Date
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
-        this.now = new Date()
+    public async init(): Promise<boolean> {
+        this._now = new Date();
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
-        switch (this.state) {
+    public produceQ(): string | null {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
                 return 'Event name? (type .exit to stop command)';
             case CONVERSATION_STATE.Q2: {
-                const twoDaysFromNow: Date = new Date(this.now);
+                const twoDaysFromNow: Date = new Date(this._now);
                 twoDaysFromNow.setMilliseconds(0);
                 twoDaysFromNow.setSeconds(0);
                 twoDaysFromNow.setHours(twoDaysFromNow.getHours() + 24 * 2);
                 return `Start it when?\nExample: ${twoDaysFromNow.toISOString()} which is two days from now OR 'asap' for one hour from now.`;
             }
             case CONVERSATION_STATE.Q2C:
-                return `Starting date is set for ${this.start.toString()}. Is this ok?`;
+                return `Starting date is set for ${this._start.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q3: {
-                const oneWeekFromNow: Date = new Date(this.now);
-                oneWeekFromNow.setMilliseconds(0);
-                oneWeekFromNow.setSeconds(0);
-                oneWeekFromNow.setHours(oneWeekFromNow.getHours() + 24 * 7);
-                return `End it when?\nExample: ${oneWeekFromNow.toISOString()} which is one week from now.`;
+                const fiveDaysFromNow: Date = new Date(this._now);
+                fiveDaysFromNow.setMilliseconds(0);
+                fiveDaysFromNow.setSeconds(0);
+                fiveDaysFromNow.setHours(fiveDaysFromNow.getHours() + 24 * 5);
+                return `End it when?\nExample: ${fiveDaysFromNow.toISOString()} which is five days from now.`;
             }
             case CONVERSATION_STATE.Q3C:
-                return `Ending date is set for ${this.end.toString()}. Is this ok?`;
+                return `Ending date is set for ${this._end.toString()}. Is this ok?`;
             case CONVERSATION_STATE.Q4:
                 return 'Which category of event?';
             case CONVERSATION_STATE.Q4C:
-                return `Event will be of type ${this.tracker.category} and track ${this.tracker.what === undefined ? 'nothing' : this.tracker.what}. Is this ok?`;
+                return `Event will be of type ${this._tracker.category} and track ${this._tracker.what === undefined ? 'nothing' : this._tracker.what}. Is this ok?`;
             case CONVERSATION_STATE.Q5:
                 return 'Would you like other Discord guilds to be able to compete?';
             case CONVERSATION_STATE.Q6:
                 return 'Would you like to invite specific guilds (yes) or leave the event open to everyone (no)?';
             case CONVERSATION_STATE.Q6O:
                 return 'Enter the Discord Guild IDs separating each one with a comma.';
-            case CONVERSATION_STATE.CONFIRM:
-                return `The event looks like this:\n\`\`\`json\n${JSON.stringify(this.event, null, 2)}\n\`\`\`\nIs this ok?`;
+            case CONVERSATION_STATE.CONFIRM: {
+                return `The event looks like this:\n\`\`\`json\n${this._event.dbStringify}\n\`\`\`\nIs this ok?`;
+            }
             default:
                 return null;
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
-        switch (this.state) {
+    protected async consumeQa(qa: Qa): Promise<void> {
+        switch (this._state) {
             // Event name
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const name: string = qa.answer.content;
                 if (name.length === 0) {
-                    this.state = CONVERSATION_STATE.Q1E;
-                    this.lastErrorMessage = 'The name is blank.';
+                    this._state = CONVERSATION_STATE.Q1E;
+                    this._lastErrorMessage = 'The name is blank.';
                     break;
                 } else if (name.length > 50) {
-                    this.state = CONVERSATION_STATE.Q1E;
-                    this.lastErrorMessage = 'The name is greater than 100 characters long.';
+                    this._state = CONVERSATION_STATE.Q1E;
+                    this._lastErrorMessage = 'The name is longer than 50 characters.';
                     break;
                 } else {
-                    this.name = name;
-                    this.state = CONVERSATION_STATE.Q2;
+                    this._name = name;
+                    this._state = CONVERSATION_STATE.Q2;
                     break;
                 }
             }
@@ -92,26 +98,26 @@ class EventAddConversation extends Conversation {
                     ? new Date(dateStr)
                     : oneHourFromNow;
                 if (!Utils.isValidDate(start)) {
-                    this.state = CONVERSATION_STATE.Q2E;
-                    this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
+                    this._state = CONVERSATION_STATE.Q2E;
+                    this._lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
                     break;
                 } else if (start.getTime() - now.getTime() < 1000 * 60 * 60) {
-                    this.state = CONVERSATION_STATE.Q2E;
-                    this.lastErrorMessage = 'The start date must be at least an hour in advance';
+                    this._state = CONVERSATION_STATE.Q2E;
+                    this._lastErrorMessage = 'The start date must be at least an hour in advance';
                     break;
                 } else {
-                    this.start = start;
-                    this.state = CONVERSATION_STATE.Q2C;
+                    this._start = start;
+                    this._state = CONVERSATION_STATE.Q2C;
                     break;
                 }
             }
             case CONVERSATION_STATE.Q2C: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.state = CONVERSATION_STATE.Q2;
+                    this._state = CONVERSATION_STATE.Q2;
                     break;
                 } else {
-                    this.state = CONVERSATION_STATE.Q3;
+                    this._state = CONVERSATION_STATE.Q3;
                     break;
                 }
             }
@@ -121,37 +127,37 @@ class EventAddConversation extends Conversation {
                 const dateStr: string = qa.answer.content;
                 const end: Date = new Date(dateStr);
                 if (!Utils.isValidDate(end)) {
-                    this.state = CONVERSATION_STATE.Q3E;
-                    this.lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
+                    this._state = CONVERSATION_STATE.Q3E;
+                    this._lastErrorMessage = 'The date is not in a valid ISO 8601 format.';
                     break;
                 }
-                
-                if (this.start >= end) {
-                    this.state = CONVERSATION_STATE.Q3E;
-                    this.lastErrorMessage = 'The start date is after the event end date.';
+
+                if (this._start >= end) {
+                    this._state = CONVERSATION_STATE.Q3E;
+                    this._lastErrorMessage = 'The start date is after the event end date.';
                     break;
-                } else if (end.getTime() - this.start.getTime() < 1000 * 60 * 60) {
-                    this.state = CONVERSATION_STATE.Q3E;
-                    this.lastErrorMessage = 'The event must be at least an hour in duration.';
+                } else if (end.getTime() - this._start.getTime() < 1000 * 60 * 60) {
+                    this._state = CONVERSATION_STATE.Q3E;
+                    this._lastErrorMessage = 'The event must be at least an hour in duration.';
                     break;
-                } else if (end.getTime() - this.start.getTime() > 1000 * 60 * 60 * 24 * 5) {
+                } else if (end.getTime() - this._start.getTime() > 1000 * 60 * 60 * 24 * 5) {
                     // freemium
-                    this.state = CONVERSATION_STATE.Q3E;
-                    this.lastErrorMessage = 'The free version limits events to five days duration maximum.';
+                    this._state = CONVERSATION_STATE.Q3E;
+                    this._lastErrorMessage = 'The free version limits events to five days duration maximum.';
                     break;
                 } else {
-                    this.end = end;
-                    this.state = CONVERSATION_STATE.Q3C;
+                    this._end = end;
+                    this._state = CONVERSATION_STATE.Q3C;
                     break;
                 }
             }
             case CONVERSATION_STATE.Q3C: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.state = CONVERSATION_STATE.Q3;
+                    this._state = CONVERSATION_STATE.Q3;
                     break;
                 } else {
-                    this.state = CONVERSATION_STATE.Q4;
+                    this._state = CONVERSATION_STATE.Q4;
                     break;
                 }
             }
@@ -174,8 +180,8 @@ class EventAddConversation extends Conversation {
                         tracking = trackingStr;
                         break;
                     default:
-                        this.state = CONVERSATION_STATE.Q4E;
-                        this.lastErrorMessage = 'Unknown category. See user manual.';
+                        this._state = CONVERSATION_STATE.Q4E;
+                        this._lastErrorMessage = 'Unknown category. See user manual.';
                         return;
                 }
 
@@ -192,7 +198,7 @@ class EventAddConversation extends Conversation {
                     .join(' ')
                     .split(',')
                     .map(
-                        (str: string): string => str.trim()
+                        (str: string): string => str.trim(),
                     );
                 switch (tracking) {
                     case 'custom':
@@ -211,7 +217,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -231,7 +237,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -267,7 +273,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -323,7 +329,7 @@ class EventAddConversation extends Conversation {
                                     default:
                                         return null;
                                 }
-                            }
+                            },
                         ).filter(Utils.isDefinedFilter);
                         break;
                     }
@@ -333,42 +339,42 @@ class EventAddConversation extends Conversation {
                     }
                 }
                 if (what !== undefined && what.length !== keyStrs.length) {
-                    this.state = CONVERSATION_STATE.Q4E;
-                    this.lastErrorMessage = 'Some inputs were invalid. See user manual.';
+                    this._state = CONVERSATION_STATE.Q4E;
+                    this._lastErrorMessage = 'Some inputs were invalid. See user manual.';
                     break;
                 }
-                this.tracker = {
+                this._tracker = {
                     category: tracking,
                     what,
                 };
-                this.state = CONVERSATION_STATE.Q4C;
+                this._state = CONVERSATION_STATE.Q4C;
                 break;
             }
             case CONVERSATION_STATE.Q4C: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.state = CONVERSATION_STATE.Q4;
+                    this._state = CONVERSATION_STATE.Q4;
                     break;
                 } else {
                     // create event here
                     // freemium
-                    this.event = new Event.Standard(
+                    this._event = new Event.Standard(
                         undefined,
-                        this.name,
-                        this.start,
-                        this.end,
+                        this._name,
+                        this._start,
+                        this._end,
                         {
                             creator: {
                                 guildId: qa.answer.guild.id,
                             },
                         },
                         [],
-                        this.tracker,
+                        this._tracker,
                         false,
                         false,
                     );
                     // freemium
-                    this.state = CONVERSATION_STATE.CONFIRM;
+                    this._state = CONVERSATION_STATE.CONFIRM;
                     break;
                 }
             }
@@ -441,17 +447,17 @@ class EventAddConversation extends Conversation {
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.returnMessage = 'Cancelled.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Cancelled.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
                     // save here
-                    const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
                     willAddEvent$.next(savedEvent);
                     Utils.logger.trace(`Saved event id ${savedEvent.id} to database.`);
 
-                    this.returnMessage = 'Event successfully scheduled.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Event successfully scheduled.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 }
             }
@@ -466,7 +472,7 @@ class EventAddConversation extends Conversation {
  * @info msg the input Discord message
  */
 const eventsAdd = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsAdd = Command.parseParameters(
         Command.ALL.EVENTS_ADD,
@@ -479,7 +485,7 @@ const eventsAdd = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventAddConversation
+        eventAddConversation,
     );
 };
 

@@ -11,6 +11,12 @@
   "plugins": ["@typescript-eslint"],
   "extends": ["airbnb-base", "plugin:@typescript-eslint/recommended"],
   "rules": {
+    "arrow-parens": "off",
+    "no-underscore-dangle": "off",
+    "prefer-destructuring": "off"
+  }
+  /*
+  "rules": {
     "comma-dangle": [2, "always"],
     "max-len": "warn",
     "@typescript-eslint/member-delimiter-style": ["error", {
@@ -32,4 +38,5 @@
       "exceptAfterSingleLine": true
     }]
   }
+  */
 }

@@ -1,14 +1,14 @@
 import * as discord from 'discord.js';
 import {
-    Subscription, Observable, merge, Subject, concat, of, from,
+    Subscription, Observable, merge, Subject, of, from,
 } from 'rxjs';
 import {
-    filter, timeout, map, tap, catchError, withLatestFrom, distinctUntilChanged, switchMap, concatMap, throttleTime, auditTime, debounceTime,
+    filter, timeout, map, tap, catchError, withLatestFrom, switchMap, concatMap, debounceTime,
 } from 'rxjs/operators';
-import { messageReceived$, } from '..';
-import { MessageWrapper, } from './messageWrapper';
-import { Utils, } from './utils';
-import { Command, } from './command';
+import { messageReceived$ } from '..';
+import { MessageWrapper } from './messageWrapper';
+import { Utils } from './utils';
+import { Command } from './command';
 
 export enum CONVERSATION_STATE {
     Q1,
@@ -40,70 +40,83 @@ export enum CONVERSATION_STATE {
 }
 
 export interface Qa {
-    questions: (discord.Message | null)[] // keep track of all questions
-    answer: discord.Message // and answers
+    questions: (discord.Message | null)[]; // keep track of all questions
+    answer: discord.Message; // and answers
 }
 
 export abstract class Conversation {
-    opMessage: discord.Message;
-    uuid: string;
-    private qaSub: Subscription | undefined
-    private nextQa$: Observable<Qa>;
-    private errorInjector$: Subject<Qa>;
-    state: CONVERSATION_STATE;
-    lastErrorMessage: string | null;
-    returnMessage: string | null;
-    returnOptions: discord.MessageOptions | undefined;
-    params: Record<string, string | number | boolean | undefined>;
+    protected opMessage: discord.Message;
 
-    static parser = <U>(command: Command.ALL, paramName: string, answer: string):
+    private _uuid: string;
+
+    public get uuid(): string {
+        return this._uuid;
+    }
+
+    private _qaSub: Subscription | undefined
+
+    private _nextQa$: Observable<Qa>;
+
+    private _errorInjector$: Subject<Qa>;
+
+    protected _state: CONVERSATION_STATE;
+
+    protected _lastErrorMessage: string | null;
+
+    protected _returnMessage: string | null;
+
+    protected _returnOptions: discord.MessageOptions | undefined;
+
+    protected _params: Record<string, string | number | boolean | undefined>;
+
+    protected static parser = <U>(command: Command.ALL, paramName: string, answer: string):
     Record<string, U> => Command.parseParameters<Record<string, U>>(
         command,
-        `${paramName}=${answer}`
+        `${paramName}=${answer}`,
     );
 
-    constructor(
+    public constructor(
         opMessage: discord.Message,
         params: Record<string, string | number | boolean | undefined> = Object(),
     ) {
-        this.params = params;
+        this._params = params;
         this.opMessage = opMessage;
-        this.uuid = `${Math.random()}`;
-        this.errorInjector$ = new Subject<Qa>();
-        this.returnOptions = {
+        this._uuid = `${Math.random()}`;
+        this._errorInjector$ = new Subject<Qa>();
+        this._returnOptions = {
             reply: opMessage.author,
         };
-        this.returnMessage = null;
-        this.lastErrorMessage = null;
+        this._returnMessage = null;
+        this._lastErrorMessage = null;
 
         const nextA$ = messageReceived$.pipe(
             // need op message state
             filter(
                 (msg: discord.Message):
                 boolean => msg.author.id === this.opMessage.author.id
-                && msg.channel.id === this.opMessage.channel.id
+                && msg.channel.id === this.opMessage.channel.id,
             ),
             debounceTime(500),
             timeout(60000),
             tap(
                 (msg: discord.Message):
                 void => {
-                    Utils.logger.debug(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
-                }
+                    Utils.logger.debug(`Conversation id '${this._uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
+                },
             ),
             catchError(
                 (error: Error):
                 Observable<discord.Message> => {
-                    Utils.logger.debug(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
+                    Utils.logger.debug(`Conversation id ${this._uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
                     throw (error);
-                }
+                },
             ),
         );
 
         const nextQ$ = MessageWrapper.sentMessages$.pipe(
             filter(
                 (response: MessageWrapper.Response):
-                boolean => response.tag === this.uuid
+                boolean => response.tag === this._uuid,
             ),
             tap(
                 (response: MessageWrapper.Response):
@@ -114,17 +127,17 @@ export abstract class Conversation {
                                 return msg.content;
                             }
                             return '(NULL)';
-                        }
+                        },
                     ).join('\n');
-                    Utils.logger.trace(`Conversation id '${this.uuid}' with user '${this.opMessage.author.tag}' continued with question '${content}'`);
-                }
+                    Utils.logger.trace(`Conversation id '${this._uuid}' with user '${this.opMessage.author.tag}' continued with question '${content}'`);
+                },
             ),
             catchError(
                 (error: Error):
                 Observable<MessageWrapper.Response> => {
-                    Utils.logger.trace(`Conversation id ${this.uuid} with user '${this.opMessage.author.tag}' will end because the question did not send '${error}'`);
+                    Utils.logger.trace(`Conversation id ${this._uuid} with user '${this.opMessage.author.tag}' will end because the question did not send '${error}'`);
                     throw (error);
-                }
+                },
             ),
         );
 
@@ -135,7 +148,7 @@ export abstract class Conversation {
                 Qa => ({
                     answer: value[0],
                     questions: value[1].messages,
-                })
+                }),
             ),
             catchError(
                 (error: Error):
@@ -143,38 +156,38 @@ export abstract class Conversation {
                     const sendInfo: MessageWrapper.SendInfo = {
                         message: this.opMessage,
                         content: 'Meowbe later.',
-                        options: this.returnOptions,
-                        tag: this.uuid,
+                        options: this._returnOptions,
+                        tag: this._uuid,
                     };
                     MessageWrapper.sendMessages$.next(sendInfo);
                     throw (error);
-                }
+                },
             ),
         );
 
-        this.nextQa$ = merge(
+        this._nextQa$ = merge(
             nextQa$,
-            this.errorInjector$,
+            this._errorInjector$,
         );
 
-        this.qaSub = this.nextQa$.pipe(
+        this._qaSub = this._nextQa$.pipe(
             switchMap(
                 (qa: Qa): Observable<void> => from(
-                    this.consumeQa(qa)
-                )
+                    this.consumeQa(qa),
+                ),
             ),
             concatMap(
                 (): Observable<void> => {
                     let question: string | null;
-                    switch (this.state) {
+                    switch (this._state) {
                         case CONVERSATION_STATE.Q1E:
                         case CONVERSATION_STATE.Q2E:
                         case CONVERSATION_STATE.Q3E:
                         case CONVERSATION_STATE.Q4E:
                         case CONVERSATION_STATE.Q5E:
                         case CONVERSATION_STATE.Q6E: {
-                            question = this.lastErrorMessage;
-                            this.lastErrorMessage = null;
+                            question = this._lastErrorMessage;
+                            this._lastErrorMessage = null;
                             break;
                         }
                         default:
@@ -185,66 +198,68 @@ export abstract class Conversation {
                         const sendInfo: MessageWrapper.SendInfo = {
                             message: this.opMessage,
                             content: question,
-                            options: this.returnOptions,
-                            tag: this.uuid,
+                            options: this._returnOptions,
+                            tag: this._uuid,
                         };
                         MessageWrapper.sendMessages$.next(sendInfo);
                     } else {
                         this.conversationDidEndSuccessfully();
                     }
                     return of();
-                }
+                },
             ),
         ).subscribe(
             (): void => {},
             (error: Error): void => {
                 Utils.logger.trace(`Conversation ended ${error}`);
-                if (this.qaSub !== undefined) {
-                    this.qaSub.unsubscribe();
-                    this.qaSub = undefined;
+                if (this._qaSub !== undefined) {
+                    this._qaSub.unsubscribe();
+                    this._qaSub = undefined;
                 }
             },
         );
 
         // start conversation
-        Utils.logger.trace(`Starting a new conversation id '${this.uuid}' with '${this.opMessage.author.tag}'`);
-        this.state = CONVERSATION_STATE.Q1;
+        Utils.logger.trace(`Starting a new conversation id '${this._uuid}' with '${this.opMessage.author.tag}'`);
+        this._state = CONVERSATION_STATE.Q1;
     }
 
-    abstract async init(): Promise<boolean>;
-    abstract async consumeQa(qa: Qa): Promise<void>;
-    abstract produceQ(): string | null;
+    public abstract async init(): Promise<boolean>;
 
-    stopConversation(): void {
-        if (this.qaSub !== undefined) {
-            this.errorInjector$.error(
+    protected abstract async consumeQa(qa: Qa): Promise<void>;
+
+    public abstract produceQ(): string | null;
+
+    public stopConversation(): void {
+        if (this._qaSub !== undefined) {
+            this._errorInjector$.error(
                 new Error('Stop Conversation was called'),
             );
         }
     }
 
-    conversationDidEndSuccessfully(): void {
+    public conversationDidEndSuccessfully(): void {
         let content: string;
-        if (this.returnMessage === null) {
-            if (this.lastErrorMessage === null) {
+        if (this._returnMessage === null) {
+            if (this._lastErrorMessage === null) {
                 content = 'Conversation state error! Report this.';
             } else {
-                content = this.lastErrorMessage;
+                content = this._lastErrorMessage;
             }
         } else {
-            content = this.returnMessage;
+            content = this._returnMessage;
         }
         const sendInfo: MessageWrapper.SendInfo = {
             message: this.opMessage,
             content,
-            options: this.returnOptions,
-            tag: this.uuid,
+            options: this._returnOptions,
+            tag: this._uuid,
         };
         MessageWrapper.sendMessages$.next(sendInfo);
         Utils.logger.trace(`Conversation with ${this.opMessage.author.tag} finished successfully.`);
-        if (this.qaSub !== undefined) {
-            this.qaSub.unsubscribe();
-            this.qaSub = undefined;
+        if (this._qaSub !== undefined) {
+            this._qaSub.unsubscribe();
+            this._qaSub = undefined;
         }
     }
 }
@@ -267,7 +282,7 @@ export namespace ConversationManager {
 
     export const startNewConversation = async (
         msg: discord.Message,
-        newConversation: Conversation
+        newConversation: Conversation,
     ): Promise<void> => {
         stopConversation(msg);
 
@@ -288,7 +303,7 @@ export namespace ConversationManager {
                 tag: newConversation.uuid,
             };
             MessageWrapper.sendMessages$.next(
-                sendInfo
+                sendInfo,
             );
         } else {
             newConversation.conversationDidEndSuccessfully();

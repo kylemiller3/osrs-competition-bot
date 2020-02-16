@@ -1,25 +1,25 @@
 import * as discord from 'discord.js';
-import { hiscores, } from 'osrs-json-api';
 import {
     Conversation, CONVERSATION_STATE, Qa, ConversationManager,
 } from '../conversation';
-import { Network, } from '../network';
-import { Command, } from '../command';
-import { Event, } from '../event';
-import { Db, } from '../database';
-import { willSignUpPlayer$, getTagFromDiscordId, gClient, } from '../..';
-import { Utils, } from '../utils';
+import { Command } from '../command';
+import { Event } from '../event';
+import { Db } from '../database';
+import { willSignUpPlayer$, getTagFromDiscordId, gClient } from '../..';
+import { Utils } from '../utils';
 
 class EventsSignupConversation extends Conversation {
-    event: Event.Standard;
-    rsn: string;
-    teamName: string | null = null;
+    private _event: Event.Standard;
+
+    private _rsn: string;
+
+    private _teamName: string | null = null;
 
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
-        const id = this.params.id as number | undefined;
-        const rsn = this.params.rsn as string | undefined;
-        const teamName = this.params.team as string | undefined;
+    public async init(): Promise<boolean> {
+        const id = this._params.id as number | undefined;
+        const rsn = this._params.rsn as string | undefined;
+        const teamName = this._params.team as string | undefined;
 
         if (id === undefined || rsn === undefined) {
             return Promise.resolve(false);
@@ -49,7 +49,7 @@ class EventsSignupConversation extends Conversation {
             questions: [],
             answer: dummy,
         });
-        if (this.state === CONVERSATION_STATE.Q1E) {
+        if (this._state === CONVERSATION_STATE.Q1E) {
             return Promise.resolve(false);
         }
 
@@ -58,7 +58,7 @@ class EventsSignupConversation extends Conversation {
             questions: [],
             answer: dummy,
         });
-        if (this.state === CONVERSATION_STATE.DONE) {
+        if (this._state === CONVERSATION_STATE.DONE) {
             return Promise.resolve(true);
         }
 
@@ -68,7 +68,7 @@ class EventsSignupConversation extends Conversation {
                 questions: [],
                 answer: dummy,
             });
-            if (this.state === CONVERSATION_STATE.Q3E) {
+            if (this._state === CONVERSATION_STATE.Q3E) {
                 return Promise.resolve(false);
             }
             return Promise.resolve(true);
@@ -76,8 +76,8 @@ class EventsSignupConversation extends Conversation {
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
-        switch (this.state) {
+    public produceQ(): string | null {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
                 return 'Which event id would you like to signup for? (type .exit to stop command)';
             case CONVERSATION_STATE.Q2:
@@ -89,14 +89,14 @@ class EventsSignupConversation extends Conversation {
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
-        switch (this.state) {
+    protected async consumeQa(qa: Qa): Promise<void> {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const id = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(id)) {
-                    this.lastErrorMessage = 'Cannot parse number.';
-                    this.state = CONVERSATION_STATE.Q1E;
+                    this._lastErrorMessage = 'Cannot parse number.';
+                    this._state = CONVERSATION_STATE.Q1E;
                     break;
                 }
                 const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
@@ -104,152 +104,152 @@ class EventsSignupConversation extends Conversation {
                     this.opMessage.guild.id,
                 );
                 if (guildEvent === null) {
-                    this.lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';
-                    this.state = CONVERSATION_STATE.Q1E;
+                    this._lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';
+                    this._state = CONVERSATION_STATE.Q1E;
                     break;
                 }
 
-                if (guildEvent.global === true) {
+                if (guildEvent.isGlobal === true) {
                     const teamIdx: number = guildEvent.teams.findIndex(
-                        (team: Event.Team): boolean => team.guildId === qa.answer.guild.id
+                        (team: Event.Team): boolean => team.guildId === qa.answer.guild.id,
                     );
                     if (teamIdx !== -1) {
-                        this.teamName = guildEvent.teams[teamIdx].name;
+                        this._teamName = guildEvent.teams[teamIdx].name;
                     }
 
                     // make sure teams are not locked
                     const tenMinutesBeforeStart: Date = new Date(guildEvent.when.start);
                     tenMinutesBeforeStart.setMinutes(tenMinutesBeforeStart.getMinutes() - 10);
                     if (Utils.isInPast(tenMinutesBeforeStart)) {
-                        this.lastErrorMessage = 'Teams are locked 10 minutes before a global event starts.';
-                        this.state = CONVERSATION_STATE.DONE;
+                        this._lastErrorMessage = 'Teams are locked 10 minutes before a global event starts.';
+                        this._state = CONVERSATION_STATE.DONE;
                         break;
                     }
-                } else if (guildEvent.adminLocked === true) {
-                    this.returnMessage = 'Teams have been locked by an administrator.';
-                    this.state = CONVERSATION_STATE.DONE;
+                } else if (guildEvent.isAdminLocked === true) {
+                    this._returnMessage = 'Teams have been locked by an administrator.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 }
-                this.event = guildEvent;
-                this.state = CONVERSATION_STATE.Q2;
+                this._event = guildEvent;
+                this._state = CONVERSATION_STATE.Q2;
                 break;
             }
             case CONVERSATION_STATE.Q2:
             case CONVERSATION_STATE.Q2E: {
-                this.rsn = qa.answer.content;
+                this._rsn = qa.answer.content;
 
-                if (this.rsn.length === 0) {
-                    this.lastErrorMessage = 'Rsn must not be blank.';
-                    this.state = CONVERSATION_STATE.Q2E;
+                if (this._rsn.length === 0) {
+                    this._lastErrorMessage = 'Rsn must not be blank.';
+                    this._state = CONVERSATION_STATE.Q2E;
                     break;
                 }
 
-                if (this.rsn.length > 12) {
-                    this.lastErrorMessage = 'Rsn must be less than or equal to 12 characters.';
-                    this.state = CONVERSATION_STATE.Q2E;
+                if (this._rsn.length > 12) {
+                    this._lastErrorMessage = 'Rsn must be less than or equal to 12 characters.';
+                    this._state = CONVERSATION_STATE.Q2E;
                     break;
                 }
 
                 // eslint-disable-next-line no-control-regex
                 const regex = /[^\x00-\x7F]/g;
-                const matches = this.rsn.match(regex);
+                const matches = this._rsn.match(regex);
                 if (matches !== null) {
-                    this.lastErrorMessage = 'Rsn must be of ASCII characters.';
-                    this.state = CONVERSATION_STATE.Q2E;
+                    this._lastErrorMessage = 'Rsn must be of ASCII characters.';
+                    this._state = CONVERSATION_STATE.Q2E;
                     break;
                 }
 
                 const findRsn = (participant: Event.Participant):
                 boolean => participant.runescapeAccounts.some(
                     (account: Event.Account):
-                    boolean => account.rsn.toLowerCase() === this.rsn.toLowerCase()
+                    boolean => account.rsn.toLowerCase() === this._rsn.toLowerCase(),
                 );
 
-                const rsnIdx: number = this.event.teams.findIndex(
+                const rsnIdx: number = this._event.teams.findIndex(
                     (team: Event.Team):
                     boolean => team.participants.some(
-                        findRsn
-                    )
+                        findRsn,
+                    ),
                 );
 
                 const rsnJdx: number = rsnIdx !== -1
-                    ? this.event.teams[rsnIdx].participants.findIndex(
-                        findRsn
+                    ? this._event.teams[rsnIdx].participants.findIndex(
+                        findRsn,
                     ) : -1;
 
                 if (rsnIdx !== -1 && rsnJdx !== -1) {
                     // we found the rsn in use already
                     const tag: string = await getTagFromDiscordId(
                         gClient,
-                        this.event.teams[rsnIdx].participants[rsnJdx].userId
+                        this._event.teams[rsnIdx].participants[rsnJdx].userId,
                     );
-                    this.lastErrorMessage = `This rsn is already signed up by ${tag}.`;
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._lastErrorMessage = `This rsn is already signed up by ${tag}.`;
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 }
 
                 // is the participant already on a team?
-                const participantIdx: number = this.event.teams.findIndex(
+                const participantIdx: number = this._event.teams.findIndex(
                     (team: Event.Team):
                     boolean => team.participants.some(
                         (participant: Event.Participant):
-                        boolean => participant.userId === qa.answer.author.id
-                    )
+                        boolean => participant.userId === qa.answer.author.id,
+                    ),
                 );
 
                 const participantJdx: number = participantIdx !== -1
-                    ? this.event.teams[participantIdx].participants.findIndex(
+                    ? this._event.teams[participantIdx].participants.findIndex(
                         (participant: Event.Participant):
-                        boolean => participant.userId === qa.answer.author.id
+                        boolean => participant.userId === qa.answer.author.id,
                     ) : -1;
 
                 if (participantIdx !== -1 && participantJdx !== -1) {
                 // we know the team to signup for
                     const participant: Event.Participant = this
-                        .event
+                        ._event
                         .teams[participantIdx]
                         .participants[participantJdx];
                     this
-                        .event
+                        ._event
                         .teams[participantIdx]
                         .participants[participantJdx]
                         .runescapeAccounts = participant
                             .runescapeAccounts.concat({
-                                rsn: this.rsn,
+                                rsn: this._rsn,
                             });
-                    const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
                     willSignUpPlayer$.next(savedEvent);
 
-                    this.returnMessage = 'Successfully signed-up up for event.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Successfully signed-up up for event.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
-                    this.state = CONVERSATION_STATE.Q3;
+                    this._state = CONVERSATION_STATE.Q3;
                     break;
                 }
             }
             case CONVERSATION_STATE.Q3:
             case CONVERSATION_STATE.Q3E: {
-                const teamName: string = this.teamName !== null
-                    ? this.teamName
+                const teamName: string = this._teamName !== null
+                    ? this._teamName
                     : qa.answer.content;
 
                 if (teamName.length === 0) {
-                    this.lastErrorMessage = 'Team name must not be blank.';
-                    this.state = CONVERSATION_STATE.Q3E;
+                    this._lastErrorMessage = 'Team name must not be blank.';
+                    this._state = CONVERSATION_STATE.Q3E;
                     break;
                 }
 
                 if (teamName.length > 30) {
-                    this.lastErrorMessage = 'Team name must be shorter than 30 characters.';
-                    this.state = CONVERSATION_STATE.Q3E;
+                    this._lastErrorMessage = 'Team name must be shorter than 30 characters.';
+                    this._state = CONVERSATION_STATE.Q3E;
                     break;
                 }
 
                 // we either add a new team or we add to the found team
-                const teamIdx: number = this.event.teams.findIndex(
+                const teamIdx: number = this._event.teams.findIndex(
                     (team: Event.Team):
-                    boolean => team.name.toLowerCase() === teamName.toLowerCase()
+                    boolean => team.name.toLowerCase() === teamName.toLowerCase(),
                 );
 
                 const participant: Event.Participant = {
@@ -257,7 +257,7 @@ class EventsSignupConversation extends Conversation {
                     customScore: 0,
                     runescapeAccounts: [
                         {
-                            rsn: this.rsn,
+                            rsn: this._rsn,
                         },
                     ],
                 };
@@ -271,23 +271,23 @@ class EventsSignupConversation extends Conversation {
                             participant,
                         ],
                     };
-                    this.event.teams = [
-                        ...this.event.teams,
+                    this._event.teams = [
+                        ...this._event.teams,
                         team,
                     ];
                 } else {
                 // we found the team
                 // so add the participant to the team
-                    this.event.teams[teamIdx].participants = [
-                        ...this.event.teams[teamIdx].participants,
+                    this._event.teams[teamIdx].participants = [
+                        ...this._event.teams[teamIdx].participants,
                         participant,
                     ];
                 }
-                const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
                 willSignUpPlayer$.next(savedEvent);
 
-                this.returnMessage = 'Successfully signed-up up for event.';
-                this.state = CONVERSATION_STATE.DONE;
+                this._returnMessage = 'Successfully signed-up up for event.';
+                this._state = CONVERSATION_STATE.DONE;
                 break;
             }
             default:
@@ -297,7 +297,7 @@ class EventsSignupConversation extends Conversation {
 }
 
 const eventsSignup = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsSignup = Command.parseParameters(
         Command.ALL.EVENTS_SIGNUP,
@@ -310,7 +310,7 @@ const eventsSignup = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventsSignupConversation
+        eventsSignupConversation,
     );
 };
 

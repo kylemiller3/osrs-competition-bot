@@ -1,16 +1,16 @@
 import * as discord from 'discord.js';
 
-import { EventEmitter, } from 'events';
+import { EventEmitter } from 'events';
 import {
     fromEvent, Observable, Subject, merge, forkJoin, of, from, concat, defer,
 } from 'rxjs';
 import {
     filter, tap, mergeMap, concatMap, map, combineAll, catchError,
 } from 'rxjs/operators';
-import { hiscores, } from 'osrs-json-api';
-import { privateKey, } from './auth';
-import { Command, } from './src/command';
-import { Utils, } from './src/utils';
+import { hiscores } from 'osrs-json-api';
+import { privateKey } from './auth';
+import { Command } from './src/command';
+import { Utils } from './src/utils';
 import setChannel from './src/commands/setchannel';
 import addEvent from './src/commands/add';
 import deleteEvent from './src/commands/delete';
@@ -22,12 +22,12 @@ import signupEvent from './src/commands/signup';
 import unsignupEvent from './src/commands/unsignup';
 import help from './src/commands/help';
 import forceUpdate from './src/commands/forceupdate';
-import { Db, } from './src/database';
-import { MessageWrapper, } from './src/messageWrapper';
-import { Event, } from './src/event';
-import { Network, } from './src/network';
-import { Settings, } from './src/settings';
-import { ConversationManager, } from './src/conversation';
+import { Db } from './src/database';
+import { MessageWrapper } from './src/messageWrapper';
+import { Event } from './src/event';
+import { Network } from './src/network';
+import { Settings } from './src/settings';
+import { ConversationManager } from './src/conversation';
 import joinGlobalEvent from './src/commands/gjoin';
 import unjoinGlobalEvent from './src/commands/gleave';
 import lockEvent from './src/commands/lock';
@@ -45,7 +45,7 @@ export const gClient: discord.Client = new discord.Client();
  */
 export const messageReceived$: Observable<discord.Message> = fromEvent(
     gClient as unknown as EventEmitter,
-    'message'
+    'message',
 );
 
 /**
@@ -160,20 +160,20 @@ export const isAdmin = (
     author: discord.User,
 ): boolean => {
     const guildMember: discord.GuildMember | undefined = guild.members.get(
-        author.id
+        author.id,
     );
     if (guildMember === undefined) {
         Utils.logger.warn(
-            `${author.tag} was not found in ${guild.name}'s member list. Returning false.`
+            `${author.tag} was not found in ${guild.name}'s member list. Returning false.`,
         );
         return false;
     }
     if (discord.Permissions.FLAGS.ADMINISTRATOR) {
         return guildMember.permissions.has(
-            discord.Permissions.FLAGS.ADMINISTRATOR
+            discord.Permissions.FLAGS.ADMINISTRATOR,
         ) || guildMember.roles.some(
             (role: discord.Role):
-            boolean => role.name.toLowerCase() === 'osrs event manager'
+            boolean => role.name.toLowerCase() === 'osrs event manager',
         );
     }
     return false;
@@ -243,12 +243,12 @@ export const getTextChannelFromId = (
  */
 export const getTagFromDiscordId = async (
     client: discord.Client,
-    discordId: string
+    discordId: string,
 ): Promise<string> => {
     const user: discord.User | null = await client.fetchUser(
-        discordId
+        discordId,
     ).catch(
-        (): null => null
+        (): null => null,
     );
     if (user === null) {
         return discordId;
@@ -266,15 +266,15 @@ export const getTagFromDiscordId = async (
 export const getDisplayNameFromDiscordId = (
     client: discord.Client,
     guildId: string,
-    discordId: string
+    discordId: string,
 ): string | null => {
     const guild: discord.Guild = client.guilds.get(
-        guildId
+        guildId,
     ) as discord.Guild;
     if (guild === undefined || !guild.available) return null;
     const foundMember: discord.GuildMember = guild.members.find(
         (member: discord.GuildMember):
-        boolean => member.id === discordId
+        boolean => member.id === discordId,
     );
     if (foundMember === null) return null;
     return foundMember.displayName;
@@ -288,7 +288,7 @@ const commandDispatch$: Observable<discord.Message> = mergedMessage$.pipe(
     filter(
         (msg: discord.Message):
         boolean => msg.guild
-            && msg.guild.available
+            && msg.guild.available,
     ),
     tap(
         (msg: discord.Message): void => {
@@ -297,13 +297,13 @@ const commandDispatch$: Observable<discord.Message> = mergedMessage$.pipe(
             }
 
             const validCommandKeys: string[] = Object.keys(
-                Command.ALL
+                Command.ALL,
             ).filter(
-                (key: string): boolean => Number.isNaN(Number(key))
+                (key: string): boolean => Number.isNaN(Number(key)),
             ).filter(
                 (key: string): boolean => Command.isValid(
                     Command.ALL[key],
-                    msg.content
+                    msg.content,
                 ),
             );
 
@@ -312,7 +312,7 @@ const commandDispatch$: Observable<discord.Message> = mergedMessage$.pipe(
                     Command.ALL[validCommandKeys[0]],
                     isAdmin(
                         msg.guild,
-                        msg.author
+                        msg.author,
                     ),
                 )) {
                     return;
@@ -384,7 +384,7 @@ const commandDispatch$: Observable<discord.Message> = mergedMessage$.pipe(
 export const spoofMessage = (
     newCommand: Command.ALL,
     sourceMessage: discord.Message,
-    spoofedAuthor: discord.User
+    spoofedAuthor: discord.User,
 ): void => {
     const content = `${Command.getCommandString(newCommand)}${sourceMessage.content.replace(/<@!?[0-9]+>/gi, '')}`;
     const newMessage: discord.Message = new discord.Message(
@@ -408,7 +408,7 @@ export const spoofMessage = (
             webhook_id: sourceMessage.webhookID,
             hit: sourceMessage.hit,
         },
-        gClient
+        gClient,
     );
 
     Utils.logger.debug('Injecting new spoofed message.');
@@ -438,7 +438,7 @@ const resumeRunningEvents = async (): Promise<void> => {
     events.forEach(
         (event: Event.Standard): void => {
             willStartEvent$.next(event);
-        }
+        },
     );
 };
 
@@ -474,16 +474,16 @@ const deleteMessages = async (
             (error: Error): null => {
                 Utils.logger.warn(`${error} during discord message fetch`);
                 return null;
-            }
-        )
+            },
+        ),
     );
     const discordMessages: (discord.Message | null)[] = await Promise.all(
-        discordMessagesPromises
+        discordMessagesPromises,
     );
 
     // delete the old messages
     const validDiscordMessages: discord.Message[] = discordMessages.filter(
-        Utils.isDefinedFilter
+        Utils.isDefinedFilter,
     );
 
     return Promise.all(
@@ -491,8 +491,8 @@ const deleteMessages = async (
             (message: discord.Message):
             Promise<MessageWrapper.Response> => MessageWrapper.deleteMessage({
                 message,
-            })
-        )
+            }),
+        ),
     );
 };
 
@@ -543,7 +543,7 @@ const refreshMessage = async (
     if (oldMessage !== undefined) {
         deleteMessagePromise = deleteMessages(
             guild,
-            oldMessage
+            oldMessage,
         );
     }
 
@@ -594,18 +594,19 @@ const saveAndNotifyUpdatedEventScoreboard = (
         Observable<Event.ChannelMessage | null> => {
             const guild: discord.Guild | null = getGuildFromId(
                 gClient,
-                eventGuild.guildId
+                eventGuild.guildId,
             );
             if (guild === null) {
                 Utils.logger.warn('Discord guild not available');
                 return of(null);
             }
-            const deferredRefreshScoreboardObservable: Observable<Event.ChannelMessage | null> = defer(
+            const deferredRefreshScoreboardObservable:
+            Observable<Event.ChannelMessage | null> = defer(
                 (): Observable<Event.ChannelMessage | null> => from(
-                    event.getEventScoreboardString(
+                    event.scoreboardStr(
                         eventGuild.guildId,
                         false,
-                    )
+                    ),
                 ).pipe(
                     mergeMap(
                         (scoreboardStr: string):
@@ -622,15 +623,15 @@ const saveAndNotifyUpdatedEventScoreboard = (
                                 `${scoreboardStr}${footer}`,
                                 {
                                     code: true,
-                                }
+                                },
                             );
                             return from(msg2);
-                        }
-                    )
-                )
+                        },
+                    ),
+                ),
             );
             return deferredRefreshScoreboardObservable;
-        }
+        },
     );
 
     const newEvent: Event.Standard = event instanceof Event.Global
@@ -642,8 +643,8 @@ const saveAndNotifyUpdatedEventScoreboard = (
             event.guilds,
             event.teams,
             event.tracking,
-            event.global,
-            event.adminLocked,
+            event.isGlobal,
+            event.isAdminLocked,
             event.invitations,
         )
         : new Event.Standard(
@@ -654,11 +655,11 @@ const saveAndNotifyUpdatedEventScoreboard = (
             event.guilds,
             event.teams,
             event.tracking,
-            event.global,
-            event.adminLocked,
+            event.isGlobal,
+            event.isAdminLocked,
         );
     const ret: Observable<Event.Standard> = concat(
-        observables
+        observables,
     ).pipe(
         combineAll(),
         map(
@@ -685,20 +686,20 @@ const saveAndNotifyUpdatedEventScoreboard = (
                                     ? channelMessage
                                     : undefined;
                         }
-                    }
+                    },
                 );
                 return newEvent;
-            }
+            },
         ),
         mergeMap(
             (eventToSave: Event.Standard): Observable<Event.Standard> => from(
-                Db.upsertEvent(eventToSave)
-            )
+                Db.upsertEvent(eventToSave),
+            ),
         ),
         tap(
             (savedEvent: Event.Standard): void => {
                 didUpdateScores$.next(savedEvent);
-            }
+            },
         ),
     );
     return ret;
@@ -731,7 +732,8 @@ const scheduleEvents = async (): Promise<void> => {
                 startTimers[event.id] = setTimeout(
                     async (): Promise<void> => {
                         if (event.id !== undefined) {
-                            const updatedEvent: Event.Standard | null = await Db.fetchEvent(event.id);
+                            const updatedEvent:
+                            Event.Standard | null = await Db.fetchEvent(event.id);
                             if (updatedEvent !== null) {
                                 willStartEvent$.next(updatedEvent);
                             }
@@ -746,15 +748,16 @@ const scheduleEvents = async (): Promise<void> => {
                 endTimers[event.id] = setTimeout(
                     async (): Promise<void> => {
                         if (event.id !== undefined) {
-                            const updatedEvent: Event.Standard | null = await Db.fetchEvent(event.id);
+                            const updatedEvent:
+                            Event.Standard | null = await Db.fetchEvent(event.id);
                             if (updatedEvent !== null) {
                                 willEndEvent$.next(updatedEvent);
                             }
                         }
-                    }, event.when.end.getTime() - now.getTime()
+                    }, event.when.end.getTime() - now.getTime(),
                 );
             }
-        }
+        },
     );
 };
 
@@ -768,7 +771,7 @@ MessageWrapper.sentMessages$.subscribe(
     },
     (): void => {
         Utils.logger.trace('Finished sending messages.');
-    }
+    },
 );
 
 // when an event will start
@@ -785,7 +788,7 @@ willStartEvent$.pipe(
 
             // if we have a competitive event
             // track scoreboard automatically
-            if (!event.isCustom()) {
+            if (!event.isCustom) {
                 Utils.logger.debug('Event is auto tracking score');
                 willUpdateScores$.next([
                     event,
@@ -814,8 +817,8 @@ willStartEvent$.pipe(
             //         didUpdateScores$.next(updatedEvent);
             //     }
             // );
-        }
-    )
+        },
+    ),
 ).subscribe();
 
 // will update scoreboard
@@ -835,12 +838,12 @@ willUpdateScores$.pipe(
             }
 
             const flattenedParticipants: Event.Participant[] = event.teams.flatMap(
-                (team: Event.Team): Event.Participant[] => team.participants
+                (team: Event.Team): Event.Participant[] => team.participants,
             );
 
             const flattenedAccounts: Event.Account[] = flattenedParticipants.flatMap(
                 (participant: Event.Participant):
-                Event.Account[] => participant.runescapeAccounts
+                Event.Account[] => participant.runescapeAccounts,
             );
 
             const observables: Observable<hiscores.Player | null>[] = flattenedAccounts.flatMap(
@@ -856,7 +859,7 @@ willUpdateScores$.pipe(
                         (error: Error): Observable<null> => {
                             Utils.logger.warn(`Failed to update rsn ${account.rsn}: ${error.message}`);
                             throw error;
-                        }
+                        },
                     ),
                 ),
             );
@@ -883,8 +886,8 @@ willUpdateScores$.pipe(
                                 event.guilds,
                                 event.teams,
                                 event.tracking,
-                                event.global,
-                                event.adminLocked,
+                                event.isGlobal,
+                                event.isAdminLocked,
                                 event.invitations,
                             )
                             : new Event.Standard(
@@ -895,27 +898,28 @@ willUpdateScores$.pipe(
                                 event.guilds,
                                 event.teams,
                                 event.tracking,
-                                event.global,
-                                event.adminLocked,
+                                event.isGlobal,
+                                event.isAdminLocked,
                             );
 
                         // cascade remake of teams
                         const newTeams: Event.Team[] = newEvent.teams.map(
                             (team: Event.Team): Event.Team => {
-                                const newTeam: Event.Team = { ...team, };
+                                const newTeam: Event.Team = { ...team };
                                 const newParticipants:
                                 Event.Participant[] = newTeam.participants.map(
                                     (participant: Event.Participant):
                                     Event.Participant => {
                                         const newParticipant:
-                                        Event.Participant = { ...participant, };
+                                        Event.Participant = { ...participant };
                                         const newAccounts:
                                         Event.Account[] = newParticipant
                                             .runescapeAccounts.map(
                                                 (account: Event.Account):
                                                 Event.Account => {
-                                                    const newAccount = { ...account, };
-                                                    const result: hiscores.Player | null = results[idx];
+                                                    const newAccount = { ...account };
+                                                    const result:
+                                                    hiscores.Player | null = results[idx];
                                                     if (result !== null) {
                                                         newAccount.ending = result;
                                                         if (newAccount.starting === undefined) {
@@ -924,45 +928,46 @@ willUpdateScores$.pipe(
                                                     }
                                                     idx += 1;
                                                     return newAccount;
-                                                }
+                                                },
                                             );
                                         newParticipant.runescapeAccounts = newAccounts;
                                         return newParticipant;
-                                    }
+                                    },
                                 );
                                 newTeam.participants = newParticipants;
                                 return newTeam;
-                            }
+                            },
                         );
                         newEvent.teams = newTeams;
                         return saveAndNotifyUpdatedEventScoreboard(
                             newEvent,
                             undefined,
                         );
-                    }
+                    },
                 ),
                 tap(
                     (savedEvent: Event.Standard): void => {
                         didUpdateScores$.next(savedEvent);
-                    }
+                    },
                 ),
             ).pipe(
                 catchError(
-                    (error: Error): Observable<Event.Standard> => saveAndNotifyUpdatedEventScoreboard(
+                    (error: Error):
+                    Observable<Event.Standard> => saveAndNotifyUpdatedEventScoreboard(
                         event,
                         error,
-                    )
-                )
+                    ),
+                ),
             );
             return inner;
-        }
+        },
     ),
 ).subscribe();
 
 didStartEvent$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} did start.`);
-    }
+    },
 );
 
 willEndEvent$.subscribe(
@@ -981,19 +986,19 @@ willEndEvent$.subscribe(
             true,
         ]);
         didEndEvent$.next(event);
-    }
+    },
 );
 
 didEndEvent$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} did end.`);
-    }
+    },
 );
 
 didUpdateScores$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} scores did update.`);
-    }
+    },
 );
 
 willAddEvent$.subscribe(
@@ -1008,7 +1013,7 @@ willAddEvent$.subscribe(
             Utils.logger.info('Event ended in the past.');
             willEndEvent$.next(event);
         }
-        if (event.isCustom()) {
+        if (event.isCustom) {
             Utils.logger.info('Custom event added.');
             willUpdateScores$.next([
                 event,
@@ -1026,13 +1031,13 @@ willAddEvent$.subscribe(
             ]);
         }
         didAddEvent$.next(event);
-    }
+    },
 );
 
 didAddEvent$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} has been added.`);
-    }
+    },
 );
 
 willSignUpPlayer$.subscribe(
@@ -1044,13 +1049,13 @@ willSignUpPlayer$.subscribe(
             false,
         ]);
         didSignupPlayer$.next(event);
-    }
+    },
 );
 
 didSignupPlayer$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} did signup player.`);
-    }
+    },
 );
 
 willUnsignupPlayer$.subscribe(
@@ -1062,13 +1067,13 @@ willUnsignupPlayer$.subscribe(
             false,
         ]);
         didUnsignupPlayer$.next(event);
-    }
+    },
 );
 
 didUnsignupPlayer$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} did unsignup player.`);
-    }
+    },
 );
 
 willDeleteEvent$.subscribe(
@@ -1091,7 +1096,7 @@ willDeleteEvent$.subscribe(
                 if (discordGuild === null) {
                     return;
                 }
-                const content: string = await event.getEventScoreboardString(
+                const content: string = await event.scoreboardStr(
                     guild.guildId,
                     true,
                 );
@@ -1102,21 +1107,21 @@ willDeleteEvent$.subscribe(
                     content,
                     {
                         code: true,
-                    }
+                    },
                 );
-            }
+            },
         );
 
         didDeleteEvent$.next(
             event,
         );
-    }
+    },
 );
 
 didDeleteEvent$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} did delete`);
-    }
+    },
 );
 
 /**
@@ -1148,10 +1153,10 @@ const init = async (): Promise<void> => {
                 return;
             }
             const filteredEvents: Event.Standard[] = runningEvents.filter(
-                Utils.isDefinedFilter
+                Utils.isDefinedFilter,
             );
             const autoUpdateEvents: Event.Standard[] = filteredEvents.filter(
-                (eventToFilter: Event.Standard): boolean => !eventToFilter.isCustom()
+                (eventToFilter: Event.Standard): boolean => !eventToFilter.isCustom,
             );
             autoUpdateEvents.forEach(
                 (autoEvent: Event.Standard): void => {
@@ -1159,9 +1164,9 @@ const init = async (): Promise<void> => {
                         autoEvent,
                         false,
                     ]);
-                }
+                },
             );
-        }, 1000 * 60 * 15
+        }, 1000 * 60 * 15,
     );
     Utils.logger.info('Auto update scheduler running');
 };

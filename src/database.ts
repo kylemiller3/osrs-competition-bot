@@ -1,10 +1,10 @@
-import pgp, { PreparedStatement, } from 'pg-promise';
+import pgp, { PreparedStatement } from 'pg-promise';
 // eslint-disable-next-line import/no-unresolved
 import pg from 'pg-promise/typescript/pg-subset';
-import { Utils, } from './utils';
-import { Event, } from './event';
-import { Settings, } from './settings';
-import { dbPassword, } from '../auth';
+import { Utils } from './utils';
+import { Event } from './event';
+import { Settings } from './settings';
+import { dbPassword } from '../auth';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -21,16 +21,16 @@ export namespace Db {
     }
 
     interface EventRow {
-        id: number
-        event: Event.Standard
+        id: number;
+        event: Event.Standard;
     }
 
     const rowToEvent = (
-        eventRow: EventRow
+        eventRow: EventRow,
     ): Event.Standard => {
         const event: Event.Standard = eventRow.event;
         let returnEvent: Event.Standard;
-        if (event instanceof Event.Global || event.global) {
+        if (event instanceof Event.Global || event.isGlobal) {
             returnEvent = new Event.Global(
                 eventRow.id,
                 event.name,
@@ -39,8 +39,8 @@ export namespace Db {
                 event.guilds,
                 event.teams,
                 event.tracking,
-                event.global,
-                event.adminLocked,
+                event.isGlobal,
+                event.isAdminLocked,
                 (event as Event.Global).invitations,
             );
         } else {
@@ -52,8 +52,8 @@ export namespace Db {
                 event.guilds,
                 event.teams,
                 event.tracking,
-                event.global,
-                event.adminLocked,
+                event.isGlobal,
+                event.isAdminLocked,
             );
         }
         return returnEvent;
@@ -169,7 +169,7 @@ export namespace Db {
                     + '('
                     + `${SETTINGS_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
                     + `${SETTINGS_COL.CHANNEL_ID} TEXT NOT NULL, `
-                    + `${SETTINGS_COL.PAY_TIER} SMALLINT NOT NULL`
+                    + `${SETTINGS_COL.PAY_TIER} SMALLINT NOT NULL DEFAULT 0`
                     + ')',
             });
 
@@ -305,7 +305,7 @@ export namespace Db {
                     + ')',
             });
             // TODO: add constraint that checks for unique rsn?
-        }
+        },
     );
 
     const insertNewEventStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
@@ -330,10 +330,11 @@ export namespace Db {
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Event.Standard> => {
         if (event.id === undefined) {
-            const json: string = JSON.stringify(event);
             const ret: { id: number; event: Event.Standard } = await db.one(
                 insertNewEventStmt,
-                json,
+                [
+                    event.dbStringify,
+                ],
             );
             return rowToEvent(ret);
         }
@@ -341,7 +342,7 @@ export namespace Db {
             updateEventStmt,
             [
                 event.id,
-                JSON.stringify(event),
+                event.dbStringify,
             ],
         );
         return rowToEvent(ret);
@@ -446,7 +447,7 @@ export namespace Db {
             [
                 id,
                 guildId,
-            ]
+            ],
         );
         if (ret === null) return null;
         return rowToEvent(ret);
@@ -504,7 +505,7 @@ export namespace Db {
             [
                 id,
                 guildId,
-            ]
+            ],
         );
         if (ret === null) return null;
         return rowToEvent(ret);
@@ -665,7 +666,7 @@ export namespace Db {
             [
                 dateA.toISOString(),
                 dateB.toISOString(),
-            ]
+            ],
         );
         if (ret === null) return null;
         return ret.map(rowToEvent);
@@ -759,11 +760,10 @@ export namespace Db {
         text: `INSERT INTO ${TABLES.SETTINGS} `
             + '('
             + `${SETTINGS_COL.GUILD_ID}, `
-            + `${SETTINGS_COL.CHANNEL_ID}, `
-            + `${SETTINGS_COL.PAY_TIER}, `
+            + `${SETTINGS_COL.CHANNEL_ID} `
             + ')'
             + 'VALUES '
-            + '($1, $2, $3) '
+            + '($1, $2) '
             + 'ON CONFLICT DO NOTHING '
             + 'RETURNING *',
     });
@@ -772,15 +772,13 @@ export namespace Db {
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Settings.GuildSettings> => {
         const ret: {
-            [SETTINGS_COL.GUILD_ID]: string
-            [SETTINGS_COL.CHANNEL_ID]: string
-            [SETTINGS_COL.PAY_TIER]: Settings.PAY_TIER
+            [SETTINGS_COL.GUILD_ID]: string;
+            [SETTINGS_COL.CHANNEL_ID]: string;
         } = await db.one(
             upsertSettingsStmt,
             [
                 settings.guildId,
                 settings.channelId,
-                settings.payTier,
             ],
         );
         return {
@@ -802,9 +800,9 @@ export namespace Db {
         db: pgp.IDatabase<unknown> = Db.mainDb,
     ): Promise<Settings.GuildSettings | null> => {
         const ret: {
-            [SETTINGS_COL.GUILD_ID]: string
-            [SETTINGS_COL.CHANNEL_ID]: string
-            [SETTINGS_COL.PAY_TIER]: Settings.PAY_TIER
+            [SETTINGS_COL.GUILD_ID]: string;
+            [SETTINGS_COL.CHANNEL_ID]: string;
+            [SETTINGS_COL.PAY_TIER]: Settings.PAY_TIER;
         } | null = await db.oneOrNone(
             fetchSettingsStmt,
             [

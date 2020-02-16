@@ -1,38 +1,39 @@
 import * as discord from 'discord.js';
-import { Command, } from '../command';
-import { Event, } from '../event';
+import { Command } from '../command';
+import { Event } from '../event';
 import {
     Conversation, Qa, CONVERSATION_STATE, ConversationManager,
 } from '../conversation';
-import { Db, } from '../database';
-import { Utils, } from '../utils';
-import { willEndEvent$, } from '../..';
+import { Db } from '../database';
+import { Utils } from '../utils';
+import { willEndEvent$ } from '../..';
 
 class EventEndConversation extends Conversation {
-    event: Event.Standard;
+    private _event: Event.Standard;
+
     // eslint-disable-next-line class-methods-use-this
-    async init(): Promise<boolean> {
+    public async init(): Promise<boolean> {
         return Promise.resolve(false);
     }
 
-    produceQ(): string | null {
-        switch (this.state) {
+    public produceQ(): string | null {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
                 return 'End which event id? (type .exit to stop command)';
             case CONVERSATION_STATE.CONFIRM:
-                return `Are you sure you want to end ${this.event.name} now? This cannot be undone.`;
+                return `Are you sure you want to end ${this._event.name} now? This cannot be undone.`;
             default:
                 return null;
         }
     }
 
-    async consumeQa(qa: Qa): Promise<void> {
-        switch (this.state) {
+    protected async consumeQa(qa: Qa): Promise<void> {
+        switch (this._state) {
             case CONVERSATION_STATE.Q1:
             case CONVERSATION_STATE.Q1E: {
                 const idToEdit: number = Number.parseInt(qa.answer.content, 10);
                 if (Number.isNaN(idToEdit)) {
-                    this.state = CONVERSATION_STATE.Q1E;
+                    this._state = CONVERSATION_STATE.Q1E;
                     break;
                 } else {
                     const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
@@ -40,24 +41,24 @@ class EventEndConversation extends Conversation {
                         this.opMessage.guild.id,
                     );
                     if (event === null) {
-                        this.lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
-                        this.state = CONVERSATION_STATE.Q1E;
+                        this._lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';
+                        this._state = CONVERSATION_STATE.Q1E;
                         break;
                     } else if (Utils.isInFuture(event.when.start)) {
-                        this.returnMessage = 'The event has not started. Delete it instead.';
-                        this.state = CONVERSATION_STATE.DONE;
+                        this._returnMessage = 'The even_whens not started. Delete it instead.';
+                        this._state = CONVERSATION_STATE.DONE;
                         break;
                     } else if (Utils.isInPast(event.when.end)) {
-                        this.returnMessage = 'The event has already ended.';
-                        this.state = CONVERSATION_STATE.DONE;
+                        this._returnMessage = 'The ev_whenhas already ended.';
+                        this._state = CONVERSATION_STATE.DONE;
                         break;
-                    } else if (event.global === true) {
-                        this.returnMessage = 'Ending early is disabled for global events.';
-                        this.state = CONVERSATION_STATE.DONE;
+                    } else if (event.isGlobal === true) {
+                        this._returnMessage = 'Ending early is disabled for global events.';
+                        this._state = CONVERSATION_STATE.DONE;
                         break;
                     } else {
-                        this.event = event;
-                        this.state = CONVERSATION_STATE.CONFIRM;
+                        this._event = event;
+                        this._state = CONVERSATION_STATE.CONFIRM;
                         break;
                     }
                 }
@@ -65,16 +66,16 @@ class EventEndConversation extends Conversation {
             case CONVERSATION_STATE.CONFIRM: {
                 const answer: string = qa.answer.content;
                 if (!Utils.isYes(answer)) {
-                    this.returnMessage = 'Cancelled.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Cancelled.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
-                    this.event.end();
-                    const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                    this._event.end();
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
                     willEndEvent$.next(savedEvent);
 
-                    this.returnMessage = 'Event successfully ended.';
-                    this.state = CONVERSATION_STATE.DONE;
+                    this._returnMessage = 'Event successfully ended.';
+                    this._state = CONVERSATION_STATE.DONE;
                     break;
                 }
             }
@@ -85,7 +86,7 @@ class EventEndConversation extends Conversation {
 }
 
 const eventsEndEvent = (
-    msg: discord.Message
+    msg: discord.Message,
 ): void => {
     const params: Command.EventsEnd = Command.parseParameters(
         Command.ALL.EVENTS_END_EVENT,
@@ -98,7 +99,7 @@ const eventsEndEvent = (
     );
     ConversationManager.startNewConversation(
         msg,
-        eventEndConversation
+        eventEndConversation,
     );
 };
 

@@ -8,7 +8,7 @@ export namespace Utils {
      * @param input The string to check
      */
     export const isYes = (
-        input: string
+        input: string,
     ): boolean => input.toLowerCase() === 'yes'
         || input.toLowerCase() === 'y'
         || input.toLowerCase() === 'ok'
@@ -23,7 +23,7 @@ export namespace Utils {
      * @returns An array without undefined or nulls
      */
     export const isDefinedFilter = <T>(
-        input: T | undefined | null
+        input: T | undefined | null,
     ): input is T => typeof input !== 'undefined' && input !== null;
 
 
@@ -34,7 +34,7 @@ export namespace Utils {
      * @returns True if the date is in the future
      */
     export const isInFuture = (
-        date: Date
+        date: Date,
     ): boolean => date > new Date();
 
     /**
@@ -44,7 +44,7 @@ export namespace Utils {
      * @returns True if the date is in the past
      */
     export const isInPast = (
-        date: Date
+        date: Date,
     ): boolean => date < new Date();
 
     /**
@@ -56,7 +56,7 @@ export namespace Utils {
      */
     export const isNowBetween = (
         dateStart: Date,
-        dateEnd: Date
+        dateEnd: Date,
     ): boolean => {
         const now: Date = new Date();
         return dateStart <= now && now <= dateEnd;
@@ -69,10 +69,10 @@ export namespace Utils {
      * @category Date
      */
     export const isValidDate = (
-        date: Date
+        date: Date,
     ): boolean => date instanceof Date
         && !Number.isNaN(
-            date.getTime()
+            date.getTime(),
         );
 
     /**
@@ -112,7 +112,7 @@ export namespace Utils {
                     enableCallStack: true,
                 },
             },
-        }
+        },
     );
 
     /**

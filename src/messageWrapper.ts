@@ -5,8 +5,8 @@ import {
 import {
     mergeMap, map, share, filter, combineAll, flatMap, concatMap, catchError,
 } from 'rxjs/operators';
-import { rejects, } from 'assert';
-import { Network, } from './network';
+import { rejects } from 'assert';
+import { Network } from './network';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace MessageWrapper {
@@ -14,10 +14,10 @@ export namespace MessageWrapper {
      * Contract of the message information to post
      */
     export interface SendInfo {
-        message: discord.Message
-        content: string
-        options?: discord.MessageOptions
-        tag?: string
+        message: discord.Message;
+        content: string;
+        options?: discord.MessageOptions;
+        tag?: string;
     }
     export const sendMessages$: Subject<SendInfo> = new Subject();
 
@@ -25,8 +25,8 @@ export namespace MessageWrapper {
      * Contract of the message information to delete
      */
     export interface DeleteInfo {
-        message: discord.Message
-        tag?: string
+        message: discord.Message;
+        tag?: string;
     }
     export const deleteMessages$: Subject<DeleteInfo> = new Subject();
 
@@ -34,10 +34,10 @@ export namespace MessageWrapper {
      * Contract of the message information to edit
      */
     export interface EditInfo {
-        message: discord.Message
-        newContent: string
-        options?: discord.MessageOptions
-        tag?: string
+        message: discord.Message;
+        newContent: string;
+        options?: discord.MessageOptions;
+        tag?: string;
     }
     export const editMessage$: Subject<EditInfo> = new Subject();
 
@@ -45,20 +45,20 @@ export namespace MessageWrapper {
      * Contract of the messages that were received
      */
     export interface Response {
-        messages: discord.Message[]
-        tag: string
+        messages: discord.Message[];
+        tag: string;
     }
 
     const regex = /[\s\S]{1,1950}(?:\n|$)/g;
     export const getMessageChunks = (
-        content: string
+        content: string,
     ): string[] => content.match(regex) || [];
 
     export const sentMessages$ = sendMessages$.pipe(
         mergeMap(
             (sendInfo: SendInfo):
             Observable<[string, discord.Message[]]> => {
-                const input: SendInfo = { ...sendInfo, };
+                const input: SendInfo = { ...sendInfo };
                 input.tag = input.tag
                     ? input.tag
                     : `${Math.random()}`;
@@ -83,19 +83,19 @@ export namespace MessageWrapper {
                                     x,
                                 ].flatMap(
                                     (t: discord.Message | discord.Message[]):
-                                    (discord.Message | discord.Message[]) => t
-                                )
+                                    (discord.Message | discord.Message[]) => t,
+                                ),
                             ),
                             catchError(
-                                (): [] => []
+                                (): [] => [],
                             ),
                         );
                         return ret;
-                    }
+                    },
                 );
 
                 const ret: Observable<discord.Message[]> = concat(
-                    requests
+                    requests,
                 ).pipe(
                     combineAll(),
                     map(
@@ -103,17 +103,17 @@ export namespace MessageWrapper {
                         (discord.Message)[] => {
                             const flattened = results.flatMap(
                                 (x: (discord.Message)[]):
-                                (discord.Message)[] => x
+                                (discord.Message)[] => x,
                             );
                             return flattened;
-                        }
-                    )
+                        },
+                    ),
                 );
                 return forkJoin(
                     of(input.tag),
                     ret,
                 );
-            }
+            },
         ),
         map((x: [string, discord.Message[]]): Response => ({
             tag: x[0],
@@ -126,7 +126,7 @@ export namespace MessageWrapper {
         mergeMap(
             (deleteInfo: DeleteInfo):
             Observable<[string, discord.Message | null]> => {
-                const input: DeleteInfo = { ...deleteInfo, };
+                const input: DeleteInfo = { ...deleteInfo };
                 input.tag = input.tag
                     ? input.tag
                     : `${Math.random()}`;
@@ -137,14 +137,14 @@ export namespace MessageWrapper {
                     bound,
                 ).pipe(
                     catchError(
-                        (): Observable<null> => of(null)
+                        (): Observable<null> => of(null),
                     ),
                 );
                 return forkJoin(
                     of(input.tag),
-                    request
+                    request,
                 );
-            }
+            },
         ),
         map(
             (response: [string, discord.Message | null]): Response => {
@@ -161,7 +161,7 @@ export namespace MessageWrapper {
                     ],
                     tag: response[0],
                 };
-            }
+            },
         ),
         share(),
     );
@@ -170,7 +170,7 @@ export namespace MessageWrapper {
         mergeMap(
             (editInfo: EditInfo):
             Observable<[string, discord.Message | null]> => {
-                const input: EditInfo = { ...editInfo, };
+                const input: EditInfo = { ...editInfo };
                 input.tag = input.tag
                     ? input.tag
                     : `${Math.random()}`;
@@ -184,14 +184,14 @@ export namespace MessageWrapper {
                     bound,
                 ).pipe(
                     catchError(
-                        (): Observable<null> => of(null)
+                        (): Observable<null> => of(null),
                     ),
                 );
                 return forkJoin(
                     of(input.tag),
-                    request
+                    request,
                 );
-            }
+            },
         ),
         map(
             (response: [string, discord.Message | null]): Response => {
@@ -208,7 +208,7 @@ export namespace MessageWrapper {
                     ],
                     tag: response[0],
                 };
-            }
+            },
         ),
         share(),
     );
@@ -217,25 +217,25 @@ export namespace MessageWrapper {
      * Send Message promise wrapper
      */
     export const sendMessage = (
-        sendInfo: SendInfo
+        sendInfo: SendInfo,
     ): Promise<Response> => {
-        const taggedInfo: SendInfo = { ...sendInfo, };
+        const taggedInfo: SendInfo = { ...sendInfo };
         taggedInfo.tag = taggedInfo.tag !== undefined
             ? taggedInfo.tag
             : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
             (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
                 const sub = sentMessages$.pipe(
-                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
+                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag),
                 ).subscribe(
                     (response: Response): void => {
                         resolver(response);
                         sub.unsubscribe();
                     }, (error: Error): void => {
                         rejector(error);
-                    }
+                    },
                 );
-            }
+            },
         );
         sendMessages$.next(taggedInfo);
         return p;
@@ -245,25 +245,25 @@ export namespace MessageWrapper {
      * Delete Message promise wrapper
      */
     export const deleteMessage = (
-        deleteInfo: DeleteInfo
+        deleteInfo: DeleteInfo,
     ): Promise<Response> => {
-        const taggedInfo: DeleteInfo = { ...deleteInfo, };
+        const taggedInfo: DeleteInfo = { ...deleteInfo };
         taggedInfo.tag = taggedInfo.tag !== undefined
             ? taggedInfo.tag
             : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
             (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
                 const sub = deletedMessages$.pipe(
-                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
+                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag),
                 ).subscribe(
                     (response: Response): void => {
                         resolver(response);
                         sub.unsubscribe();
                     }, (error: Error): void => {
                         rejector(error);
-                    }
+                    },
                 );
-            }
+            },
         );
         deleteMessages$.next(taggedInfo);
         return p;
@@ -273,25 +273,25 @@ export namespace MessageWrapper {
      * Edit Message promise wrapper
      */
     export const editMessage = (
-        editInfo: EditInfo
+        editInfo: EditInfo,
     ): Promise<Response> => {
-        const taggedInfo: EditInfo = { ...editInfo, };
+        const taggedInfo: EditInfo = { ...editInfo };
         taggedInfo.tag = taggedInfo.tag !== undefined
             ? taggedInfo.tag
             : `${Math.random()}`;
         const p: Promise<Response> = new Promise(
             (resolver: (response: Response) => void, rejector: (error: Error) => void): void => {
                 const sub = editedMessage$.pipe(
-                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag)
+                    filter((msg: Response): boolean => msg.tag === taggedInfo.tag),
                 ).subscribe(
                     (response: Response): void => {
                         resolver(response);
                         sub.unsubscribe();
                     }, (error: Error): void => {
                         rejector(error);
-                    }
+                    },
                 );
-            }
+            },
         );
         editMessage$.next(taggedInfo);
         return p;
