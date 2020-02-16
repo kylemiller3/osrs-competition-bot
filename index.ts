@@ -8,7 +8,7 @@ import {
     filter, tap, mergeMap, concatMap, map, combineAll, catchError,
 } from 'rxjs/operators';
 import { hiscores } from 'osrs-json-api';
-import { Client } from 'ssh2';
+import { Client, ClientChannel } from 'ssh2';
 import fs from 'fs';
 import socks from 'socksv5';
 import { privateKey } from './auth';
@@ -38,7 +38,7 @@ import unlockEvent from './src/commands/unlock';
 
 
 /**
- * Global discord client
+ * Global Discord client
  * @category Global
  */
 export const gClient: discord.Client = new discord.Client();
@@ -151,6 +151,28 @@ const mergedMessage$: Observable<discord.Message> = merge(
     messageReceived$,
     messageInjector$,
 );
+
+
+// NOTE: you could just use one ssh2 client connection for all forwards, but
+// you could run into server-imposed limits if you have too many forwards open
+// at any given time
+/**
+ * Global SSH client
+ * @category Global
+ */
+const gSshClient = new Client();
+/**
+ * Observable of all SSH connection events
+ * @category Observable
+ */
+// const sshReady$ = fromEvent<any>(gSshClient, 'connect');
+// /**
+//  * Observable of all SSH error events
+//  * @category Observable
+//  */
+// const sshError$ = fromEvent<Error>(gSshClient, 'error');
+
+// const sshClose$ = fromEvent<boolean>
 
 /**
  * Helper function to determine if a user has access to the command
@@ -1174,30 +1196,29 @@ const init = async (): Promise<void> => {
     );
     Utils.logger.info('Auto update scheduler running');
 
+    socks.createServer()
+
     socks.createServer((info, accept, deny): void => {
-        // NOTE: you could just use one ssh2 client connection for all forwards, but
-        // you could run into server-imposed limits if you have too many forwards open
-        // at any given time
-        const conn = new Client();
-        conn.on('ready', (): void => {
-            conn.forwardOut(info.srcAddr,
+        gSshClient.on('ready', (): void => {
+            gSshClient.forwardOut(info.srcAddr,
                 info.srcPort,
                 info.dstAddr,
                 info.dstPort,
-                (err, stream): any => {
+                (err: Error | undefined, stream: ClientChannel): void => {
                     if (err) {
-                        conn.end();
-                        return deny();
+                        gSshClient.end();
+                        deny();
+                        return;
                     }
 
                     const clientSocket = accept(true);
                     if (clientSocket) {
                         stream.pipe(clientSocket).pipe(stream).on('close', (): void => {
-                            conn.end();
+                            gSshClient.end();
                         });
-                    } else conn.end();
+                    } else gSshClient.end();
                 });
-        }).on('error', (err): any => {
+        }).on('error', (err: Error): void => {
             deny();
         }).connect({
             host: 'ec2-3-19-56-249.us-east-2.compute.amazonaws.com',
@@ -1208,6 +1229,38 @@ const init = async (): Promise<void> => {
     }).listen(4711, 'localhost', (): void => {
         console.log('SOCKSv5 proxy server started on port 4711');
     }).useAuth(socks.auth.None());
+
+    // socks.createServer((info, accept, deny): void => {
+    //     gSshClient.on('ready', (): void => {
+    //         gSshClient.forwardOut(info.srcAddr,
+    //             info.srcPort,
+    //             info.dstAddr,
+    //             info.dstPort,
+    //             (err: Error | undefined, stream: ClientChannel): void => {
+    //                 if (err) {
+    //                     gSshClient.end();
+    //                     deny();
+    //                     return;
+    //                 }
+
+    //                 const clientSocket = accept(true);
+    //                 if (clientSocket) {
+    //                     stream.pipe(clientSocket).pipe(stream).on('close', (): void => {
+    //                         gSshClient.end();
+    //                     });
+    //                 } else gSshClient.end();
+    //             });
+    //     }).on('error', (err: Error): void => {
+    //         deny();
+    //     }).connect({
+    //         host: 'ec2-3-19-56-249.us-east-2.compute.amazonaws.com',
+    //         port: 22,
+    //         username: 'ubuntu',
+    //         privateKey: fs.readFileSync('servers/main.pem'),
+    //     });
+    // }).listen(4712, 'localhost', (): void => {
+    //     console.log('SOCKSv5 proxy server started on port 4712');
+    // }).useAuth(socks.auth.None());
 };
 init();
 
