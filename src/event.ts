@@ -557,7 +557,26 @@ export namespace Event {
                 return 'active (∞ hrs left)';
             }
             const now: Date = new Date();
-            return `active (${Number(((this.when.end.getTime() - now.getTime()) / 3.6e6).toFixed(1)).toLocaleString('en-us')} hrs left)`;
+            const msLeft = this.when.end.getTime() - now.getTime();
+            const padToTwo = (number: number): string => (number <= 99 ? `0${number}`.slice(-2) : `${number}`);
+            interface TimeLeft { d: number; h: number; m: number; s: number }
+            const convertMS = (ms: number): TimeLeft => {
+                let h;
+                let m;
+                let s;
+                s = Math.floor(ms / 1000);
+                m = Math.floor(s / 60);
+                s %= 60;
+                h = Math.floor(m / 60);
+                m %= 60;
+                const d = Math.floor(h / 24);
+                h %= 24;
+                return {
+                    d, h, m, s,
+                };
+            };
+            const timeLeft: TimeLeft = convertMS(msLeft);
+            return `active (${timeLeft.d}d ${padToTwo(timeLeft.h)}h ${padToTwo(timeLeft.m)}m remain)`;
         }
 
         async listParticipants(): Promise<string> {
