@@ -579,11 +579,26 @@ export namespace Event {
                 return 'ended';
             }
             const now: Date = new Date();
-            const msLeft = this._when.end.getTime() - now.getTime();
+            const msLeft = this.when.end.getTime() - now.getTime();
             const padToTwo = (number: number): string => (number <= 99 ? `0${number}`.slice(-2) : `${number}`);
-            const hoursLeft: number = Math.floor(msLeft / (60 * 60));
-            const minsLeft: number = Math.floor((msLeft / 60) - hoursLeft * 60);
-            return `active (${padToTwo(hoursLeft)}:${padToTwo(minsLeft)})`;
+            interface TimeLeft { d: number; h: number; m: number; s: number }
+            const convertMS = (ms: number): TimeLeft => {
+                let h;
+                let m;
+                let s;
+                s = Math.floor(ms / 1000);
+                m = Math.floor(s / 60);
+                s %= 60;
+                h = Math.floor(m / 60);
+                m %= 60;
+                const d = Math.floor(h / 24);
+                h %= 24;
+                return {
+                    d, h, m, s,
+                };
+            };
+            const timeLeft: TimeLeft = convertMS(msLeft);
+            return `active (${timeLeft.d}d ${padToTwo(timeLeft.h)}h ${padToTwo(timeLeft.m)}m remain)`;
         }
 
         public async listParticipants(): Promise<string> {
