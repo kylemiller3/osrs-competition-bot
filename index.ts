@@ -8,6 +8,9 @@ import {
     filter, tap, mergeMap, concatMap, map, combineAll, catchError,
 } from 'rxjs/operators';
 import { hiscores } from 'osrs-json-api';
+import { Client } from 'ssh2';
+import fs from 'fs';
+import socks from 'socksv5';
 import { privateKey } from './auth';
 import { Command } from './src/command';
 import { Utils } from './src/utils';
@@ -32,6 +35,7 @@ import joinGlobalEvent from './src/commands/gjoin';
 import unjoinGlobalEvent from './src/commands/gleave';
 import lockEvent from './src/commands/lock';
 import unlockEvent from './src/commands/unlock';
+
 
 /**
  * Global discord client
@@ -1169,6 +1173,41 @@ const init = async (): Promise<void> => {
         }, 1000 * 60 * 15,
     );
     Utils.logger.info('Auto update scheduler running');
+
+    socks.createServer((info, accept, deny): void => {
+        // NOTE: you could just use one ssh2 client connection for all forwards, but
+        // you could run into server-imposed limits if you have too many forwards open
+        // at any given time
+        const conn = new Client();
+        conn.on('ready', (): void => {
+            conn.forwardOut(info.srcAddr,
+                info.srcPort,
+                info.dstAddr,
+                info.dstPort,
+                (err, stream): any => {
+                    if (err) {
+                        conn.end();
+                        return deny();
+                    }
+
+                    const clientSocket = accept(true);
+                    if (clientSocket) {
+                        stream.pipe(clientSocket).pipe(stream).on('close', (): void => {
+                            conn.end();
+                        });
+                    } else conn.end();
+                });
+        }).on('error', (err): any => {
+            deny();
+        }).connect({
+            host: 'ec2-3-19-56-249.us-east-2.compute.amazonaws.com',
+            port: 22,
+            username: 'ubuntu',
+            privateKey: fs.readFileSync('servers/main.pem'),
+        });
+    }).listen(4711, 'localhost', (): void => {
+        console.log('SOCKSv5 proxy server started on port 4711');
+    }).useAuth(socks.auth.None());
 };
 init();
 

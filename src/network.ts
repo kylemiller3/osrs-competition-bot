@@ -1,40 +1,75 @@
 import {
-    Observable, defer, of, from, merge,
+    Observable, defer, of, from, Subject, GroupedObservable, forkJoin,
 } from 'rxjs';
 
 import { retryBackoff } from 'backoff-rxjs';
 import {
-    timeout, catchError, publishReplay, refCount, tap, map, delay, retry, mergeMap,
+    catchError, publishReplay, refCount, mergeMap, groupBy, scan, switchMap, toArray,
 } from 'rxjs/operators';
 import { hiscores } from 'osrs-json-api';
+import SocksProxyAgent from 'socks-proxy-agent';
+
 import { Utils } from './utils';
+
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Network {
-    /**
-     * A generic network request function that calls the bound function and returns a promise
-     * @param bound A bound network function to call
-     * @returns A promise of the network result
-     */
-    // export const genericNetworkFetch$ = <T>(
-    //     bound: () => Promise<T | null>,
-    //     shouldRetry: (error: Error) => boolean = (): boolean => true
-    // ): Observable<T | null> => {
-    //     const ret: Observable<T | null> = from(
-    //         bound()
-    //     ).pipe(
-    //         retryBackoff({
-    //             initialInterval: 50,
-    //             maxInterval: 10000,
-    //             maxRetries: 10,
-    //             shouldRetry,
-    //         }),
-    //         catchError((error: Error): Observable<null> => { // must catch to get values
-    //             Utils.logger.error(error);
-    //             return of(null);
-    //         }),
-    //     );
-    //     return ret;
+
+    // export interface Request {
+    //     tag: string;
+    //     bounds: (() => Promise<unknown>)[];
+    //     shouldRetry: (error: Error) => boolean;
+    //     server: number;
+    // }
+
+    // export const networkRequestDispatch$ = new Subject<Request>();
+    // export const networkRequestResponse$ = networkRequestDispatch$.pipe(
+    //     groupBy(
+    //         (request: Request): string => request.tag,
+    //     ),
+    //     mergeMap(
+    //         (group: GroupedObservable<string, Request>):
+    //         Observable<[string, unknown[]]> => group.pipe(
+    //             switchMap(
+    //                 (req: Request):
+    //                 Observable<[string, unknown[]]> => {
+    //                     const obs$: Observable<unknown[]> = req.bounds.map(
+    //                         (bound: () => Promise<unknown>):
+    //                         Observable<unknown> => genericNetworkFetch$(
+    //                             bound,
+    //                             req.shouldRetry,
+    //                         ),
+    //                     );
+    //                     const req$: Observable<unknown[]> = forkJoin(...req.bounds).pipe(
+    //                         toArray(),
+    //                     );
+    //                     return forkJoin(of(req.tag), req$);
+    //                 },
+    //             ),
+    //         ),
+    //     ),
+    // );
+
+    // const serverCount = 2;
+    // let currCount = 1;
+    // export const makeRequest = <T>(
+    //     tag: string,
+    //     request: Observable<T>,
+    //     isPremium: boolean,
+    // ): void => {
+    //     let server = 0;
+    //     if (isPremium && serverCount > 1) {
+    //         currCount += 1;
+    //         if (currCount === serverCount) {
+    //             currCount = 1;
+    //         }
+    //         server = currCount;
+    //     }
+    //     networkRequestDispatch$.next({
+    //         tag,
+    //         request,
+    //         server,
+    //     });
     // };
 
     export const genericNetworkFetch$ = <T>(
@@ -52,7 +87,7 @@ export namespace Network {
             retryBackoff({
                 initialInterval: 100,
                 maxInterval: 20000,
-                maxRetries: 15,
+                maxRetries: 10,
                 shouldRetry,
                 backoffDelay: (
                     (iteration: number, initialInterval: number):
@@ -113,10 +148,18 @@ export namespace Network {
             }
         }
 
+        const proxyHost = 'localhost';
+        const proxyPort = 4711;
+        const proxyOptions = `socks5://${proxyHost}:${proxyPort}`;
+        const httpsAgent = SocksProxyAgent(proxyOptions);
+        const httpAgent = httpsAgent;
+        const config = { httpsAgent, httpAgent };
         if (cachedRsn === undefined) {
             const bound = hiscores.getPlayer.bind(
                 undefined,
                 asciiRsn,
+                'main',
+                config,
             );
 
             const isInputError: (error: Error) => boolean = (
