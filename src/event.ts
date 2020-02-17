@@ -369,7 +369,7 @@ export namespace Event {
             participantId: string,
             guildId: string,
             rsn: string,
-            teamName?: string
+            teamName: string | undefined
         ): 'this rsn is already signed up'
             | 'osrs hiscores cannot be reached'
             | 'osrs account cannot be found'
@@ -434,15 +434,10 @@ export namespace Event {
                 return undefined;
             }
 
-            // we need the teamname supplied
-            if (teamName === undefined) {
-                return 'team name needs to be supplied';
-            }
-
             // we either add a new team or we add to the found team
             const teamIdx: number = this.teams.findIndex(
                 (team: Event.Team):
-                boolean => team.name.toLowerCase() === teamName.toLowerCase()
+                boolean => teamName !== undefined && team.name.toLowerCase() === teamName.toLowerCase()
             );
 
             const participant: Participant = {
@@ -456,7 +451,11 @@ export namespace Event {
             };
             if (teamIdx === -1) {
                 // if we didn't find the team
-                // create a new team
+                // create a new team if teamname is defined
+                if (teamName === undefined) {
+                    return 'team name needs to be supplied';
+                }
+
                 const team: Team = {
                     name: teamName,
                     guildId,

@@ -19,10 +19,14 @@ class EventsSignupConversation extends Conversation {
     async init(): Promise<boolean> {
         const id = this.params.id as number | undefined;
         const rsn = this.params.rsn as string | undefined;
-        const team = this.params.team as string | undefined;
+        let team = this.params.team as string | undefined;
 
         if (id === undefined || rsn === undefined) {
             return Promise.resolve(false);
+        }
+
+        if (team === undefined) {
+            team = this.opMessage.author.id;
         }
 
         const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
@@ -69,6 +73,8 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q2E:
                 return 'Cannot find Runescape name on hiscores. Please try again.';
             case CONVERSATION_STATE.Q3:
+                return 'Would you like to join a team?';
+            case CONVERSATION_STATE.Q3O:
                 return 'Which team would you like to join?';
             case CONVERSATION_STATE.Q3E:
                 return 'Could not parse team name. Please try again.';
@@ -113,6 +119,7 @@ class EventsSignupConversation extends Conversation {
                     this.opMessage.author.id,
                     this.opMessage.guild.id,
                     this.rsn,
+                    undefined
                 );
 
                 switch (error) {
@@ -148,7 +155,49 @@ class EventsSignupConversation extends Conversation {
                 }
                 break;
             }
-            case CONVERSATION_STATE.Q3:
+            case CONVERSATION_STATE.Q3: {
+                const answer = qa.answer.content;
+                if (!Utils.isYes(answer)) {
+                    this.teamName = this.opMessage.author.id;
+                    const error: 'this rsn is already signed up'
+                    | 'osrs hiscores cannot be reached'
+                    | 'osrs account cannot be found'
+                    | 'team name needs to be supplied'
+                    | 'teams are locked 10 minutes before a global event starts'
+                    | 'teams have been locked by an administrator'
+                    | 'participant has no access to this event'
+                    | undefined = this.event.signupParticipant(
+                        this.opMessage.author.id,
+                        this.opMessage.guild.id,
+                        this.rsn,
+                        this.opMessage.author.id,
+                    );
+                    switch (error) {
+                        case 'osrs hiscores cannot be reached': {
+                            this.returnMessage = `Failed to sign up because ${error}.`;
+                            this.state = CONVERSATION_STATE.DONE;
+                            break;
+                        }
+                        case undefined: {
+                            this.returnMessage = 'Successfully signed-up up for event';
+                            this.state = CONVERSATION_STATE.DONE;
+                            const savedEvent: Event.Standard = await Db.upsertEvent(this.event);
+                            willSignUpPlayer$.next(savedEvent);
+                            break;
+                        }
+                        // everything else should be filtered out from q2
+                        default: {
+                            Utils.logger.error(`${error} case not handled`);
+                            this.state = CONVERSATION_STATE.DONE;
+                            break;
+                        }
+                    }
+                } else {
+                    this.state = CONVERSATION_STATE.Q3O;
+                }
+                break;
+            }
+            case CONVERSATION_STATE.Q3O:
             case CONVERSATION_STATE.Q3E: {
                 this.teamName = qa.answer.content;
                 const error: 'this rsn is already signed up'
