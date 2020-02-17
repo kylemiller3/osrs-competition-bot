@@ -462,15 +462,11 @@ export namespace Event {
                 return false;
             }
 
-            // we need the teamname supplied
-            if (teamName === undefined) {
-                return true;
-            }
-
             // we either add a new team or we add to the found team
             const teamIdx: number = this._teams.findIndex(
                 (team: Event.Team):
-                boolean => team.name.toLowerCase() === teamName.toLowerCase(),
+                boolean => teamName !== undefined
+                    && team.name.toLowerCase() === teamName.toLowerCase(),
             );
 
             const participant: Participant = {
@@ -484,7 +480,11 @@ export namespace Event {
             };
             if (teamIdx === -1) {
                 // if we didn't find the team
-                // create a new team
+                // create a new team if teamname is defined
+                if (teamName === undefined) {
+                    return true;
+                }
+
                 const team: Team = {
                     name: teamName,
                     guildId,
@@ -737,7 +737,7 @@ export namespace Event {
                                         ? 0
                                         : whatsScores.map(
                                             (what: WhatScoreboard): number => what.whatScore,
-                                        ).reduce(add);
+                                        ).reduce(add, 0);
                                     return {
                                         lhs: account.rsn,
                                         accountScore,
@@ -752,7 +752,7 @@ export namespace Event {
                             const participantScore: number = accountsScores.map(
                                 (account: AccountScoreboard): number => account.accountScore,
                                 customScore,
-                            ).reduce(add);
+                            ).reduce(add, 0);
 
                             return {
                                 lhs: participant.userId,
@@ -768,7 +768,7 @@ export namespace Event {
                     const teamScore: number = participantsScores.map(
                         (participant: ParticipantScoreboard):
                         number => participant.participantScore,
-                    ).reduce(add);
+                    ).reduce(add, 0);
 
                     return {
                         lhs: team.name,

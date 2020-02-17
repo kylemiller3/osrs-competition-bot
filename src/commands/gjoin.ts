@@ -39,7 +39,7 @@ class EventsJoinGlobalConversation extends Conversation {
 
                 const event: Event.Standard | null = await Db.fetchInvitedEvent(
                     id,
-                    this.opMessage.guild.id,
+                    this._opMessage.guild.id,
                 );
 
                 if (event === null) {
@@ -52,7 +52,7 @@ class EventsJoinGlobalConversation extends Conversation {
                 thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
                 if (event.guilds.others !== undefined
                     && event.guilds.others.findIndex(
-                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id,
+                        (guild: Event.Guild): boolean => guild.guildId === this._opMessage.guild.id,
                     ) !== -1) {
                     this._returnMessage = 'Your guild has already joined this event.';
                     this._state = CONVERSATION_STATE.DONE;
@@ -78,13 +78,13 @@ class EventsJoinGlobalConversation extends Conversation {
                         this._event.guilds.others = [
                             ...this._event.guilds.others,
                             {
-                                guildId: this.opMessage.guild.id,
+                                guildId: this._opMessage.guild.id,
                             },
                         ];
                     } else {
                         this._event.guilds.others = [
                             {
-                                guildId: this.opMessage.guild.id,
+                                guildId: this._opMessage.guild.id,
                             },
                         ];
                     }

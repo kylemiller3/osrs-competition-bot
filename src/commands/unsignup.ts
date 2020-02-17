@@ -18,23 +18,23 @@ class EventUnsignupConversation extends Conversation {
         }
 
         const dummy: discord.Message = new discord.Message(
-            this.opMessage.channel, {
-                id: this.opMessage.id,
-                type: this.opMessage.type,
-                author: this.opMessage.author,
+            this._opMessage.channel, {
+                id: this._opMessage.id,
+                type: this._opMessage.type,
+                author: this._opMessage.author,
                 content: `${id}`,
-                member: this.opMessage.member,
-                pinned: this.opMessage.pinned,
-                tts: this.opMessage.tts,
-                nonce: this.opMessage.nonce,
-                system: this.opMessage.system,
-                embeds: this.opMessage.embeds,
-                attachments: this.opMessage.attachments,
-                createdTimestamp: this.opMessage.createdTimestamp,
-                editedTimestamp: this.opMessage.editedTimestamp,
-                reactions: this.opMessage.reactions,
-                webhookID: this.opMessage.webhookID,
-                hit: this.opMessage.hit,
+                member: this._opMessage.member,
+                pinned: this._opMessage.pinned,
+                tts: this._opMessage.tts,
+                nonce: this._opMessage.nonce,
+                system: this._opMessage.system,
+                embeds: this._opMessage.embeds,
+                attachments: this._opMessage.attachments,
+                createdTimestamp: this._opMessage.createdTimestamp,
+                editedTimestamp: this._opMessage.editedTimestamp,
+                reactions: this._opMessage.reactions,
+                webhookID: this._opMessage.webhookID,
+                hit: this._opMessage.hit,
             }, gClient,
         );
         await this.consumeQa({
@@ -135,8 +135,8 @@ class EventUnsignupConversation extends Conversation {
                         );
                         // if no participants remove the team
                         if (this._event.teams[userIdx].participants.length === 0) {
-                            this._event.teams.splice(
-                                userIdx, 1,
+                            this._event.teams = this._event.teams.splice(
+                                userJdx, 1,
                             );
                         }
                         const savedEvent: Event.Standard = await Db.upsertEvent(this._event);

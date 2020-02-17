@@ -33,7 +33,7 @@ class UnlockEventConversation extends Conversation {
                 }
                 const creatorEvent: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                     id,
-                    this.opMessage.guild.id,
+                    this._opMessage.guild.id,
                 );
                 if (creatorEvent === null) {
                     this._lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';

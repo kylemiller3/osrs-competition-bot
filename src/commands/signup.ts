@@ -13,36 +13,40 @@ class EventsSignupConversation extends Conversation {
 
     private _rsn: string;
 
-    private _teamName: string | null = null;
+    private _teamName: string | undefined;
 
     // eslint-disable-next-line class-methods-use-this
     public async init(): Promise<boolean> {
         const id = this._params.id as number | undefined;
         const rsn = this._params.rsn as string | undefined;
-        const teamName = this._params.team as string | undefined;
+        let team = this._params.team as string | undefined;
 
         if (id === undefined || rsn === undefined) {
             return Promise.resolve(false);
         }
 
+        if (team === undefined) {
+            team = this._opMessage.author.id;
+        }
+
         const dummy: discord.Message = new discord.Message(
-            this.opMessage.channel, {
-                id: this.opMessage.id,
-                type: this.opMessage.type,
-                author: this.opMessage.author,
+            this._opMessage.channel, {
+                id: this._opMessage.id,
+                type: this._opMessage.type,
+                author: this._opMessage.author,
                 content: `${id}`,
-                member: this.opMessage.member,
-                pinned: this.opMessage.pinned,
-                tts: this.opMessage.tts,
-                nonce: this.opMessage.nonce,
-                system: this.opMessage.system,
-                embeds: this.opMessage.embeds,
-                attachments: this.opMessage.attachments,
-                createdTimestamp: this.opMessage.createdTimestamp,
-                editedTimestamp: this.opMessage.editedTimestamp,
-                reactions: this.opMessage.reactions,
-                webhookID: this.opMessage.webhookID,
-                hit: this.opMessage.hit,
+                member: this._opMessage.member,
+                pinned: this._opMessage.pinned,
+                tts: this._opMessage.tts,
+                nonce: this._opMessage.nonce,
+                system: this._opMessage.system,
+                embeds: this._opMessage.embeds,
+                attachments: this._opMessage.attachments,
+                createdTimestamp: this._opMessage.createdTimestamp,
+                editedTimestamp: this._opMessage.editedTimestamp,
+                reactions: this._opMessage.reactions,
+                webhookID: this._opMessage.webhookID,
+                hit: this._opMessage.hit,
             }, gClient,
         );
         await this.consumeQa({
@@ -60,20 +64,31 @@ class EventsSignupConversation extends Conversation {
         });
         if (this._state === CONVERSATION_STATE.DONE) {
             return Promise.resolve(true);
+        } if (this._state === CONVERSATION_STATE.Q2E) {
+            return Promise.resolve(false);
         }
 
-        if (teamName !== undefined) {
-            dummy.content = teamName;
-            await this.consumeQa({
-                questions: [],
-                answer: dummy,
-            });
-            if (this._state === CONVERSATION_STATE.Q3E) {
-                return Promise.resolve(false);
-            }
-            return Promise.resolve(true);
+        dummy.content = 'yes';
+        await this.consumeQa({
+            questions: [],
+            answer: dummy,
+        });
+        if (this._state !== CONVERSATION_STATE.Q3O) {
+            return Promise.resolve(false);
         }
-        return Promise.resolve(false);
+
+        dummy.content = team === undefined
+            ? this._opMessage.author.id
+            : team;
+        await this.consumeQa({
+            questions: [],
+            answer: dummy,
+        });
+        // @ts-ignore
+        if (this._state !== CONVERSATION_STATE.DONE) {
+            return Promise.resolve(false);
+        }
+        return Promise.resolve(true);
     }
 
     public produceQ(): string | null {
@@ -83,6 +98,8 @@ class EventsSignupConversation extends Conversation {
             case CONVERSATION_STATE.Q2:
                 return 'What is your Runescape name?';
             case CONVERSATION_STATE.Q3:
+                return 'Would you like to join a team?';
+            case CONVERSATION_STATE.Q3O:
                 return 'Which team would you like to join?';
             default:
                 return null;
@@ -101,7 +118,7 @@ class EventsSignupConversation extends Conversation {
                 }
                 const guildEvent: Event.Standard | null = await Db.fetchAnyGuildEvent(
                     id,
-                    this.opMessage.guild.id,
+                    this._opMessage.guild.id,
                 );
                 if (guildEvent === null) {
                     this._lastErrorMessage = 'Event not found. Hint: find the event id on the corresponding scoreboard.';
@@ -204,7 +221,7 @@ class EventsSignupConversation extends Conversation {
                     ) : -1;
 
                 if (participantIdx !== -1 && participantJdx !== -1) {
-                // we know the team to signup for
+                    // we know the team to signup for
                     const participant: Event.Participant = this
                         ._event
                         .teams[participantIdx]
@@ -223,14 +240,95 @@ class EventsSignupConversation extends Conversation {
                     this._returnMessage = 'Successfully signed-up up for event.';
                     this._state = CONVERSATION_STATE.DONE;
                     break;
+                } else if (this._teamName !== undefined) {
+                    // we need to create the team
+                    // we either add a new team or we add to the found team
+                    const teamIdx: number = this._event.teams.findIndex(
+                        (team: Event.Team):
+                        boolean => this._teamName !== undefined
+                            && team.name.toLowerCase() === this._teamName.toLowerCase(),
+                    );
+
+                    const participant: Event.Participant = {
+                        userId: this._opMessage.author.id,
+                        customScore: 0,
+                        runescapeAccounts: [
+                            {
+                                rsn: this._rsn,
+                            },
+                        ],
+                    };
+                    if (teamIdx === -1) {
+                        const team: Event.Team = {
+                            name: this._teamName,
+                            guildId: this._opMessage.guild.id,
+                            participants: [
+                                participant,
+                            ],
+                        };
+                        this._event.teams = [
+                            ...this._event.teams,
+                            team,
+                        ];
+                    }
+
+                    // we found the team
+                    // so add the participant to the team
+                    this._event.teams[teamIdx].participants = [
+                        ...this._event.teams[teamIdx].participants,
+                        participant,
+                    ];
+
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
+                    willSignUpPlayer$.next(savedEvent);
+
+                    this._returnMessage = 'Successfully signed-up up for event.';
+                    this._state = CONVERSATION_STATE.DONE;
+                    break;
                 } else {
                     this._state = CONVERSATION_STATE.Q3;
                     break;
                 }
             }
-            case CONVERSATION_STATE.Q3:
+            case CONVERSATION_STATE.Q3: {
+                const answer = qa.answer.content;
+                if (!Utils.isYes(answer)) {
+                    const participant: Event.Participant = {
+                        userId: this._opMessage.author.id,
+                        customScore: 0,
+                        runescapeAccounts: [
+                            {
+                                rsn: this._rsn,
+                            },
+                        ],
+                    };
+
+                    this._teamName = this._opMessage.author.id;
+                    const team: Event.Team = {
+                        name: this._teamName,
+                        guildId: this._opMessage.guild.id,
+                        participants: [
+                            participant,
+                        ],
+                    };
+                    this._event.teams = [
+                        ...this._event.teams,
+                        team,
+                    ];
+
+                    const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
+                    willSignUpPlayer$.next(savedEvent);
+
+                    this._returnMessage = 'Successfully signed-up up for event.';
+                    this._state = CONVERSATION_STATE.DONE;
+                } else {
+                    this._state = CONVERSATION_STATE.Q3O;
+                }
+                break;
+            }
+            case CONVERSATION_STATE.Q3O:
             case CONVERSATION_STATE.Q3E: {
-                const teamName: string = this._teamName !== null
+                const teamName: string = this._teamName !== undefined
                     ? this._teamName
                     : qa.answer.content;
 

@@ -81,11 +81,11 @@ class ForceUpdateConversation extends Conversation {
                 } else {
                     const creatorEvent: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         eventId,
-                        this.opMessage.guild.id,
+                        this._opMessage.guild.id,
                     );
                     const invitedEvent: Event.Standard | null = await Db.fetchInvitedEvent(
                         eventId,
-                        this.opMessage.guild.id,
+                        this._opMessage.guild.id,
                     );
                     const event: Event.Standard | null = creatorEvent !== null
                         ? creatorEvent
@@ -111,7 +111,7 @@ class ForceUpdateConversation extends Conversation {
                         // do it
                         rateThrottle.next([
                             this.event,
-                            this.opMessage,
+                            this._opMessage,
                         ]);
                         this._returnMessage = 'This command is rate limited to once every fifteen minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
                         this._state = CONVERSATION_STATE.DONE;
@@ -128,7 +128,7 @@ class ForceUpdateConversation extends Conversation {
                 } else {
                     rateThrottle.next([
                         this.event,
-                        this.opMessage,
+                        this._opMessage,
                     ]);
                     this._returnMessage = 'This command is rate limited to once a minute per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
                     this._state = CONVERSATION_STATE.DONE;

@@ -39,7 +39,7 @@ class EventDeleteConversation extends Conversation {
                 } else {
                     const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         idToDelete,
-                        this.opMessage.guild.id,
+                        this._opMessage.guild.id,
                     );
                     if (event === null) {
                         this._state = CONVERSATION_STATE.Q1E;

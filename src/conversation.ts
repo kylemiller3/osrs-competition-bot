@@ -45,7 +45,7 @@ export interface Qa {
 }
 
 export abstract class Conversation {
-    protected opMessage: discord.Message;
+    protected _opMessage: discord.Message;
 
     private _uuid: string;
 
@@ -80,7 +80,7 @@ export abstract class Conversation {
         params: Record<string, string | number | boolean | undefined> = Object(),
     ) {
         this._params = params;
-        this.opMessage = opMessage;
+        this._opMessage = opMessage;
         this._uuid = `${Math.random()}`;
         this._errorInjector$ = new Subject<Qa>();
         this._returnOptions = {
@@ -93,21 +93,21 @@ export abstract class Conversation {
             // need op message state
             filter(
                 (msg: discord.Message):
-                boolean => msg.author.id === this.opMessage.author.id
-                && msg.channel.id === this.opMessage.channel.id,
+                boolean => msg.author.id === this._opMessage.author.id
+                && msg.channel.id === this._opMessage.channel.id,
             ),
             debounceTime(500),
             timeout(60000),
             tap(
                 (msg: discord.Message):
                 void => {
-                    Utils.logger.debug(`Conversation id '${this._uuid}' with user '${this.opMessage.author.tag}' continued with answer ${msg.content}`);
+                    Utils.logger.debug(`Conversation id '${this._uuid}' with user '${this._opMessage.author.tag}' continued with answer ${msg.content}`);
                 },
             ),
             catchError(
                 (error: Error):
                 Observable<discord.Message> => {
-                    Utils.logger.debug(`Conversation id ${this._uuid} with user '${this.opMessage.author.tag}' will end because they did not reply '${error}'`);
+                    Utils.logger.debug(`Conversation id ${this._uuid} with user '${this._opMessage.author.tag}' will end because they did not reply '${error}'`);
                     throw (error);
                 },
             ),
@@ -129,13 +129,13 @@ export abstract class Conversation {
                             return '(NULL)';
                         },
                     ).join('\n');
-                    Utils.logger.trace(`Conversation id '${this._uuid}' with user '${this.opMessage.author.tag}' continued with question '${content}'`);
+                    Utils.logger.trace(`Conversation id '${this._uuid}' with user '${this._opMessage.author.tag}' continued with question '${content}'`);
                 },
             ),
             catchError(
                 (error: Error):
                 Observable<MessageWrapper.Response> => {
-                    Utils.logger.trace(`Conversation id ${this._uuid} with user '${this.opMessage.author.tag}' will end because the question did not send '${error}'`);
+                    Utils.logger.trace(`Conversation id ${this._uuid} with user '${this._opMessage.author.tag}' will end because the question did not send '${error}'`);
                     throw (error);
                 },
             ),
@@ -154,7 +154,7 @@ export abstract class Conversation {
                 (error: Error):
                 Observable<Qa> => {
                     const sendInfo: MessageWrapper.SendInfo = {
-                        message: this.opMessage,
+                        message: this._opMessage,
                         content: 'Meowbe later.',
                         options: this._returnOptions,
                         tag: this._uuid,
@@ -196,7 +196,7 @@ export abstract class Conversation {
                     }
                     if (question !== null) {
                         const sendInfo: MessageWrapper.SendInfo = {
-                            message: this.opMessage,
+                            message: this._opMessage,
                             content: question,
                             options: this._returnOptions,
                             tag: this._uuid,
@@ -220,7 +220,7 @@ export abstract class Conversation {
         );
 
         // start conversation
-        Utils.logger.trace(`Starting a new conversation id '${this._uuid}' with '${this.opMessage.author.tag}'`);
+        Utils.logger.trace(`Starting a new conversation id '${this._uuid}' with '${this._opMessage.author.tag}'`);
         this._state = CONVERSATION_STATE.Q1;
     }
 
@@ -250,13 +250,13 @@ export abstract class Conversation {
             content = this._returnMessage;
         }
         const sendInfo: MessageWrapper.SendInfo = {
-            message: this.opMessage,
+            message: this._opMessage,
             content,
             options: this._returnOptions,
             tag: this._uuid,
         };
         MessageWrapper.sendMessages$.next(sendInfo);
-        Utils.logger.trace(`Conversation with ${this.opMessage.author.tag} finished successfully.`);
+        Utils.logger.trace(`Conversation with ${this._opMessage.author.tag} finished successfully.`);
         if (this._qaSub !== undefined) {
             this._qaSub.unsubscribe();
             this._qaSub = undefined;

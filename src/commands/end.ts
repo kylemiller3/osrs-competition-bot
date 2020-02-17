@@ -38,7 +38,7 @@ class EventEndConversation extends Conversation {
                 } else {
                     const event: Event.Standard | null = await Db.fetchLocallyCreatedEvent(
                         idToEdit,
-                        this.opMessage.guild.id,
+                        this._opMessage.guild.id,
                     );
                     if (event === null) {
                         this._lastErrorMessage = 'Could not find event. Hint: find the event id on the corresponding scoreboard.';

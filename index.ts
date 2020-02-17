@@ -1196,7 +1196,7 @@ const init = async (): Promise<void> => {
     );
     Utils.logger.info('Auto update scheduler running');
 
-    socks.createServer()
+    // socks.createServer()
 
     socks.createServer((info, accept, deny): void => {
         gSshClient.on('ready', (): void => {

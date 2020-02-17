@@ -32,11 +32,11 @@ class AdminSetChannelConversation extends Conversation {
                     this._state = CONVERSATION_STATE.Q1E;
                 } else {
                     await Db.upsertSettings({
-                        guildId: this.opMessage.guild.id,
+                        guildId: this._opMessage.guild.id,
                         channelId: channelMentions.array()[0].id,
                         payTier: Settings.PAY_TIER.FREEMIUM,
                     });
-                    Utils.logger.trace(`Upserted ${this.opMessage.guild.id} settings to database.`);
+                    Utils.logger.trace(`Upserted ${this._opMessage.guild.id} settings to database.`);
                     this._returnMessage = 'Channel set successfully.';
                     this._state = CONVERSATION_STATE.DONE;
                 }

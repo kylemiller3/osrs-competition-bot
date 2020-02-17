@@ -39,7 +39,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
 
                 const event: Event.Standard | null = await Db.fetchAnyGuildEvent(
                     id,
-                    this.opMessage.guild.id,
+                    this._opMessage.guild.id,
                 );
                 if (event === null) {
                     this._lastErrorMessage = 'Could not find event. Did you join this event? Hint: find the event id with the listall command.';
@@ -71,7 +71,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
 
                 // filter out on the others list
                 const newOthers: Event.Guild[] = this._event.guilds.others.filter(
-                    (other: Event.Guild): boolean => other.guildId !== this.opMessage.guild.id,
+                    (other: Event.Guild): boolean => other.guildId !== this._opMessage.guild.id,
                 );
                 if (this._event.guilds.others.length === newOthers.length) {
                     this._state = CONVERSATION_STATE.DONE;
@@ -82,7 +82,7 @@ class EventsUnjoinGlobalConversation extends Conversation {
 
                     // update - removing all teams signed-up by this guild
                     const newTeams: Event.Team[] = this._event.teams.filter(
-                        (team: Event.Team): boolean => team.guildId !== this.opMessage.guild.id,
+                        (team: Event.Team): boolean => team.guildId !== this._opMessage.guild.id,
                     );
                     this._event.teams = newTeams;
                     const savedEvent: Event.Standard = await Db.upsertEvent(
