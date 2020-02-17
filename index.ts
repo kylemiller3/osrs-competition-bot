@@ -556,14 +556,8 @@ const refreshMessage = async (
         });
     }
 
-    const responses: [
-        (MessageWrapper.Response[] | null),
-        (MessageWrapper.Response | null)
-    ] = await Promise.all([
-        deleteMessagePromise,
-        messagePromise,
-    ]);
-    const response: MessageWrapper.Response | null = responses[1];
+    await deleteMessagePromise;
+    const response: MessageWrapper.Response | null = await messagePromise;
     if (response === null) {
         return null;
     }
