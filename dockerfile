@@ -49,6 +49,5 @@ RUN echo "export const discordKey = '${DISCORD_KEY}';" > auth.ts && \
     echo "export const dbHost = '${POSTGRES_HOST}';" >> auth.ts && \
     echo "export const dbPort = '${POSTGRES_PORT}';" >> auth.ts && \
     echo "" >> auth.ts
-RUN cat auth.ts
 
 CMD ["npm", "start"]
