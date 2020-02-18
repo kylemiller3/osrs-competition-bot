@@ -13,7 +13,7 @@ services:
             my-net:
                 ipv4_address: 10.5.0.100
         ports: 
-            - "5432:5432"
+            - "5433:5432"
 
     compy:
         image: compyscape
@@ -26,7 +26,7 @@ services:
                 - DISCORD_KEY=${DISCORD_KEY}
                 - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
                 - POSTGRES_HOST=10.5.0.100
-                - POSTGRES_PORT=5432
+                - POSTGRES_PORT=5433
         depends_on: 
             - postgres
         networks:

@@ -17,7 +17,7 @@ RUN mkdir /root/.ssh/ && \
 
 RUN mkdir -p /root/docker/
 WORKDIR /root/docker/
-RUN git clone git@github.com:kylemiller3/compyscape.git
+RUN git clone git@github.com:kylemiller3/CompyScape.git
 
 # Choose the base image for our final image
 FROM alpine:latest
@@ -33,7 +33,7 @@ RUN apk update && \
     apk upgrade
 
 # Copy across the files from our `intermediate` container
-RUN mkdir -p /root/docker/compyscape/
+RUN mkdir -p /root/docker/Compyscape/
 
 # Copy from git
 WORKDIR /root/docker/compyscape/
