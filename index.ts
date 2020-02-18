@@ -8,7 +8,7 @@ import {
     filter, tap, mergeMap, concatMap, map, combineAll, catchError,
 } from 'rxjs/operators';
 import { hiscores, } from 'osrs-json-api';
-import { privateKey, } from './auth';
+import { discordKey, } from './auth';
 import { Command, } from './src/command';
 import { Utils, } from './src/utils';
 import setChannel from './src/commands/setchannel';
@@ -1117,7 +1117,7 @@ didDeleteEvent$.subscribe(
  * Startup and initialization
  */
 const init = async (): Promise<void> => {
-    await gClient.login(privateKey);
+    await gClient.login(discordKey);
 
     commandDispatch$.subscribe();
     Utils.logger.info('Command dispatcher running');

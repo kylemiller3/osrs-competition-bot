@@ -1,0 +1,38 @@
+version: '3.7'
+
+services: 
+    postgres:
+        user: root
+        image: postgres:12
+        volumes:
+            - compyscape-data:/var/lib/postgresql/data
+        restart: always
+        environment:
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+        ports: 
+            - "5432:5432"
+
+    compy:
+        image: compyscape
+        #secrets:
+        #    - id_rsa
+        build:
+            context: .
+            args:
+                - GIT_PRIVATE_KEY=${GIT_PRIVATE_KEY}
+                - DISCORD_KEY=${DISCORD_KEY}
+                - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+                - POSTGRES_HOST="postgres"
+                - POSTGRES_PORT=5432
+        depends_on: 
+            - postgres
+        volumes: 
+            - compyscape-logs:/root/docker/compyscape/logs
+
+volumes:
+    compyscape-data:
+    compyscape-logs:
+
+#secrets:
+#    id_rsa:
+#        file: ./id_rsa

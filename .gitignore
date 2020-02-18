@@ -3,7 +3,6 @@ out
 docs
 .git
 auth.ts
-*.log
-*.out
-*.db
+id_rsa
+docker_build.sh
 !.gitignore

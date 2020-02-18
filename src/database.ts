@@ -4,7 +4,7 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
-import { dbPassword, } from '../auth';
+import { dbPassword, dbHost, dbPort, } from '../auth';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -138,17 +138,17 @@ export namespace Db {
     };
 
     export const mainDb = pgp(initOptions)({
-        host: 'localhost',
-        port: 5432,
-        database: 'osrs-competition-bot',
+        host: dbHost,
+        port: dbPort,
+        database: 'compyscape',
         user: 'postgres',
         password: dbPassword,
     });
 
     export const testDb = pgp(initOptions)({
-        host: 'localhost',
-        port: 5432,
-        database: 'osrs-competition-bot-test',
+        host: dbHost,
+        port: dbPort,
+        database: 'compyscape-test',
         user: 'postgres',
         password: dbPassword,
     });

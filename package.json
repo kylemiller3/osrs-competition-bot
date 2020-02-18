@@ -6,13 +6,13 @@
   "scripts": {
     "build": "tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",
     "test": "mocha --project ./tsconfig.json --colors --require esm --require ts-node/register ./**/*.spec.ts",
-    "start": "nohup ts-node -T --project ./tsconfig.json ./index.ts > /dev/null&"
+    "start": "ts-node -T --project ./tsconfig.json ./index.ts > /dev/null"
   },
   "author": "https://github.com/kylemiller3",
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kylemiller3/osrs-competition-bot.git"
+    "url": "https://github.com/kylemiller3/compyscape.git"
   },
   "dependencies": {
     "@types/chai": "^4.2.7",

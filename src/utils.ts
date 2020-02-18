@@ -93,7 +93,7 @@ export namespace Utils {
                 },
                 file: {
                     type: 'file',
-                    filename: 'debug.log',
+                    filename: 'logs/compy.log',
                     maxLogSize: 10485760,
                     backups: 3,
                     compress: true,
