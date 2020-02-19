@@ -147,13 +147,13 @@ export namespace Db {
         password: dbPassword,
     });
 
-    export const testDb = pgp(initOptions)({
-        host: dbHost,
-        port: dbPort,
-        database: dbName,
-        user: dbUser,
-        password: dbPassword,
-    });
+    // export const testDb = pgp(initOptions)({
+    //     host: dbHost,
+    //     port: dbPort,
+    //     database: dbName,
+    //     user: dbUser,
+    //     password: dbPassword,
+    // });
 
     export const createTables = (
         db: pgp.IDatabase<unknown, pg.IClient> = Db.mainDb,
