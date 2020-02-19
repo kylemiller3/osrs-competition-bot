@@ -1,8 +1,11 @@
 node_modules
 out
 docs
+build
 .git
 auth.ts
 id_rsa
-docker_build.sh
+docker-deploy.ts
+docker-test.ts
+git
 !.gitignore

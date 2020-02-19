@@ -4,7 +4,9 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { Utils, } from './utils';
 import { Event, } from './event';
 import { Settings, } from './settings';
-import { dbPassword, dbHost, dbPort, } from '../auth';
+import {
+    dbUser, dbPassword, dbHost, dbPort, dbName,
+} from '../auth';
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Db {
@@ -140,16 +142,16 @@ export namespace Db {
     export const mainDb = pgp(initOptions)({
         host: dbHost,
         port: dbPort,
-        database: 'compyscape',
-        user: 'postgres',
+        database: dbName,
+        user: dbUser,
         password: dbPassword,
     });
 
     export const testDb = pgp(initOptions)({
         host: dbHost,
         port: dbPort,
-        database: 'compyscape-test',
-        user: 'postgres',
+        database: dbName,
+        user: dbUser,
         password: dbPassword,
     });
 
