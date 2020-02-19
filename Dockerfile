@@ -36,7 +36,7 @@ WORKDIR /root/docker/CompyScape
 RUN npm install
 RUN npm install -g npm
 
-# Mount auth.ts
-RUN --mount=type=secret,id=auth.ts,required cat /run/secrets/auth.ts > /root/docker/CompyScape/auth.ts
+# Make auth.ts
+RUN --mount=type=secret,id=auth.ts,required cat /run/secrets/auth.ts > ./auth.ts
 
 CMD ["npm", "start"]

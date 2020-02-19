@@ -13,7 +13,7 @@ docker pull postgres:12-alpine
 DOCKER_BUILDKIT=1 docker build \
     --ssh github="${GIT}" \
     --secret id=auth.ts,src="${AUTH_TS}" \
-    --tag compy \
+    --tag kylemiller3/compyscape \
     --no-cache \
     --progress=plain \
     --rm \
