@@ -6,13 +6,13 @@
   "scripts": {
     "build": "tsc --project ./tsconfig.json && typedoc --excludeExternals --out ./docs ./src",
     "test": "mocha --project ./tsconfig.json --colors --require esm --require ts-node/register ./**/*.spec.ts",
-    "start": "nohup ts-node -T --project ./tsconfig.json ./index.ts > /dev/null&"
+    "start": "ts-node -T --project ./tsconfig.json ./index.ts"
   },
   "author": "https://github.com/kylemiller3",
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kylemiller3/osrs-competition-bot.git"
+    "url": "https://github.com/kylemiller3/compyscape.git"
   },
   "dependencies": {
     "@types/chai": "^4.2.7",
@@ -39,6 +39,7 @@
     "sinon": "^7.5.0",
     "socks-proxy-agent": "^5.0.0",
     "socksv5": "0.0.6",
+    "ssh2": "^0.8.7",
     "ssh2-promise": "^0.1.6",
     "ts-node": "^8.6.2",
     "typedoc": "^0.15.8",

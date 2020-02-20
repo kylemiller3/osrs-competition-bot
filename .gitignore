@@ -2,9 +2,11 @@ node_modules
 out
 servers
 docs
+build
 .git
 auth.ts
-*.log
-*.out
-*.db
+id_rsa
+docker-deploy.ts
+docker-test.ts
+git
 !.gitignore

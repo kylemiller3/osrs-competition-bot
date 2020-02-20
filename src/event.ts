@@ -182,16 +182,6 @@ export namespace Event {
         scoreboardMessage?: ChannelMessage;
     }
 
-    /**
-     * Contract of the information necessary to keep track of
-     * the creator guild and other competing guilds
-     * @category Event
-     */
-    export interface CompetingGuilds {
-        creator: Guild;
-        others?: Guild[];
-    }
-
     // scoreboards
 
     /**
@@ -293,10 +283,10 @@ export namespace Event {
             }
         }
 
-        protected _guilds: CompetingGuilds
+        protected _guilds: Guild[]
 
-        public get guilds(): CompetingGuilds {
-            return { ...this._guilds };
+        public get guilds(): Guild[] {
+            return [...this._guilds];
         }
 
         protected _teams: Team[]
@@ -338,7 +328,7 @@ export namespace Event {
             name: string,
             start: Date,
             end: Date,
-            guilds: CompetingGuilds,
+            guilds: Guild[],
             teams: Team[],
             tracking: Tracking,
             global: boolean,
@@ -350,7 +340,7 @@ export namespace Event {
                 start: new Date(start),
                 end: new Date(end),
             };
-            this._guilds = { ...guilds };
+            this._guilds = [...guilds];
             this._teams = [
                 ...teams,
             ];
@@ -663,17 +653,13 @@ export namespace Event {
                                         : whatKeys.map(
                                             (whatKey: string): WhatScoreboard => {
                                                 if (account.ending !== undefined
-                                                            && account.starting !== undefined) {
+                                                    && account.starting !== undefined) {
                                                     // case of a new boss or skill or something
                                                     // we may not have the starting defined
-                                                    if (account.ending[categoryKey]
-                                                    !== undefined
-                                                    && account.ending[categoryKey][whatKey]
-                                                    !== undefined
-                                                    && (account.starting[categoryKey]
-                                                        === undefined
-                                                        || account.starting[categoryKey][whatKey]
-                                                        === undefined)
+                                                    if (account.ending[categoryKey] !== undefined
+                                                        && account.ending[categoryKey][whatKey] !== undefined
+                                                        && (account.starting[categoryKey] === undefined
+                                                            || account.starting[categoryKey][whatKey] === undefined)
                                                     ) {
                                                         if (categoryKey === 'skills') {
                                                             const ending = Math.max(account
@@ -965,7 +951,7 @@ export namespace Event {
             name: string,
             start: Date,
             end: Date,
-            guilds: CompetingGuilds,
+            guilds: Guild[],
             teams: Team[],
             tracking: Tracking,
             global: boolean,
@@ -1032,11 +1018,10 @@ export namespace Event {
             if (Utils.isInPast(thirtyMinutesBeforeStart)) {
                 return;
             }
-            if (this._guilds.others !== undefined
-                && !this._guilds.others.some(
-                    (aGuild: Guild): boolean => aGuild.guildId === guild.guildId,
-                )) {
-                this._guilds.others.push(guild);
+            if (!this._guilds.some(
+                (aGuild: Guild): boolean => aGuild.guildId === guild.guildId,
+            )) {
+                this._guilds.push(guild);
             }
         }
 
@@ -1046,13 +1031,11 @@ export namespace Event {
             if (Utils.isInPast(thirtyMinutesBeforeStart)) {
                 return;
             }
-            if (this._guilds.others !== undefined) {
-                const idx: number = this._guilds.others.findIndex(
-                    (guild: Guild): boolean => guild.guildId === guildId,
-                );
-                if (idx !== -1) {
-                    this._guilds.others = this._guilds.others.splice(idx, 1);
-                }
+            const idx: number = this._guilds.findIndex(
+                (guild: Guild): boolean => guild.guildId === guildId,
+            );
+            if (idx !== -1) {
+                this._guilds = this._guilds.splice(idx, 1);
             }
         }
 
@@ -1102,15 +1085,7 @@ export namespace Event {
                 deleted,
             );
 
-            const combinedGuilds = this._guilds.others !== undefined
-                ? [
-                    this._guilds.creator,
-                    ...this._guilds.others,
-                ]
-                : [
-                    this._guilds.creator,
-                ];
-            const competitors: string = combinedGuilds.map(
+            const competitors: string = this.guilds.map(
                 (guild: Event.Guild): string => {
                     let guildName: string | null = getDiscordGuildName(
                         gClient,

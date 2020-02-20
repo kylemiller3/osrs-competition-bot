@@ -2,41 +2,26 @@
   "settings": {
     "import/resolver": {
       "node": {
-        "paths": ["src"],
-        "extensions": [".ts"]
+        "paths": [
+          "src"
+        ],
+        "extensions": [
+          ".ts"
+        ]
       }
     }
   },
   "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint"],
-  "extends": ["airbnb-base", "plugin:@typescript-eslint/recommended"],
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "extends": [
+    "airbnb-base",
+    "plugin:@typescript-eslint/recommended"
+  ],
   "rules": {
     "arrow-parens": "off",
     "no-underscore-dangle": "off",
     "prefer-destructuring": "off"
   }
-  /*
-  "rules": {
-    "comma-dangle": [2, "always"],
-    "max-len": "warn",
-    "@typescript-eslint/member-delimiter-style": ["error", {
-      "multiline": {
-          "delimiter": "none",
-          "requireLast": true
-      },
-      "singleline": {
-          "delimiter": "semi",
-          "requireLast": false
-      }
-  }],
-    "@typescript-eslint/no-unused-vars": "warn",
-    "@typescript-eslint/explicit-member-accessibility": "off",
-    "arrow-parens": "off",
-    "prefer-destructuring": "off",
-    "@typescript-eslint/prefer-namespace-keyword": "off",
-    "lines-between-class-members": ["error", "always", {
-      "exceptAfterSingleLine": true
-    }]
-  }
-  */
 }

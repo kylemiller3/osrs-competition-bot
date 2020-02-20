@@ -9,7 +9,7 @@ import { Db } from '../database';
 import { willUpdateScores$ } from '../..';
 
 class EventsJoinGlobalConversation extends Conversation {
-    private _event: Event.Standard;
+    private _event: Event.Global;
 
     // eslint-disable-next-line class-methods-use-this
     public async init(): Promise<boolean> {
@@ -48,12 +48,16 @@ class EventsJoinGlobalConversation extends Conversation {
                     break;
                 }
 
+                if (!(event instanceof Event.Global)) {
+                    Utils.logger.error('We have a standard event pulled from the database when it should only be global.');
+                    break;
+                }
+
                 const thirtyMinutesBeforeStart: Date = new Date(event.when.start);
                 thirtyMinutesBeforeStart.setMinutes(thirtyMinutesBeforeStart.getMinutes() - 30);
-                if (event.guilds.others !== undefined
-                    && event.guilds.others.findIndex(
-                        (guild: Event.Guild): boolean => guild.guildId === this._opMessage.guild.id,
-                    ) !== -1) {
+                if (event.guilds.findIndex(
+                    (guild: Event.Guild): boolean => guild.guildId === this._opMessage.guild.id,
+                ) !== -1) {
                     this._returnMessage = 'Your guild has already joined this event.';
                     this._state = CONVERSATION_STATE.DONE;
                     break;
@@ -74,20 +78,9 @@ class EventsJoinGlobalConversation extends Conversation {
                     this._state = CONVERSATION_STATE.DONE;
                     break;
                 } else {
-                    if (this._event.guilds.others !== undefined) {
-                        this._event.guilds.others = [
-                            ...this._event.guilds.others,
-                            {
-                                guildId: this._opMessage.guild.id,
-                            },
-                        ];
-                    } else {
-                        this._event.guilds.others = [
-                            {
-                                guildId: this._opMessage.guild.id,
-                            },
-                        ];
-                    }
+                    this._event.addOtherGuild({
+                        guildId: this._opMessage.guild.id,
+                    });
                     const savedEvent: Event.Standard = await Db.upsertEvent(
                         this._event,
                     );

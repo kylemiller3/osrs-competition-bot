@@ -363,19 +363,38 @@ class EventAddConversation extends Conversation {
                         this._name,
                         this._start,
                         this._end,
-                        {
-                            creator: {
+                        [
+                            {
                                 guildId: qa.answer.guild.id,
                             },
-                        },
+                        ],
                         [],
                         this._tracker,
                         false,
                         false,
                     );
-                    // freemium
                     this._state = CONVERSATION_STATE.CONFIRM;
                     break;
+                // } else {
+                //     this._event = new Event.Global(
+                //         undefined,
+                //         this._name as string,
+                //         this._start,
+                //         this._end,
+                //         [
+                //             {
+                //                 guildId: qa.answer.guild.id,
+                //             },
+                //         ],
+                //         [],
+                //         this._tracker,
+                //         true,
+                //         false,
+                //         [],
+                //     );
+                //     // freemium
+                //     this._state = CONVERSATION_STATE.CONFIRM;
+                //     break;
                 }
             }
             // // Global

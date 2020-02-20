@@ -9,13 +9,13 @@ This bot runs strictly off the OSRS hiscores. Sometimes the [hiscores](https://s
 * If the [hiscores](https://secure.runescape.com/m=hiscore_oldschool/a=13/overall.ws) are slow the above steps may need to happen multiple times. Sometimes logging out will not update the OSRS hiscores.
     * I am not responsible for [hiscores](https://secure.runescape.com/m=hiscore_oldschool/a=13/overall.ws) not being updated or being unavaliable and cannot fix this. [Complain to Jagex](https://support.runescape.com/hc/en-gb/articles/207344355-The-website-isn-t-loading-or-is-displaying-incorrectly) or [Jmods on Reddit.](https://www.reddit.com/r/2007scape/)
 * This bot should still be considered a beta version and it may be wise to use a [backup tracker such as CML.](https://crystalmathlabs.com/tracker/) Further, not all planned commands are currently implemented.
-* If you notice a bug, [open up an issue.](https://github.com/kylemiller3/osrs-competition-bot/issues/new)
+* If you notice a bug, [open up an issue.](https://github.com/kylemiller3/compyscape/issues/new)
 
 ## Setup for server administrators
 This sections is only applicable to hosting your own fork of this bot. In order to run this bot you must install Postgresql v9.5 or later with node v11.0.0 or later.
 
 1. [Initialize your Postgresql database.](https://help.ubuntu.com/community/PostgreSQL) The bot expects the database to listen on *localhost:5432* with these credentials.
-	* database:  **osrs-competition-bot**
+	* database:  **compyscape**
 	* user: **postgres**
 	* password: any password of your choosing (see below)
 2. Clone this repository and run *npm install*
