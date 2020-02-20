@@ -218,22 +218,31 @@ export namespace Db {
                             + ')'
                         + ')',
             });
-            task.none({
-                text: 'CREATE INDEX IF NOT EXISTS idx_creator_guild_id ON '
-                        + `${TABLES.EVENTS}`
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId')`
-                        + ')',
-            });
-            task.none({
-                text: 'CREATE INDEX IF NOT EXISTS idx_other_guilds ON '
-                        + `${TABLES.EVENTS} `
-                        + 'USING gin '
-                        + '('
-                            + `(${EVENTS_COL.EVENT}->'guilds'->'others')`
-                            + ' jsonb_path_ops'
-                        + ')',
-            });
+            // task.none({
+            //     text: 'CREATE INDEX IF NOT EXISTS idx_creator_guild_id ON '
+            //             + `${TABLES.EVENTS}`
+            //             + '('
+            //                 + `(${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId')`
+            //             + ')',
+            // });
+            // task.none({
+            //     text: 'CREATE INDEX IF NOT EXISTS idx_other_guilds ON '
+            //             + `${TABLES.EVENTS} `
+            //             + 'USING gin '
+            //             + '('
+            //                 + `(${EVENTS_COL.EVENT}->'guilds'->'others')`
+            //                 + ' jsonb_path_ops'
+            //             + ')',
+            // });
+            // task.none({
+            //     text: 'CREATE INDEX IF NOT EXISTS idx_guilds ON '
+            //             + `${TABLES.EVENTS} `
+            //             + 'USING gin '
+            //             + '('
+            //                 + `(${EVENTS_COL.EVENT}->'guilds')`
+            //                 + ' jsonb_path_ops'
+            //             + ')',
+            // });
             task.none({
                 text: 'CREATE INDEX IF NOT EXISTS idx_participants ON '
                         + `${TABLES.EVENTS} `
@@ -273,15 +282,26 @@ export namespace Db {
                         + ')'
                     + ')',
             });
+            // task.none({
+            //     text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS creator_guild_id_is_defined`,
+            // });
+            // task.none({
+            //     text: 'ALTER TABLE '
+            //         + `${TABLES.EVENTS} `
+            //         + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
+            //         + '('
+            //             + `${EVENTS_COL.EVENT}->'guilds'->>0 ? 'guildId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->>0->>'guildId' IS NULL`
+            //         + ')',
+            // });
             task.none({
-                text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS creator_guild_id_is_defined`,
+                text: `ALTER TABLE ${TABLES.EVENTS} DROP CONSTRAINT IF EXISTS guild_is_defined`,
             });
             task.none({
                 text: 'ALTER TABLE '
                     + `${TABLES.EVENTS} `
-                    + 'ADD CONSTRAINT creator_guild_id_is_defined CHECK '
+                    + 'ADD CONSTRAINT guild_is_defined CHECK '
                     + '('
-                        + `${EVENTS_COL.EVENT}->'guilds'->'creator' ? 'guildId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' IS NULL`
+                        + `${EVENTS_COL.EVENT}->'guilds'->0 ? 'guildId' AND NOT ${EVENTS_COL.EVENT}->'guilds'->0->>'guildId' IS NULL`
                     + ')',
             });
             task.none({
@@ -401,7 +421,7 @@ export namespace Db {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'WHERE '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text`,
+            + `${EVENTS_COL.EVENT}->'guilds'->0->>'guildId' = $1::text`,
     });
     export const fetchAllCreatorEvents = async (
         guildId: string,
@@ -425,7 +445,7 @@ export namespace Db {
             + 'WHERE '
             + `${EVENTS_COL.ID} = $1::bigint `
             + 'AND '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`,
+            + `${EVENTS_COL.EVENT}->'guilds'->0->>'guildId' = $2::text`,
     });
     export const fetchLocallyCreatedEvent = async (
         id: number,
@@ -451,9 +471,7 @@ export namespace Db {
             + 'FROM '
             + `${TABLES.EVENTS} `
             + 'WHERE '
-            + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
-            + 'OR '
-            + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text `
+            + `${EVENTS_COL.EVENT}->'guilds' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
             + 'ORDER BY '
             + `${EVENTS_COL.ID} DESC`,
     });
@@ -480,9 +498,7 @@ export namespace Db {
             + `${EVENTS_COL.ID} = $1::bigint `
             + 'AND'
             + '('
-                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $2::text)) `
-                + 'OR '
-                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $2::text`
+                + `${EVENTS_COL.EVENT}->'guilds' @> jsonb_build_array(jsonb_build_object('guildId', $2::text)) `
             + ')',
     });
     export const fetchAnyGuildEvent = async (
@@ -697,9 +713,7 @@ export namespace Db {
             + `${TABLES.EVENTS} `
             + 'WHERE '
             + '('
-                + `${EVENTS_COL.EVENT}->'guilds'->'others' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
-                + 'OR '
-                + `${EVENTS_COL.EVENT}->'guilds'->'creator'->>'guildId' = $1::text`
+                + `${EVENTS_COL.EVENT}->'guilds' @> jsonb_build_array(jsonb_build_object('guildId', $1::text)) `
             + ') '
             + 'AND '
             + '('

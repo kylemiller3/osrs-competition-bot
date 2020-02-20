@@ -575,15 +575,7 @@ const saveAndNotifyUpdatedEventScoreboard = (
     event: Event.Standard,
     lastError: Error | undefined,
 ): Observable<Event.Standard> => {
-    const eventGuilds: Event.Guild[] = event.guilds.others !== undefined
-        ? [
-            event.guilds.creator,
-            ...event.guilds.others,
-        ]
-        : [
-            event.guilds.creator,
-        ];
-    const observables: Observable<Event.ChannelMessage | null>[] = eventGuilds.map(
+    const observables: Observable<Event.ChannelMessage | null>[] = event.guilds.map(
         (eventGuild: Event.Guild):
         Observable<Event.ChannelMessage | null> => {
             const guild: discord.Guild | null = getGuildFromId(
@@ -661,24 +653,9 @@ const saveAndNotifyUpdatedEventScoreboard = (
                 channelMessages.forEach(
                     (channelMessage: Event.ChannelMessage, idx: number):
                     void => {
-                        if (idx === 0) {
-                            // newEvent.guilds.creator.statusMessage = msg1 !== null
-                            //     ? msg1
-                            //     : undefined;
-                            newEvent.guilds
-                                .creator
-                                .scoreboardMessage = channelMessage !== null
-                                    ? channelMessage
-                                    : undefined;
-                        } else if (newEvent.guilds.others !== undefined) {
-                            // newEvent.guilds.others[idx - 1].statusMessage = msg1 !== null
-                            //     ? msg1
-                            //     : undefined;
-                            newEvent.guilds.others[idx - 1]
-                                .scoreboardMessage = channelMessage !== null
-                                    ? channelMessage
-                                    : undefined;
-                        }
+                        newEvent.guilds[idx].scoreboardMessage = channelMessage !== null
+                            ? channelMessage
+                            : undefined;
                     }
                 );
                 return newEvent;
@@ -1068,15 +1045,7 @@ didUnsignupPlayer$.subscribe(
 willDeleteEvent$.subscribe(
     (event: Event.Standard): void => {
         Utils.logger.info(`Event ${event.id} will delete.`);
-        const combinedGuilds = event.guilds.others !== undefined
-            ? [
-                event.guilds.creator,
-                ...event.guilds.others,
-            ]
-            : [
-                event.guilds.creator,
-            ];
-        combinedGuilds.forEach(
+        event.guilds.forEach(
             async (guild: Event.Guild): Promise<void> => {
                 const discordGuild: discord.Guild | null = getGuildFromId(
                     gClient,

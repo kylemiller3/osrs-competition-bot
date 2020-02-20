@@ -57,11 +57,6 @@ class EventsUnjoinGlobalConversation extends Conversation {
                     this.state = CONVERSATION_STATE.DONE;
                     break;
                 }
-                if (this.event.guilds.others === undefined) {
-                    this.state = CONVERSATION_STATE.DONE;
-                    this.returnMessage = 'Your guild wasn\'t participating anyway.';
-                    break;
-                }
                 if (Utils.isInPast(this.event.when.start)) {
                     this.state = CONVERSATION_STATE.DONE;
                     this.returnMessage = 'Cannot leave an event now that it has started';
@@ -69,15 +64,15 @@ class EventsUnjoinGlobalConversation extends Conversation {
                 }
 
                 // filter out on the others list
-                const newOthers: Event.Guild[] = this.event.guilds.others.filter(
+                const newGuilds: Event.Guild[] = this.event.guilds.filter(
                     (other: Event.Guild): boolean => other.guildId !== this.opMessage.guild.id
                 );
-                if (this.event.guilds.others.length === newOthers.length) {
+                if (this.event.guilds.length === newGuilds.length) {
                     this.state = CONVERSATION_STATE.DONE;
                     this.returnMessage = 'Your guild wasn\'t participating anyway.';
                     break;
                 }
-                this.event.guilds.others = newOthers;
+                this.event.guilds = newGuilds;
 
                 // update - removing all teams signed-up by this guild
                 const newTeams: Event.Team[] = this.event.teams.filter(

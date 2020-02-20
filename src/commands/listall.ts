@@ -38,12 +38,12 @@ const eventsListAll = async (
                     const status: string = event.getStatusString();
                     let guildName: string | null = getDiscordGuildName(
                         gClient,
-                        event.guilds.creator.guildId,
+                        event.guilds[0].guildId,
                     );
                     guildName = guildName !== null
                         ? ` ${guildName}`
                         : '';
-                    return `#${event.id} ${event.name} (${event.tracking.category})\n\t\towner:${guildName} (${event.guilds.creator.guildId})\n\t\tstatus: ${status}\n\t\tstarts: ${event.when.start.toUTCString()}\n\t\tends: ${event.when.end.toUTCString()}`;
+                    return `#${event.id} ${event.name} (${event.tracking.category})\n\t\towner:${guildName} (${event.guilds[0].guildId})\n\t\tstatus: ${status}\n\t\tstarts: ${event.when.start.toUTCString()}\n\t\tends: ${event.when.end.toUTCString()}`;
                 }
             ).join('\n\t')
             : '';

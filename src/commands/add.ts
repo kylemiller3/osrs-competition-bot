@@ -338,11 +338,11 @@ class EventAddConversation extends Conversation {
                         this.params.name as string,
                         this.start,
                         this.end,
-                        {
-                            creator: {
+                        [
+                            {
                                 guildId: qa.answer.guild.id,
                             },
-                        },
+                        ],
                         [],
                         this.tracker,
                         global,
@@ -355,11 +355,11 @@ class EventAddConversation extends Conversation {
                         this.params.name as string,
                         this.start,
                         this.end,
-                        {
-                            creator: {
+                        [
+                            {
                                 guildId: qa.answer.guild.id,
                             },
-                        },
+                        ],
                         [],
                         this.tracker,
                         global,

@@ -47,10 +47,9 @@ class EventsJoinGlobalConversation extends Conversation {
                     this.state = CONVERSATION_STATE.Q1E;
                     break;
                 }
-                if (event.guilds.others !== undefined
-                    && event.guilds.others.findIndex(
-                        (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id
-                    ) !== -1) {
+                if (event.guilds.findIndex(
+                    (guild: Event.Guild): boolean => guild.guildId === this.opMessage.guild.id
+                ) !== -1) {
                     this.returnMessage = 'Your guild has already joined this event.';
                     this.state = CONVERSATION_STATE.DONE;
                     break;
@@ -66,20 +65,12 @@ class EventsJoinGlobalConversation extends Conversation {
                     this.returnMessage = 'Cancelled.';
                     this.state = CONVERSATION_STATE.DONE;
                 } else {
-                    if (this.event.guilds.others !== undefined) {
-                        this.event.guilds.others = [
-                            ...this.event.guilds.others,
-                            {
-                                guildId: this.opMessage.guild.id,
-                            },
-                        ];
-                    } else {
-                        this.event.guilds.others = [
-                            {
-                                guildId: this.opMessage.guild.id,
-                            },
-                        ];
-                    }
+                    this.event.guilds = [
+                        ...this.event.guilds,
+                        {
+                            guildId: this.opMessage.guild.id,
+                        },
+                    ];
                     const savedEvent: Event.Standard = await Db.upsertEvent(
                         this.event,
                     );

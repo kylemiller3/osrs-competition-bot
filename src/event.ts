@@ -182,16 +182,6 @@ export namespace Event {
         scoreboardMessage?: ChannelMessage
     }
 
-    /**
-     * Contract of the information necessary to keep track of
-     * the creator guild and other competing guilds
-     * @category Event
-     */
-    export interface CompetingGuilds {
-        creator: Guild
-        others?: Guild[]
-    }
-
     // scoreboards
 
     /**
@@ -245,7 +235,7 @@ export namespace Event {
         id?: number
         name: string
         when: When
-        guilds: CompetingGuilds
+        guilds: Guild[]
         teams: Team[]
         tracking: Tracking
         global: boolean
@@ -256,7 +246,7 @@ export namespace Event {
             name: string,
             start: Date,
             end: Date,
-            guilds: CompetingGuilds,
+            guilds: Guild[],
             teams: Team[],
             tracking: Tracking,
             global: boolean,
@@ -268,7 +258,9 @@ export namespace Event {
                 start: new Date(start),
                 end: new Date(end),
             };
-            this.guilds = { ...guilds, };
+            this.guilds = [
+                ...guilds,
+            ];
             this.teams = [
                 ...teams,
             ];
@@ -940,7 +932,7 @@ export namespace Event {
             name: string,
             start: Date,
             end: Date,
-            guilds: CompetingGuilds,
+            guilds: Guild[],
             teams: Team[],
             tracking: Tracking,
             global: boolean,
@@ -1082,15 +1074,7 @@ export namespace Event {
                 deleted,
             );
 
-            const combinedGuilds = this.guilds.others !== undefined
-                ? [
-                    this.guilds.creator,
-                    ...this.guilds.others,
-                ]
-                : [
-                    this.guilds.creator,
-                ];
-            const competitors: string = combinedGuilds.map(
+            const competitors: string = this.guilds.map(
                 (guild: Event.Guild): string => {
                     let guildName: string | null = getDiscordGuildName(
                         gClient,
