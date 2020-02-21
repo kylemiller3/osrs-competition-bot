@@ -135,24 +135,20 @@ import * as discord from 'discord.js';
 //     }
 // }
 
-const eventsAddScore = (
-    msg: discord.Message
-): void => {
-    // const params: Command.EventsAddScore = Command.parseParameters(
-    //     Command.ALL.EVENTS_ADD_SCORE,
-    //     msg.content,
-    // );
-
-    // const eventAddScoreConversation = new AddScoreConversation(
-    //     msg,
-    //     params
-    // );
-    // ConversationManager.startNewConversation(
-    //     msg,
-    //     eventAddScoreConversation
-    // );
-
-    /*
+const eventsAddScore = (msg: discord.Message): void => {
+  // const params: Command.EventsAddScore = Command.parseParameters(
+  //     Command.ALL.EVENTS_ADD_SCORE,
+  //     msg.content,
+  // );
+  // const eventAddScoreConversation = new AddScoreConversation(
+  //     msg,
+  //     params
+  // );
+  // ConversationManager.startNewConversation(
+  //     msg,
+  //     eventAddScoreConversation
+  // );
+  /*
 
     let errors: string[] = [];
     if (msg.mentions.members.array().length === 0) {

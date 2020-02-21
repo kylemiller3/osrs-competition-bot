@@ -88,5 +88,6 @@
         "upsert",
         "uuidv",
         "zezima"
-    ]
+    ],
+    "eslint.nodePath": "~/.nvm/versions/node/v12.13.0/lib/node_modules"
 }
