@@ -13,12 +13,32 @@ export namespace Db {
   enum TABLES {
     EVENTS = 'events',
     SETTINGS = 'settings',
-    PREMIUM = 'premium'
+    PREMIUM = 'premium',
+    GUILD_ID_NAME_XREF = 'guild_id_name_xref',
+    USER_ID_TAG_XREF = 'user_id_tag_xref'
   }
 
   enum EVENTS_COL {
     ID = 'id',
     EVENT = 'event'
+  }
+
+  enum SETTINGS_COL {
+    GUILD_ID = 'guild_id',
+    CHANNEL_ID = 'channel_id',
+    PAY_TIER = 'pay_tier'
+  }
+
+  enum GUILD_ID_NAME_XREF_COL {
+    GUILD_ID = 'guild_id',
+    NAME = 'name',
+    UPDATED = 'updated'
+  }
+
+  enum USER_ID_TAG_XREF_COL {
+    USER_ID = 'user_id',
+    TAG = 'tag',
+    UPDATED = 'updated'
   }
 
   interface EventRow {
@@ -65,12 +85,6 @@ export namespace Db {
   //         end: new Date(eventRow.event.when.end),
   //     },
   // });
-
-  enum SETTINGS_COL {
-    GUILD_ID = 'guild_id',
-    CHANNEL_ID = 'channel_id',
-    PAY_TIER = 'pay_tier'
-  }
 
   export const initOptions: pgp.IInitOptions = {
     capSQL: true,
@@ -158,6 +172,31 @@ export namespace Db {
     db: pgp.IDatabase<unknown, pg.IClient> = Db.mainDb,
   ): Promise<unknown> => db.tx(
     async (task: pgp.ITask<unknown>): Promise<void> => {
+      task.none({
+        text:
+            'CREATE TABLE IF NOT EXISTS '
+            + `${TABLES.USER_ID_TAG_XREF}`
+            + '('
+            + `${USER_ID_TAG_XREF_COL.USER_ID} TEXT PRIMARY KEY NOT NULL, `
+            + `${USER_ID_TAG_XREF_COL.TAG} TEXT NOT NULL, `
+            + `${USER_ID_TAG_XREF_COL.UPDATED} TIMESTAMP NOT NULL DEFAULT NOW()`
+            + ')',
+      });
+
+      //--------------
+      // Guild id xref
+      //--------------
+      task.none({
+        text:
+            'CREATE TABLE IF NOT EXISTS '
+            + `${TABLES.GUILD_ID_NAME_XREF}`
+            + '('
+            + `${GUILD_ID_NAME_XREF_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
+            + `${GUILD_ID_NAME_XREF_COL.NAME} TEXT NOT NULL, `
+            + `${GUILD_ID_NAME_XREF_COL.UPDATED} TIMESTAMP NOT NULL DEFAULT NOW()`
+            + ')',
+      });
+
       //---------------
       // Settings table
       //---------------
@@ -181,9 +220,7 @@ export namespace Db {
             + ')',
       });
 
-      //------------
-      // Event table
-      //------------
+      // functions
       task.none({
         text:
             'CREATE OR REPLACE FUNCTION '
@@ -192,6 +229,30 @@ export namespace Db {
             + "$$SELECT to_timestamp($1, 'YYYY-MM-DDTHH24:MI')$$ "
             + 'LANGUAGE sql IMMUTABLE',
       });
+
+      task.none({
+        text:
+            'CREATE OR REPLACE FUNCTION update_column()  '
+            + 'RETURNS TRIGGER AS $$ '
+            + 'BEGIN '
+            + 'NEW.updated = now(); '
+            + 'RETURN NEW; '
+            + 'END; '
+            + "$$ language 'plpgsql';",
+      });
+
+      // triggers
+      task.none({
+        text: `CREATE TRIGGER update_guild_id_name_xref BEFORE UPDATE ON ${TABLES.GUILD_ID_NAME_XREF} FOR EACH ROW EXECUTE PROCEDURE update_column();`,
+      });
+
+      task.none({
+        text: `CREATE TRIGGER update_user_id_tag_xref BEFORE UPDATE ON ${TABLES.USER_ID_TAG_XREF} FOR EACH ROW EXECUTE PROCEDURE update_column();`,
+      });
+
+      //------------
+      // Event table
+      //------------
       task.none({
         text:
             'CREATE TABLE IF NOT EXISTS '
@@ -812,6 +873,136 @@ export namespace Db {
       guildId: ret[SETTINGS_COL.GUILD_ID],
       channelId: ret[SETTINGS_COL.CHANNEL_ID],
       payTier: ret[SETTINGS_COL.PAY_TIER],
+    };
+  };
+
+  export interface GuildIdNameXrefRow {
+    guildId: string;
+    name: string;
+    updated: Date;
+  }
+
+  const upsertGuildIdNameXrefStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    name: 'upsert guild id name xref',
+    text:
+      `INSERT INTO ${TABLES.GUILD_ID_NAME_XREF} `
+      + '('
+      + `${GUILD_ID_NAME_XREF_COL.GUILD_ID}, `
+      + `${GUILD_ID_NAME_XREF_COL.NAME} `
+      + ')'
+      + 'VALUES '
+      + '($1, $2) '
+      + 'ON CONFLICT DO NOTHING '
+      + 'RETURNING *',
+  });
+  export const upsertGuildIdNameXref = async (
+    guildIdName: {
+      guildId: string;
+      name: string;
+    },
+    db: pgp.IDatabase<unknown> = Db.mainDb,
+  ): Promise<GuildIdNameXrefRow> => {
+    const ret: {
+      [GUILD_ID_NAME_XREF_COL.GUILD_ID]: string;
+      [GUILD_ID_NAME_XREF_COL.NAME]: string;
+    } = await db.one(upsertGuildIdNameXrefStmt, [
+      guildIdName.guildId,
+      guildIdName.name,
+    ]);
+    return {
+      guildId: ret[GUILD_ID_NAME_XREF_COL.GUILD_ID],
+      name: ret[GUILD_ID_NAME_XREF_COL.NAME],
+      updated: ret[GUILD_ID_NAME_XREF_COL.UPDATED],
+    };
+  };
+
+  const fetchGuildIdNameXrefStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    name: 'fetch guild id name xref',
+    text:
+      'SELECT * FROM '
+      + `${TABLES.GUILD_ID_NAME_XREF} `
+      + 'WHERE '
+      + `${GUILD_ID_NAME_XREF_COL.GUILD_ID} = $1`,
+  });
+  export const fetchGuildIdNameXref = async (
+    guildId: string,
+    db: pgp.IDatabase<unknown> = Db.mainDb,
+  ): Promise<GuildIdNameXrefRow | null> => {
+    const ret: {
+      [GUILD_ID_NAME_XREF_COL.GUILD_ID]: string;
+      [GUILD_ID_NAME_XREF_COL.NAME]: string;
+      [GUILD_ID_NAME_XREF_COL.UPDATED]: Date;
+    } | null = await db.oneOrNone(fetchGuildIdNameXrefStmt, [guildId]);
+    if (ret === null) return null;
+    return {
+      guildId: ret[GUILD_ID_NAME_XREF_COL.GUILD_ID],
+      name: ret[GUILD_ID_NAME_XREF_COL.NAME],
+      updated: ret[GUILD_ID_NAME_XREF_COL.UPDATED],
+    };
+  };
+
+  export interface UserIdTagXrefRow {
+    userId: string;
+    tag: string;
+    updated: Date;
+  }
+
+  const upsertUserIdTagXrefStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    name: 'upsert user id tag xref',
+    text:
+      `INSERT INTO ${TABLES.USER_ID_TAG_XREF} `
+      + '('
+      + `${USER_ID_TAG_XREF_COL.USER_ID}, `
+      + `${USER_ID_TAG_XREF_COL.TAG} `
+      + ')'
+      + 'VALUES '
+      + '($1, $2) '
+      + 'ON CONFLICT DO NOTHING '
+      + 'RETURNING *',
+  });
+  export const upsertUserIdTagXref = async (
+    userIdTag: {
+      userId: string;
+      tag: string;
+    },
+    db: pgp.IDatabase<unknown> = Db.mainDb,
+  ): Promise<UserIdTagXrefRow> => {
+    const ret: {
+      [USER_ID_TAG_XREF_COL.USER_ID]: string;
+      [USER_ID_TAG_XREF_COL.TAG]: string;
+    } = await db.one(upsertUserIdTagXrefStmt, [
+      userIdTag.userId,
+      userIdTag.tag,
+    ]);
+    return {
+      userId: ret[USER_ID_TAG_XREF_COL.USER_ID],
+      tag: ret[USER_ID_TAG_XREF_COL.TAG],
+      updated: ret[USER_ID_TAG_XREF_COL.UPDATED],
+    };
+  };
+
+  const fetchUserIdTagXrefStmt: pgp.PreparedStatement = new pgp.PreparedStatement({
+    name: 'fetch user id tag xref',
+    text:
+      'SELECT * FROM '
+      + `${TABLES.USER_ID_TAG_XREF} `
+      + 'WHERE '
+      + `${USER_ID_TAG_XREF_COL.USER_ID} = $1`,
+  });
+  export const fetchUserIdTagXref = async (
+    userId: string,
+    db: pgp.IDatabase<unknown> = Db.mainDb,
+  ): Promise<UserIdTagXrefRow | null> => {
+    const ret: {
+      [USER_ID_TAG_XREF_COL.USER_ID]: string;
+      [USER_ID_TAG_XREF_COL.TAG]: string;
+      [USER_ID_TAG_XREF_COL.UPDATED]: Date;
+    } | null = await db.oneOrNone(fetchUserIdTagXrefStmt, [userId]);
+    if (ret === null) return null;
+    return {
+      userId: ret[USER_ID_TAG_XREF_COL.USER_ID],
+      tag: ret[USER_ID_TAG_XREF_COL.TAG],
+      updated: ret[USER_ID_TAG_XREF_COL.UPDATED],
     };
   };
 }

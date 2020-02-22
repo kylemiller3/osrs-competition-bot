@@ -168,6 +168,23 @@ const mergedMessage$: Observable<discord.Message> = merge(
   messageInjector$,
 );
 
+/**
+ * Observable to update our database of user tags and guild name
+ */
+messageReceived$.pipe(
+  filter((msg: discord.Message): boolean => !msg.author.bot),
+  tap((msg: discord.Message): void => {
+    Db.upsertUserIdTagXref({
+      userId: msg.author.id,
+      tag: msg.author.tag,
+    });
+    Db.upsertGuildIdNameXref({
+      guildId: msg.guild.id,
+      name: msg.guild.name,
+    });
+  }),
+).subscribe();
+
 // NOTE: you could just use one ssh2 client connection for all forwards, but
 // you could run into server-imposed limits if you have too many forwards open
 // at any given time
@@ -284,6 +301,11 @@ export const getTagFromDiscordId = async (
   if (user === null) {
     return discordId;
   }
+  // Update the db
+  Db.upsertUserIdTagXref({
+    userId: discordId,
+    tag: user.tag,
+  });
   return user.tag;
 };
 
