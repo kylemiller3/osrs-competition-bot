@@ -298,7 +298,7 @@ export namespace Event {
 
     public set teams(teams: Team[]) {
       if (!this._adminLocked) {
-        this._teams = teams;
+        this._teams = [...teams];
       }
     }
 

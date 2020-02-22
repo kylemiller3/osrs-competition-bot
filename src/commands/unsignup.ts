@@ -109,46 +109,17 @@ class EventUnsignupConversation extends Conversation {
             this._state = CONVERSATION_STATE.DONE;
             break;
           } else {
-            // did we find the user?
-            const findUser = (participant: Event.Participant):
-                    boolean => participant.userId === qa.answer.author.id;
+            // delete thru the event
+            this._event.unsignupParticipant(qa.answer.author.id);
+            const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
+            willUpdateScores$.next([
+              savedEvent,
+              false,
+            ]);
 
-            const userIdx: number = this._event.teams.findIndex(
-              (team: Event.Team):
-                        boolean => team.participants.some(
-                findUser,
-              ),
-            );
-            const userJdx: number = userIdx !== -1
-              ? this._event.teams[userIdx].participants.findIndex(
-                findUser,
-              ) : -1;
-            if (userJdx === -1) {
-              // participant not found
-              this._lastErrorMessage = 'You were not signed up anyway.';
-              this._state = CONVERSATION_STATE.DONE;
-              break;
-            } else {
-              // remove the user
-              this._event.teams[userIdx].participants.splice(
-                userJdx, 1,
-              );
-              // if no participants remove the team
-              if (this._event.teams[userIdx].participants.length === 0) {
-                this._event.teams = this._event.teams.splice(
-                  userJdx, 1,
-                );
-              }
-              const savedEvent: Event.Standard = await Db.upsertEvent(this._event);
-              willUpdateScores$.next([
-                savedEvent,
-                false,
-              ]);
-
-              this._returnMessage = 'Removed from event.';
-              this._state = CONVERSATION_STATE.DONE;
-              break;
-            }
+            this._returnMessage = 'Removed from event.';
+            this._state = CONVERSATION_STATE.DONE;
+            break;
           }
         }
         default:

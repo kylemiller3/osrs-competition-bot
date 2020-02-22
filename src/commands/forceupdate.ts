@@ -102,12 +102,15 @@ class ForceUpdateConversation extends Conversation {
               this._state = CONVERSATION_STATE.Q1C;
               break;
             }
-          } else {
+          } else if (Utils.isInPast(event.when.start)) {
             // do it
-            rateThrottle.next([this.event, this._opMessage]);
+            rateThrottle.next([event, this._opMessage]);
             this._returnMessage = 'This command is rate limited to once every fifteen minutes per event. This request may be dropped. Please be patient as Runescape hiscores may be slow.';
             this._state = CONVERSATION_STATE.DONE;
             break;
+          } else {
+            this._returnMessage = 'The event has not yet started.';
+            this._state = CONVERSATION_STATE.DONE;
           }
         }
       }

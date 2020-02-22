@@ -20,6 +20,7 @@ import {
   map,
   combineAll,
   catchError,
+  switchMap,
 } from 'rxjs/operators';
 import { hiscores } from 'osrs-json-api';
 import { Client, ClientChannel } from 'ssh2';
@@ -814,7 +815,7 @@ willStartEvent$
 // and save updated event to db
 willUpdateScores$
   .pipe(
-    concatMap(
+    switchMap(
       (obj: [Event.Standard, boolean]): Observable<Event.Standard> => {
         const event: Event.Standard = obj[0];
         const forced: boolean = obj[1];
@@ -1081,48 +1082,48 @@ const init = async (): Promise<void> => {
 
   // socks.createServer()
 
-  socks
-    .createServer((info, accept, deny): void => {
-      gSshClient
-        .on('ready', (): void => {
-          gSshClient.forwardOut(
-            info.srcAddr,
-            info.srcPort,
-            info.dstAddr,
-            info.dstPort,
-            (err: Error | undefined, stream: ClientChannel): void => {
-              if (err) {
-                gSshClient.end();
-                deny();
-                return;
-              }
+  // socks
+  //   .createServer((info, accept, deny): void => {
+  //     gSshClient
+  //       .on('ready', (): void => {
+  //         gSshClient.forwardOut(
+  //           info.srcAddr,
+  //           info.srcPort,
+  //           info.dstAddr,
+  //           info.dstPort,
+  //           (err: Error | undefined, stream: ClientChannel): void => {
+  //             if (err) {
+  //               gSshClient.end();
+  //               deny();
+  //               return;
+  //             }
 
-              const clientSocket = accept(true);
-              if (clientSocket) {
-                stream
-                  .pipe(clientSocket)
-                  .pipe(stream)
-                  .on('close', (): void => {
-                    gSshClient.end();
-                  });
-              } else gSshClient.end();
-            },
-          );
-        })
-        .on('error', (err: Error): void => {
-          deny();
-        })
-        .connect({
-          host: 'ec2-3-19-56-249.us-east-2.compute.amazonaws.com',
-          port: 22,
-          username: 'ubuntu',
-          privateKey: fs.readFileSync('servers/main.pem'),
-        });
-    })
-    .listen(4711, 'localhost', (): void => {
-      console.log('SOCKSv5 proxy server started on port 4711');
-    })
-    .useAuth(socks.auth.None());
+  //             const clientSocket = accept(true);
+  //             if (clientSocket) {
+  //               stream
+  //                 .pipe(clientSocket)
+  //                 .pipe(stream)
+  //                 .on('close', (): void => {
+  //                   gSshClient.end();
+  //                 });
+  //             } else gSshClient.end();
+  //           },
+  //         );
+  //       })
+  //       .on('error', (err: Error): void => {
+  //         deny();
+  //       })
+  //       .connect({
+  //         host: 'ec2-3-19-56-249.us-east-2.compute.amazonaws.com',
+  //         port: 22,
+  //         username: 'ubuntu',
+  //         privateKey: fs.readFileSync('servers/main.pem'),
+  //       });
+  //   })
+  //   .listen(4711, 'localhost', (): void => {
+  //     console.log('SOCKSv5 proxy server started on port 4711');
+  //   })
+  //   .useAuth(socks.auth.None());
 
   // socks.createServer((info, accept, deny): void => {
   //     gSshClient.on('ready', (): void => {

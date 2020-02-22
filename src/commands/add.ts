@@ -310,6 +310,7 @@ class EventAddConversation extends Conversation {
                   case "Kree'Arra":
                   case "K'ril Tsutsaroth":
                   case 'Mimic':
+                  case 'Nightmare':
                   case 'Obor':
                   case 'Sarachnis':
                   case 'Scorpia':

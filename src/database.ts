@@ -172,7 +172,6 @@ export namespace Db {
     db: pgp.IDatabase<unknown, pg.IClient> = Db.mainDb,
   ): Promise<unknown> => db.tx(
     async (task: pgp.ITask<unknown>): Promise<void> => {
-
       //--------------
       // User tag xref
       //--------------
@@ -250,26 +249,6 @@ export namespace Db {
             + 'RETURNS timestamptz AS '
             + "$$SELECT to_timestamp($1, 'YYYY-MM-DDTHH24:MI')$$ "
             + 'LANGUAGE sql IMMUTABLE',
-      });
-
-      task.none({
-        text:
-            'CREATE OR REPLACE FUNCTION update_column()  '
-            + 'RETURNS TRIGGER AS $$ '
-            + 'BEGIN '
-            + 'NEW.updated = now(); '
-            + 'RETURN NEW; '
-            + 'END; '
-            + "$$ language 'plpgsql';",
-      });
-
-      // triggers
-      task.none({
-        text: `CREATE TRIGGER update_guild_id_name_xref BEFORE UPDATE ON ${TABLES.GUILD_ID_NAME_XREF} FOR EACH ROW EXECUTE PROCEDURE update_column();`,
-      });
-
-      task.none({
-        text: `CREATE TRIGGER update_user_id_tag_xref BEFORE UPDATE ON ${TABLES.USER_ID_TAG_XREF} FOR EACH ROW EXECUTE PROCEDURE update_column();`,
       });
 
       //------------
@@ -852,7 +831,8 @@ export namespace Db {
       + ')'
       + 'VALUES '
       + '($1, $2) '
-      + 'ON CONFLICT DO NOTHING '
+      + `ON CONFLICT (${SETTINGS_COL.GUILD_ID}) DO UPDATE SET `
+      + `${SETTINGS_COL.CHANNEL_ID} = $2 `
       + 'RETURNING *',
   });
   export const upsertSettings = async (
@@ -914,7 +894,9 @@ export namespace Db {
       + ')'
       + 'VALUES '
       + '($1, $2) '
-      + 'ON CONFLICT DO NOTHING '
+      + `ON CONFLICT (${GUILD_ID_NAME_XREF_COL.GUILD_ID}) DO UPDATE SET  `
+      + `${GUILD_ID_NAME_XREF_COL.NAME} = $2, `
+      + `${GUILD_ID_NAME_XREF_COL.UPDATED} = NOW() `
       + 'RETURNING *',
   });
   export const upsertGuildIdNameXref = async (
@@ -979,7 +961,9 @@ export namespace Db {
       + ')'
       + 'VALUES '
       + '($1, $2) '
-      + 'ON CONFLICT DO NOTHING '
+      + `ON CONFLICT (${USER_ID_TAG_XREF_COL.USER_ID}) DO UPDATE SET `
+      + `${USER_ID_TAG_XREF_COL.TAG} = $2, `
+      + `${USER_ID_TAG_XREF_COL.UPDATED} = NOW()`
       + 'RETURNING *',
   });
   export const upsertUserIdTagXref = async (
