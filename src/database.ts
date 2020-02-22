@@ -172,6 +172,10 @@ export namespace Db {
     db: pgp.IDatabase<unknown, pg.IClient> = Db.mainDb,
   ): Promise<unknown> => db.tx(
     async (task: pgp.ITask<unknown>): Promise<void> => {
+
+      //--------------
+      // User tag xref
+      //--------------
       task.none({
         text:
             'CREATE TABLE IF NOT EXISTS '
@@ -180,6 +184,15 @@ export namespace Db {
             + `${USER_ID_TAG_XREF_COL.USER_ID} TEXT PRIMARY KEY NOT NULL, `
             + `${USER_ID_TAG_XREF_COL.TAG} TEXT NOT NULL, `
             + `${USER_ID_TAG_XREF_COL.UPDATED} TIMESTAMP NOT NULL DEFAULT NOW()`
+            + ')',
+      });
+
+      task.none({
+        text:
+            'CREATE INDEX IF NOT EXISTS idx_user_tag ON '
+            + `${TABLES.USER_ID_TAG_XREF}`
+            + '('
+            + `${USER_ID_TAG_XREF_COL.TAG}`
             + ')',
       });
 
@@ -194,6 +207,15 @@ export namespace Db {
             + `${GUILD_ID_NAME_XREF_COL.GUILD_ID} TEXT PRIMARY KEY NOT NULL, `
             + `${GUILD_ID_NAME_XREF_COL.NAME} TEXT NOT NULL, `
             + `${GUILD_ID_NAME_XREF_COL.UPDATED} TIMESTAMP NOT NULL DEFAULT NOW()`
+            + ')',
+      });
+
+      task.none({
+        text:
+            'CREATE INDEX IF NOT EXISTS idx_guild_name ON '
+            + `${TABLES.GUILD_ID_NAME_XREF}`
+            + '('
+            + `${GUILD_ID_NAME_XREF_COL.NAME}`
             + ')',
       });
 
