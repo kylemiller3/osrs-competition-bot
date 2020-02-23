@@ -826,7 +826,7 @@ willUpdateScores$.pipe(
                     catchError(
                         (error: Error): Observable<null> => {
                             Utils.logger.warn(`Failed to update rsn ${account.rsn}: ${error.message}`);
-                            throw error;
+                            return of(null);
                         }
                     ),
                 ),
