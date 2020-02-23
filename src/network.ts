@@ -52,7 +52,7 @@ export namespace Network {
             retryBackoff({
                 initialInterval: 100,
                 maxInterval: 20000,
-                maxRetries: 15,
+                maxRetries: 7,
                 shouldRetry,
                 backoffDelay: (
                     (iteration: number, initialInterval: number):
@@ -123,7 +123,8 @@ export namespace Network {
                 error: Error
             ): boolean => error.message === 'Player not found! Check RSN or game mode.'
                 || error.message === 'RSN must be less or equal to 12 characters'
-                || error.message === 'RSN must be of type string';
+                || error.message === 'RSN must be of type string'
+                || error.message === 'No items were found for the specified id';
             const obs = genericNetworkFetch$<hiscores.Player | null>(
                 bound,
                 (error: Error): boolean => {
