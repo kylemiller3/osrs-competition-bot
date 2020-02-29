@@ -66,6 +66,15 @@ export const messageReceived$: Observable<discord.Message> = fromEvent(
 );
 
 /**
+ * Handle errors
+ * @category Error Handling
+ */
+gClient.on('error', error => {
+  Utils.logger.error('The WebSocket encountered an error:', error);
+  Utils.logger.info('Not shutting down.');
+});
+
+/**
  * Observable of starting events
  * @category Observable
  */
